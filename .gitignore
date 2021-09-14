@@ -1,0 +1,6 @@
+Gemfile.lock
+/.envrc
+/vendor/bundle
+/vendor/libddwaf
+/*.nix
+*.vim
