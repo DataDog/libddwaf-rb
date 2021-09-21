@@ -126,21 +126,28 @@ task :fetch do
   dirname = 'vendor/libddwaf'
 
   version = Datadog::WAF::VERSION::BASE_STRING
-  os = 'darwin'
-  cpu = 'x86_64'
+  os = Gem::Platform.local.os
+  cpu = Gem::Platform.local.cpu
   extname = '.tar.gz'
   filename_base = 'libddwaf-%<version>s-%<os>s-%<cpu>s%<extname>s'
   uri_base = 'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s'
 
   sha256_filename = {
-    'libddwaf-1.0.8-darwin-x86_64.tar.gz' => '8562fa09fde83aebf85bb6ea0e9933623e2a997794ddc9f4b9c3051c28183e04',
+    'libddwaf-1.0.11-darwin-x86_64.tar.gz'  => '0f046ccc789e1ddf06923ac09c0eabd68e0e45a6ab51d0bb7171b583034871ad',
+    'libddwaf-1.0.11-darwin-arm64.tar.gz'   => '03f1edc01a18379b7ec6c967225a50224c5cc463b5982d64aad9f68c2c1e6823',
+    'libddwaf-1.0.11-linux-x86_64.tar.gz'   => 'd1a3e49c96c272620b0c5f82f9fa68fcfa871dddf2a38f9d3af374e742a1e0c0',
+    'libddwaf-1.0.11-linux-aarch64.tar.gz'  => 'af21751b2f53b3ddbaecdacda281e585642448702edc100a47b972f4939137b5',
   }
 
   filename = format(filename_base, version: version, os: os, cpu: cpu, extname: extname)
   filepath = File.join(dirname, filename)
   sha256 = sha256_filename[filename]
 
-  if (actual = Digest::SHA256.hexdigest(File.read(filepath))) == sha256
+  if sha256.nil?
+    fail 'unsupported platform: #{filename}'
+  end
+
+  if File.exist?(filepath) && Digest::SHA256.hexdigest(File.read(filepath)) == sha256
     next
   end
 
@@ -151,7 +158,30 @@ task :fetch do
     req = Net::HTTP::Get.new(uri)
     res = http.request(req)
     case res
-    when Net::HTTPNotFound
+    when Net::HTTPFound
+      uri = URI(res['Location'])
+      Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
+        puts "fetch #{uri}"
+        req = Net::HTTP::Get.new(uri)
+        res = http.request(req)
+        case res
+        when Net::HTTPFound
+          uri = URI(res['Location'])
+          fail "unexpected redirect: #{uri}"
+        when Net::HTTPOK
+          if (actual = Digest::SHA256.hexdigest(res.body)) != sha256
+            puts "fetch failed: expected #{sha256}, got #{actual}"
+            exit 1
+          end
+
+          FileUtils.mkdir_p(dirname)
+          File.open(filepath, 'wb') { |f| f.write(res.body) }
+        else
+          puts "fetch failed: #{res.class.name}"
+          exit 1
+        end
+      end
+    when Net::HTTPOK
       if (actual = Digest::SHA256.hexdigest(res.body)) != sha256
         puts "fetch failed: expected #{sha256}, got #{actual}"
         exit 1
@@ -159,7 +189,6 @@ task :fetch do
 
       FileUtils.mkdir_p(dirname)
       File.open(filepath, 'wb') { |f| f.write(res.body) }
-
     else
       puts "fetch failed: #{res.class.name}"
       exit 1
@@ -174,8 +203,8 @@ task :extract => :fetch do
   dirname = 'vendor/libddwaf'
 
   version = Datadog::WAF::VERSION::BASE_STRING
-  os = 'darwin'
-  cpu = 'x86_64'
+  os = Gem::Platform.local.os
+  cpu = Gem::Platform.local.cpu
   extname = '.tar.gz'
   filename_base = 'libddwaf-%<version>s-%<os>s-%<cpu>s%<extname>s'
 

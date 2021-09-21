@@ -6,7 +6,23 @@ module Datadog
     module LibDDWAF
       extend ::FFI::Library
 
-      ffi_lib ['vendor/libddwaf/libddwaf-1.0.8-darwin-x86_64/lib/libddwaf.dylib']
+      def self.local_os
+        Gem::Platform.local.os
+      end
+
+      def self.local_cpu
+        Gem::Platform.local.cpu
+      end
+
+      def self.shared_lib_extname
+        Gem::Platform.local.os == 'darwin' ? '.dylib' : '.so'
+      end
+
+      def self.shared_lib_path
+        "vendor/libddwaf/libddwaf-#{Datadog::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}/lib/libddwaf#{shared_lib_extname}"
+      end
+
+      ffi_lib [shared_lib_path]
 
       # version
 
@@ -33,16 +49,16 @@ module Datadog
 
       class ObjectValueUnion < ::FFI::Union
         layout :stringValue, :charptr,
-               :uintValue,   :uint64_t,
-               :intValue,    :int64_t,
+               :uintValue,   :uint64,
+               :intValue,    :int64,
                :array,       :pointer
       end
 
       class Object < ::FFI::Struct
         layout :parameterName,       :charptr,
-               :parameterNameLength, :uint64_t,
+               :parameterNameLength, :uint64,
                :valueUnion,          ObjectValueUnion,
-               :nbEntries,           :uint64_t,
+               :nbEntries,           :uint64,
                :type,                DDWAF_OBJ_TYPE
       end
 
@@ -52,10 +68,10 @@ module Datadog
       attach_function :ddwaf_object_string, [:ddwaf_object, :string], :ddwaf_object
       attach_function :ddwaf_object_stringl, [:ddwaf_object, :charptr, :size_t], :ddwaf_object
       attach_function :ddwaf_object_stringl_nc, [:ddwaf_object, :charptr, :size_t], :ddwaf_object
-      attach_function :ddwaf_object_unsigned, [:ddwaf_object, :uint64_t], :ddwaf_object
-      attach_function :ddwaf_object_signed, [:ddwaf_object, :int64_t], :ddwaf_object
-      attach_function :ddwaf_object_unsigned_force, [:ddwaf_object, :uint64_t], :ddwaf_object
-      attach_function :ddwaf_object_signed_force, [:ddwaf_object, :int64_t], :ddwaf_object
+      attach_function :ddwaf_object_unsigned, [:ddwaf_object, :uint64], :ddwaf_object
+      attach_function :ddwaf_object_signed, [:ddwaf_object, :int64], :ddwaf_object
+      attach_function :ddwaf_object_unsigned_force, [:ddwaf_object, :uint64], :ddwaf_object
+      attach_function :ddwaf_object_signed_force, [:ddwaf_object, :int64], :ddwaf_object
 
       attach_function :ddwaf_object_array, [:ddwaf_object], :ddwaf_object
       attach_function :ddwaf_object_array_add, [:ddwaf_object, :ddwaf_object], :bool
@@ -73,9 +89,9 @@ module Datadog
       typedef Object.by_ref, :ddwaf_rule
 
       class Config < ::FFI::Struct
-        layout :maxArrayLength, :uint64_t,
-               :maxMapDepth,    :uint64_t,
-               :maxTimeStore,   :uint64_t
+        layout :maxArrayLength, :uint64,
+               :maxMapDepth,    :uint64,
+               :maxTimeStore,   :uint64
       end
 
       typedef Config.by_ref, :ddwaf_config
@@ -104,7 +120,7 @@ module Datadog
         layout :action,           DDWAF_RET_CODE,
                :data,             :string,
                :perfData,         :string,
-               :perfTotalRuntime, :uint32_t # in us
+               :perfTotalRuntime, :uint32 # in us
       end
 
       typedef Result.by_ref, :ddwaf_result
@@ -122,7 +138,7 @@ module Datadog
                              :ddwaf_log_error,
                              :ddwaf_log_off
 
-      callback :ddwaf_log_cb, [DDWAF_LOG_LEVEL, :string, :string, :uint, :charptr, :uint64_t], :void
+      callback :ddwaf_log_cb, [DDWAF_LOG_LEVEL, :string, :string, :uint, :charptr, :uint64], :void
 
       attach_function :ddwaf_set_log_cb, [:ddwaf_log_cb, DDWAF_LOG_LEVEL], :bool
     end
