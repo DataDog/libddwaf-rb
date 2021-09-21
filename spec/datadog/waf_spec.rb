@@ -344,79 +344,182 @@ RSpec.describe Datadog::WAF::LibDDWAF do
       expect(Datadog::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => ['42'] }], '21' => '10.5' })
     end
   end
+
+  context 'run' do
+    let(:data1) do
+      {
+        'version' => '1.0',
+        'events' => [
+          {
+            'id' => 1,
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1', 'value2'], 'regex' => 'rule1' } }
+            ],
+            'action' => 'record',
+          },
+          {
+            'id' => 2,
+            'tags' => { 'type' => 'flow2' },
+            'conditions' => [
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } }
+            ],
+            'action' => 'record',
+          },
+          {
+            'id' => 3,
+            'tags' => { 'type' => 'flow2' },
+            'conditions' => [
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule3' } }
+            ],
+            'action' => 'record',
+          }
+        ]
+      }
+    end
+
+    let(:data2) do
+      {
+        'version' => '1.0',
+        'events' => [
+          {
+            'id' => 1,
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } },
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule3' } }
+            ],
+            'action' => 'record',
+          }
+        ]
+      }
+    end
+
+    let(:rule1) do
+      Datadog::WAF.ruby_to_object(data1)
+    end
+
+    let(:rule2) do
+      Datadog::WAF.ruby_to_object(data2)
+    end
+
+    let(:log_store) do
+      []
+    end
+
+    let(:log_cb) do
+      proc do |level, func, file, line, message, len|
+        log_store << message.read_bytes(len)
+      end
+    end
+
+    let(:config) do
+      Datadog::WAF::LibDDWAF::Config.new
+    end
+
+    let(:input) do
+      Datadog::WAF.ruby_to_object({ value1: [4242, 'randomString'], value2: ['rule1'] })
+    end
+
+    let(:timeout) do
+      10000000
+    end
+
+    before do
+      Datadog::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+    end
+
+    it 'logs via the log callback' do
+      expect(log_store).to include('Sending log messages to binding, min level trace')
+    end
+
+    it 'triggers a monitoring rule' do
+      handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule1, config)
+      expect(handle.null?).to be false
+
+      context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      expect(context.null?).to be false
+
+      result = Datadog::WAF::LibDDWAF::Result.new
+      code = Datadog::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
+
+      expect(code).to eq :ddwaf_monitor
+      expect(result[:action]).to eq :ddwaf_monitor
+      expect(result[:data]).to_not be nil
+    end
+
+    it 'does not trigger' do
+      handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule2, config)
+      expect(handle.null?).to be false
+
+      context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      result = Datadog::WAF::LibDDWAF::Result.new
+      code = Datadog::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
+      expect(code).to eq :ddwaf_good
+      expect(result[:action]).to eq :ddwaf_good
+      expect(result[:data]).to be nil
+    end
+  end
 end
 
 RSpec.describe Datadog::WAF do
-  let(:data1) do
-    {"version"=>"1.0", "events"=>[{"id"=>1, "tags"=>{"type"=>"flow1"}, "conditions"=>[{"operation"=>"match_regex", "parameters"=>{"inputs"=>["value1", "value2"], "regex"=>"rule1"}}], "action"=>"record"}, {"id"=>2, "tags"=>{"type"=>"flow2"}, "conditions"=>[{"operation"=>"match_regex", "parameters"=>{"inputs"=>["value1"], "regex"=>"rule2"}}], "action"=>"record"}, {"id"=>3, "tags"=>{"type"=>"flow2"}, "conditions"=>[{"operation"=>"match_regex", "parameters"=>{"inputs"=>["value2"], "regex"=>"rule3"}}], "action"=>"record"}]}
+  let(:rule) do
+    {
+      'version' => '1.0',
+      'events' => [
+        {
+          'id' => 1,
+          'tags' => { 'type' => 'flow1' },
+          'conditions' => [
+            { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule1' } },
+          ],
+          'action' => 'record',
+        }
+      ]
+    }
   end
 
-  let(:data2) do
-    {"version"=>"1.0", "events"=>[{"id"=>1, "tags"=>{"type"=>"flow1"}, "conditions"=>[{"operation"=>"match_regex", "parameters"=>{"inputs"=>["value1"], "regex"=>"rule2"}}, {"operation"=>"match_regex", "parameters"=>{"inputs"=>["value2"], "regex"=>"rule3"}}], "action"=>"record"}]}
+  let(:handle) do
+    Datadog::WAF::Handle.new(rule)
   end
 
-  let(:rule1) do
-    Datadog::WAF.ruby_to_object(data1)
+  let(:context) do
+    Datadog::WAF::Context.new(handle)
   end
 
-  let(:rule2) do
-    Datadog::WAF.ruby_to_object(data2)
+  let(:passing_input) do
+    { value1: [4242, 'randomString'], value2: ['nope'] }
   end
 
-  let(:log_store) do
-    []
+  let(:matching_input) do
+    { value1: [4242, 'randomString'], value2: ['rule1'] }
   end
 
-  let(:log_cb) do
-    proc do |level, func, file, line, message, len|
-      log_store << message.read_bytes(len)
+  it 'creates a valid handle' do
+    expect(handle.handle_obj.null?).to be false
+  end
+
+  it 'creates a valid context' do
+    expect(context.context_obj.null?).to be false
+  end
+
+  context 'run' do
+    it 'passes non-matching input' do
+      code, result = context.run(passing_input)
+      expect(code).to eq :ddwaf_good
+      expect(result.action).to eq :ddwaf_good
+      expect(result.data).to be nil
+      expect(result.perf_data).to be_a String
+      expect(result.perf_total_runtime).to be > 0
     end
-  end
 
-  let(:config) do
-    Datadog::WAF::LibDDWAF::Config.new
-  end
-
-  let(:input) do
-    Datadog::WAF.ruby_to_object({ value1: [4242, 'randomString'], value2: ['rule1'] })
-  end
-
-  let(:timeout) do
-    10000000
-  end
-
-  before do
-    Datadog::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
-  end
-
-  it 'logs via the log callback' do
-    expect(log_store).to include('Sending log messages to binding, min level trace')
-  end
-
-  it 'triggers a monitoring rule' do
-    handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule1, config)
-    expect(handle.null?).to be false
-
-    context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
-    expect(context.null?).to be false
-
-    result = Datadog::WAF::LibDDWAF::Result.new
-    code = Datadog::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
-
-    expect(code).to eq :ddwaf_monitor
-    expect(result[:action]).to eq :ddwaf_monitor
-    expect(result[:data]).to_not be nil
-  end
-
-  it 'deos not trigger' do
-    handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule2, config)
-    expect(handle.null?).to be false
-
-    context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
-    result = Datadog::WAF::LibDDWAF::Result.new
-    code = Datadog::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
-    expect(code).to eq :ddwaf_good
-    expect(result[:action]).to eq :ddwaf_good
-    expect(result[:data]).to be nil
+    it 'catches a match' do
+      code, result = context.run(matching_input)
+      expect(code).to eq :ddwaf_monitor
+      expect(result.action).to eq :ddwaf_monitor
+      expect(result.data).to be_a String
+      expect(result.perf_data).to be_a String
+      expect(result.perf_total_runtime).to be > 0
+    end
   end
 end

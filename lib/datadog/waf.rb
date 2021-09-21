@@ -102,7 +102,8 @@ module Datadog
       # running
 
       typedef :pointer, :ddwaf_context
-      typedef :pointer, :ddwaf_object_free_fn
+
+      callback :ddwaf_object_free_fn, [:ddwaf_object], :void
 
       attach_function :ddwaf_context_init, [:ddwaf_handle, :ddwaf_object_free_fn], :ddwaf_context
       attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
@@ -200,6 +201,76 @@ module Datadog
           v = object_to_ruby(LibDDWAF::Object.new(ptr))
           h[k] = v
         end
+      end
+    end
+
+    class Handle
+      attr_reader :handle_obj
+
+      DEFAULT_MAX_ARRAY_LENGTH = 256
+      DEFAULT_MAX_MAP_DEPTH = 16
+      DEFAULT_MAX_TIME_STORE = 128
+
+      def initialize(rule, config = {})
+        rule_obj = Datadog::WAF.ruby_to_object(rule)
+        config_obj = Datadog::WAF::LibDDWAF::Config.new
+        config_obj[:maxArrayLength] = DEFAULT_MAX_ARRAY_LENGTH
+        config_obj[:maxMapDepth] = DEFAULT_MAX_MAP_DEPTH
+        config_obj[:maxTimeStore] = DEFAULT_MAX_TIME_STORE
+
+        @handle_obj = Datadog::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj)
+
+        ObjectSpace.define_finalizer(self, Handle.finalizer(handle_obj))
+      ensure
+        Datadog::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
+      end
+
+      def self.finalizer(handle_obj)
+        proc do |object_id|
+          Datadog::WAF::LibDDWAF.ddwaf_destroy(handle_obj)
+        end
+      end
+    end
+
+    Result = Struct.new(:action, :data, :perf_data, :perf_total_runtime)
+
+    class Context
+      attr_reader :context_obj
+
+      def initialize(handle)
+        handle_obj = handle.handle_obj
+        free_func = FFI::Pointer::NULL
+
+        @context_obj = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
+
+        ObjectSpace.define_finalizer(self, Context.finalizer(context_obj))
+      end
+
+      def self.finalizer(context_obj)
+        proc do |object_id|
+          Datadog::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
+        end
+      end
+
+      DEFAULT_TIMEOUT_US = 10_0000
+
+      def run(input, timeout = DEFAULT_TIMEOUT_US)
+        input_obj = Datadog::WAF.ruby_to_object(input)
+        result_obj = Datadog::WAF::LibDDWAF::Result.new
+
+        code = Datadog::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
+
+        result = Result.new(
+          result_obj[:action],
+          result_obj[:data],
+          result_obj[:perfData],
+          result_obj[:perfTotalRuntime],
+        )
+
+        [code, result]
+      ensure
+        Datadog::WAF::LibDDWAF.ddwaf_object_free(input_obj) if input_obj
+        Datadog::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
       end
     end
   end
