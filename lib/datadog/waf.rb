@@ -230,9 +230,9 @@ module Datadog
     class Handle
       attr_reader :handle_obj
 
-      DEFAULT_MAX_ARRAY_LENGTH = 256
-      DEFAULT_MAX_MAP_DEPTH = 16
-      DEFAULT_MAX_TIME_STORE = 128
+      DEFAULT_MAX_ARRAY_LENGTH = 0
+      DEFAULT_MAX_MAP_DEPTH = 0
+      DEFAULT_MAX_TIME_STORE = 0
 
       def initialize(rule, config = {})
         rule_obj = Datadog::WAF.ruby_to_object(rule)
