@@ -155,25 +155,39 @@ module Datadog
     def self.ruby_to_object(val)
       case val
       when Array
-        obj = LibDDWAF.ddwaf_object_array(LibDDWAF::Object.new)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_array(obj)
         val.each { |e| LibDDWAF.ddwaf_object_array_add(obj, ruby_to_object(e)) }
         obj
       when Hash
-        obj = LibDDWAF.ddwaf_object_map(LibDDWAF::Object.new)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_map(obj)
         val.each { |k, v| LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.size, ruby_to_object(v)) }
         obj
       when String
-        LibDDWAF.ddwaf_object_stringl(LibDDWAF::Object.new, val, val.size)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_stringl(obj, val, val.size)
+        obj
       when Symbol
-        LibDDWAF.ddwaf_object_stringl(LibDDWAF::Object.new, val.to_s, val.size)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_stringl(obj, val.to_s, val.size)
+        obj
       when Integer
-        LibDDWAF.ddwaf_object_string(LibDDWAF::Object.new, val.to_s)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        obj
       when Float
-        LibDDWAF.ddwaf_object_string(LibDDWAF::Object.new, val.to_s)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        obj
       when TrueClass, FalseClass
-        LibDDWAF.ddwaf_object_string(LibDDWAF::Object.new, val.to_s)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        obj
       else
-        LibDDWAF.ddwaf_object_invalid(LibDDWAF::Object.new)
+        obj = LibDDWAF::Object.new
+        LibDDWAF.ddwaf_object_invalid(obj)
+        obj
       end
     end
 
