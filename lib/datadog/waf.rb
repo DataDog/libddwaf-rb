@@ -337,6 +337,15 @@ module Datadog
       end
 
       DEFAULT_TIMEOUT_US = 10_0000
+      ACTION_MAP_OUT = {
+        ddwaf_err_internal:         :err_internal,
+        ddwaf_err_invalid_object:   :err_invalid_object,
+        ddwaf_err_invalid_argument: :err_invalid_argument,
+        ddwaf_err_timeout:          :err_invalid_object,
+        ddwaf_good:                 :good,
+        ddwaf_monitor:              :monitor,
+        ddwaf_block:                :block,
+      }
 
       def run(input, timeout = DEFAULT_TIMEOUT_US)
         input_obj = Datadog::WAF.ruby_to_object(input)
@@ -352,13 +361,13 @@ module Datadog
         code = Datadog::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
         result = Result.new(
-          result_obj[:action],
+          ACTION_MAP_OUT[result_obj[:action]],
           (JSON.parse(result_obj[:data]) if result_obj[:data] != nil),
           (JSON.parse(result_obj[:perfData]) if result_obj[:perfData] != nil),
           result_obj[:perfTotalRuntime],
         )
 
-        [code, result]
+        [ACTION_MAP_OUT[code], result]
       ensure
         Datadog::WAF::LibDDWAF.ddwaf_object_free(input_obj) if input_obj
         Datadog::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
