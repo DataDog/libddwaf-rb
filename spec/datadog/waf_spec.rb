@@ -321,6 +321,17 @@ RSpec.describe Datadog::WAF::LibDDWAF do
       end
       expect(hash).to eq({ 'foo' => '1', 'bar' => '2', 'baz' => '3' })
     end
+
+    it 'converts a big value' do
+      data = JSON.parse(File.read(File.join(__dir__, '../fixtures/waf_rules.json')))
+      Datadog::WAF.ruby_to_object(data)
+      Datadog::WAF.ruby_to_object(data)
+      Datadog::WAF.ruby_to_object(data)
+      Datadog::WAF.ruby_to_object(data)
+      Datadog::WAF.ruby_to_object(data)
+      Datadog::WAF.ruby_to_object(data)
+      Datadog::WAF.ruby_to_object(data)
+    end
   end
 
   context 'object_to_ruby' do
@@ -395,6 +406,10 @@ RSpec.describe Datadog::WAF::LibDDWAF do
       }
     end
 
+    let(:data3) do
+      JSON.parse(File.read(File.join(__dir__, '../fixtures/waf_rules.json')))
+    end
+
     let(:rule1) do
       Datadog::WAF.ruby_to_object(data1)
     end
@@ -403,13 +418,17 @@ RSpec.describe Datadog::WAF::LibDDWAF do
       Datadog::WAF.ruby_to_object(data2)
     end
 
+    let(:rule3) do
+      Datadog::WAF.ruby_to_object(data3)
+    end
+
     let(:log_store) do
       []
     end
 
     let(:log_cb) do
       proc do |level, func, file, line, message, len|
-        log_store << message.read_bytes(len)
+        log_store << { level: level, func: func, file: file, message: message.read_bytes(len) }
       end
     end
 
@@ -421,6 +440,11 @@ RSpec.describe Datadog::WAF::LibDDWAF do
       Datadog::WAF.ruby_to_object({ value1: [4242, 'randomString'], value2: ['rule1'] })
     end
 
+    let(:attack) do
+      Datadog::WAF.ruby_to_object({ 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } })
+    end
+
+
     let(:timeout) do
       10000000
     end
@@ -430,7 +454,10 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     it 'logs via the log callback' do
-      expect(log_store).to include('Sending log messages to binding, min level trace')
+      expect(log_store).to include({:file=>"PowerWAFInterface.cpp",
+                                    :func=>"ddwaf_set_log_cb",
+                                    :level=>:ddwaf_log_info,
+                                    :message=>"Sending log messages to binding, min level trace"})
     end
 
     it 'triggers a monitoring rule' do
@@ -459,6 +486,18 @@ RSpec.describe Datadog::WAF::LibDDWAF do
       expect(result[:action]).to eq :ddwaf_good
       expect(result[:data]).to be nil
     end
+
+    it 'triggers a known attack' do
+      handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule3, config)
+      expect(handle.null?).to be false
+
+      context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      result = Datadog::WAF::LibDDWAF::Result.new
+      code = Datadog::WAF::LibDDWAF.ddwaf_run(context, attack, result, timeout)
+      expect(code).to eq :ddwaf_monitor
+      expect(result[:action]).to eq :ddwaf_monitor
+      expect(result[:data]).to_not be nil
+    end
   end
 end
 
@@ -480,7 +519,7 @@ RSpec.describe Datadog::WAF do
   end
 
   let(:handle) do
-    Datadog::WAF::Handle.new(rule)
+    Datadog::WAF::Handle.new(rule, max_time_store: 1024)
   end
 
   let(:context) do
@@ -506,19 +545,65 @@ RSpec.describe Datadog::WAF do
   context 'run' do
     it 'passes non-matching input' do
       code, result = context.run(passing_input)
-      expect(code).to eq :ddwaf_good
-      expect(result.action).to eq :ddwaf_good
+      expect(code).to eq :good
+      expect(result.action).to eq :good
       expect(result.data).to be nil
-      expect(result.perf_data).to be_a String
+      expect(result.perf_data).to be_a Hash
       expect(result.perf_total_runtime).to be > 0
     end
 
     it 'catches a match' do
       code, result = context.run(matching_input)
-      expect(code).to eq :ddwaf_monitor
-      expect(result.action).to eq :ddwaf_monitor
-      expect(result.data).to be_a String
-      expect(result.perf_data).to be_a String
+      expect(code).to eq :monitor
+      expect(result.action).to eq :monitor
+      expect(result.data).to be_a Array
+      expect(result.perf_data).to be_a Hash
+      expect(result.perf_total_runtime).to be > 0
+    end
+  end
+
+  context 'run with a big ruleset' do
+    let(:rule) do
+      JSON.parse(File.read(File.join(__dir__, '../fixtures/waf_rules.json')))
+    end
+
+    let(:passing_input) do
+      { 'server.request.headers.no_cookies' => { 'user-agent' => 'Firefox' } }
+    end
+
+    let(:matching_input) do
+      { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } }
+    end
+
+    let(:log_store) do
+      []
+    end
+
+    let(:log_cb) do
+      proc do |level, func, file, line, message, len|
+        log_store << { level: level, func: func, file: file, message: message.read_bytes(len) }
+      end
+    end
+
+    before do
+      Datadog::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+    end
+
+    it 'passes non-matching input' do
+      code, result = context.run(passing_input)
+      expect(code).to eq :good
+      expect(result.action).to eq :good
+      expect(result.data).to be nil
+      expect(result.perf_data).to be_a Hash
+      expect(result.perf_total_runtime).to be > 0
+    end
+
+    it 'catches a match' do
+      code, result = context.run(matching_input)
+      expect(code).to eq :monitor
+      expect(result.action).to eq :monitor
+      expect(result.data).to be_a Array
+      expect(result.perf_data).to be_a Hash
       expect(result.perf_total_runtime).to be > 0
     end
   end
