@@ -127,7 +127,7 @@ module Datadog
       typedef Result.by_ref, :ddwaf_result
       typedef :uint64, :timeout_us
 
-      attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_result, :timeout_us], DDWAF_RET_CODE
+      attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_result, :timeout_us], DDWAF_RET_CODE, blocking: true
       attach_function :ddwaf_result_free, [:ddwaf_result], :void
 
       # logging
