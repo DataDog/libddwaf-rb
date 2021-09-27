@@ -1,5 +1,6 @@
 require 'ffi'
 require 'datadog/waf/version'
+require 'json'
 
 module Datadog
   module WAF
@@ -285,8 +286,8 @@ module Datadog
 
         result = Result.new(
           result_obj[:action],
-          result_obj[:data],
-          result_obj[:perfData],
+          (JSON.parse(result_obj[:data]) if result_obj[:data] != nil),
+          (JSON.parse(result_obj[:perfData]) if result_obj[:perfData] != nil),
           result_obj[:perfTotalRuntime],
         )
 
