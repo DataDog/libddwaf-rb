@@ -81,7 +81,8 @@ module Datadog
       attach_function :ddwaf_object_map_addl, [:ddwaf_object, :charptr, :size_t, :pointer], :bool
       attach_function :ddwaf_object_map_addl_nc, [:ddwaf_object, :charptr, :size_t, :pointer], :bool
 
-      attach_function :ddwaf_object_free, [:ddwaf_object], :void
+      ObjectFree = attach_function :ddwaf_object_free, [:ddwaf_object], :void
+      ObjectNoFree = ::FFI::Pointer::NULL
 
       # main handle
 
@@ -239,7 +240,7 @@ module Datadog
 
       def initialize(handle)
         handle_obj = handle.handle_obj
-        free_func = FFI::Pointer::NULL
+        free_func = Datadog::WAF::LibDDWAF::ObjectNoFree
 
         @context_obj = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
 
