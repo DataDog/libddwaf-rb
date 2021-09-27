@@ -19,7 +19,7 @@ module Datadog
       end
 
       def self.shared_lib_path
-        "vendor/libddwaf/libddwaf-#{Datadog::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}/lib/libddwaf#{shared_lib_extname}"
+        File.join(__dir__, "../../vendor/libddwaf/libddwaf-#{Datadog::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}/lib/libddwaf#{shared_lib_extname}")
       end
 
       ffi_lib [shared_lib_path]
