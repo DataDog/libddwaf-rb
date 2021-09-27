@@ -5,6 +5,8 @@ require 'json'
 module Datadog
   module WAF
     module LibDDWAF
+      class Error < StandardError; end
+
       extend ::FFI::Library
 
       def self.local_os
@@ -157,37 +159,81 @@ module Datadog
       case val
       when Array
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_array(obj)
-        val.each { |e| LibDDWAF.ddwaf_object_array_add(obj, ruby_to_object(e)) }
+        res = LibDDWAF.ddwaf_object_array(obj)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
+        val.each do |e|
+          res = LibDDWAF.ddwaf_object_array_add(obj, ruby_to_object(e))
+          unless res
+            fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
+          end
+        end
+
         obj
       when Hash
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_map(obj)
-        val.each { |k, v| LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.size, ruby_to_object(v)) }
+        res = LibDDWAF.ddwaf_object_map(obj)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
+        val.each do |k, v|
+          res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.size, ruby_to_object(v))
+          unless res
+            fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
+          end
+        end
+
         obj
       when String
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_stringl(obj, val, val.size)
+        res = LibDDWAF.ddwaf_object_stringl(obj, val, val.size)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
         obj
       when Symbol
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_stringl(obj, val.to_s, val.size)
+        res = LibDDWAF.ddwaf_object_stringl(obj, val.to_s, val.size)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
         obj
       when Integer
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        res = LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
         obj
       when Float
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        res = LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
         obj
       when TrueClass, FalseClass
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        res = LibDDWAF.ddwaf_object_string(obj, val.to_s)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
         obj
       else
         obj = LibDDWAF::Object.new
-        LibDDWAF.ddwaf_object_invalid(obj)
+        res = LibDDWAF.ddwaf_object_invalid(obj)
+        if res.null?
+          fail LibDDWAF::Error, "Could not convert into object: #{val}"
+        end
+
         obj
       end
     end
@@ -237,12 +283,23 @@ module Datadog
 
       def initialize(rule, config = {})
         rule_obj = Datadog::WAF.ruby_to_object(rule)
+        if rule_obj.null? || rule_obj[:type] == :ddwaf_object_invalid
+          fail LibDDWAF::Error, "Could not convert object #{rule.inspect}"
+        end
+
         config_obj = Datadog::WAF::LibDDWAF::Config.new
+        if config_obj.null?
+          fail LibDDWAF::Error, 'Could not create config struct'
+        end
+
         config_obj[:maxArrayLength] = DEFAULT_MAX_ARRAY_LENGTH
         config_obj[:maxMapDepth] = DEFAULT_MAX_MAP_DEPTH
         config_obj[:maxTimeStore] = DEFAULT_MAX_TIME_STORE
 
         @handle_obj = Datadog::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj)
+        if @handle_obj.null?
+          fail LibDDWAF::Error, 'Could not create handle'
+        end
 
         ObjectSpace.define_finalizer(self, Handle.finalizer(handle_obj))
       ensure
@@ -266,6 +323,9 @@ module Datadog
         free_func = Datadog::WAF::LibDDWAF::ObjectNoFree
 
         @context_obj = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
+        if @context_obj.null?
+          fail LibDDWAF::Error, 'Could not create context'
+        end
 
         ObjectSpace.define_finalizer(self, Context.finalizer(context_obj))
       end
@@ -280,7 +340,14 @@ module Datadog
 
       def run(input, timeout = DEFAULT_TIMEOUT_US)
         input_obj = Datadog::WAF.ruby_to_object(input)
+        if input_obj.null?
+          fail LibDDWAF::Error, "Could not convert input: #{input.inspect}"
+        end
+
         result_obj = Datadog::WAF::LibDDWAF::Result.new
+        if result_obj.null?
+          fail LibDDWAF::Error, "Could not create result object"
+        end
 
         code = Datadog::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
