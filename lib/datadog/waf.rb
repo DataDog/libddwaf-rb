@@ -292,9 +292,9 @@ module Datadog
           fail LibDDWAF::Error, 'Could not create config struct'
         end
 
-        config_obj[:maxArrayLength] = DEFAULT_MAX_ARRAY_LENGTH
-        config_obj[:maxMapDepth] = DEFAULT_MAX_MAP_DEPTH
-        config_obj[:maxTimeStore] = DEFAULT_MAX_TIME_STORE
+        config_obj[:maxArrayLength] = config[:max_array_length] || DEFAULT_MAX_ARRAY_LENGTH
+        config_obj[:maxMapDepth]    = config[:max_map_depth]    || DEFAULT_MAX_MAP_DEPTH
+        config_obj[:maxTimeStore]   = config[:max_time_store]   || DEFAULT_MAX_TIME_STORE
 
         @handle_obj = Datadog::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj)
         if @handle_obj.null?
