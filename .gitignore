@@ -3,4 +3,6 @@ Gemfile.lock
 /vendor/bundle
 /vendor/libddwaf
 /*.nix
+/pkg
+*.gem
 *.vim

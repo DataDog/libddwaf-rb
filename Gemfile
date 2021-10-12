@@ -14,7 +14,6 @@ else
 end
 
 gem 'rake', '>= 10.5'
-gem 'rake-compiler', '~> 1.1', '>= 1.1.1' # To compile native extensions
 gem 'redcarpet', '~> 3.4' if RUBY_PLATFORM != 'java'
 gem 'rspec', '~> 3.10'
 gem 'rspec-collection_matchers', '~> 1.1'
@@ -38,6 +37,4 @@ else
   gem 'simplecov', '~> 0.17'
 end
 
-gem 'webmock', '>= 3.10.0'
-gem 'webrick', '>= 1.7.0' if RUBY_VERSION >= '3.0.0' # No longer bundled by default since Ruby 3.0
 gem 'yard', '~> 0.9'
