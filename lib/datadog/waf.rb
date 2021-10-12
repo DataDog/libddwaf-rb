@@ -10,10 +10,33 @@ module Datadog
       extend ::FFI::Library
 
       def self.local_os
+        if RUBY_ENGINE == 'jruby'
+          os_name = java.lang.System.get_property('os.name')
+
+          os = case os_name
+               when /linux/i then 'linux'
+               when /mac/i   then 'darwin'
+               else raise Error, "unsupported JRuby os.name: #{os_name.inspect}"
+               end
+
+          return os
+        end
+
         Gem::Platform.local.os
       end
 
       def self.local_cpu
+        if RUBY_ENGINE == 'jruby'
+          os_arch = java.lang.System.get_property('os.arch')
+
+          cpu = case os_arch
+                when 'amd64' then 'x86_64'
+                else raise Error, "unsupported JRuby os.arch: #{os_arch.inspect}"
+                end
+
+          return cpu
+        end
+
         Gem::Platform.local.cpu
       end
 

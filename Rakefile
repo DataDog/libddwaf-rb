@@ -174,7 +174,7 @@ module Helpers
 end
 
 task :fetch, [:platform] => [] do |_, args|
-  platform = Gem::Platform.new(args.to_h[:platform]) || Gem::Platform.local.dup
+  platform = args.to_h[:platform] ? Gem::Platform.new(args.to_h[:platform]) : Gem::Platform.local.dup
 
   require 'net/http'
   require 'fileutils'
@@ -257,7 +257,7 @@ task :fetch, [:platform] => [] do |_, args|
 end
 
 task :extract, [:platform] => [] do |_, args|
-  platform = Gem::Platform.new(args.to_h[:platform]) || Gem::Platform.local.dup
+  platform = args.to_h[:platform] ? Gem::Platform.new(args.to_h[:platform]) : Gem::Platform.local.dup
 
   Rake::Task['fetch'].execute(Rake::TaskArguments.new([:platform], [platform]))
 
@@ -282,7 +282,7 @@ task :extract, [:platform] => [] do |_, args|
 end
 
 task :binary, [:platform] => [] do |_, args|
-  platform = Gem::Platform.new(args.to_h[:platform]) || Gem::Platform.local.dup
+  platform = args.to_h[:platform] ? Gem::Platform.new(args.to_h[:platform]) : Gem::Platform.local.dup
 
   Rake::Task['extract'].execute(Rake::TaskArguments.new([:platform], [platform]))
 

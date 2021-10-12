@@ -9,8 +9,6 @@ if RUBY_PLATFORM != 'java'
   gem 'pry-byebug' if RUBY_VERSION >= '2.6.0' && RUBY_VERSION < '3.0' && RUBY_ENGINE != 'truffleruby'
   gem 'pry-nav' if RUBY_VERSION < '2.6.0'
   gem 'pry-stack_explorer' if RUBY_VERSION >= '2.2.0'
-else
-  gem 'pry-debugger-jruby'
 end
 
 gem 'rake', '>= 10.5'

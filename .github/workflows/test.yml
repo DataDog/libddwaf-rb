@@ -110,6 +110,25 @@ jobs:
             image: ruby:2.6-alpine
             qemu: aarch64
             libc: musl
+        # TODO: jruby images have no sudo so apt-get can't get a lock
+        # - os: ubuntu-20.04
+        #   cpu: x86_64
+        #   platform: x86_64-linux
+        #   image: jruby:9.3
+        #   qemu: amd64
+        #   libc: gnu
+        # - os: ubuntu-20.04
+        #   cpu: x86_64
+        #   platform: x86_64-linux
+        #   image: jruby:9.2
+        #   qemu: amd64
+        #   libc: gnu
+        # - os: ubuntu-20.04
+        #   cpu: x86_64
+        #   platform: x86_64-linux
+        #   image: jruby:9.1
+        #   qemu: amd64
+        #   libc: gnu
     name: Test (${{ matrix.image }}, ${{ matrix.cpu }})
     runs-on: ${{ matrix.os }}
     steps:
@@ -129,6 +148,11 @@ jobs:
       - name: Install Alpine system dependencies
         if: ${{ matrix.libc == 'musl' }}
         run: docker exec -w "${PWD}" ${{ steps.container.outputs.id }} apk add --no-cache build-base git
+      - name: Install JRuby system dependencies
+        if: ${{ startsWith(matrix.image, 'jruby') }}
+        run: |
+          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} sudo apt-get update
+          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} sudo apt-get install -y build-essential git
       - name: Checkout
         uses: actions/checkout@v2
       - name: Bundle
