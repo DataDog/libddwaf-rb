@@ -18,7 +18,7 @@ jobs:
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:3.0
-            qemu: aarch64
+            qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
@@ -30,7 +30,7 @@ jobs:
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:2.7
-            qemu: aarch64
+            qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
@@ -42,7 +42,7 @@ jobs:
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:2.6
-            qemu: aarch64
+            qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
@@ -84,7 +84,7 @@ jobs:
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:3.0-alpine
-            qemu: aarch64
+            qemu: arm64
             libc: musl
           - os: ubuntu-20.04
             cpu: x86_64
@@ -96,7 +96,7 @@ jobs:
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:2.7-alpine
-            qemu: aarch64
+            qemu: arm64
             libc: musl
           - os: ubuntu-20.04
             cpu: x86_64
@@ -108,7 +108,7 @@ jobs:
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:2.6-alpine
-            qemu: aarch64
+            qemu: arm64
             libc: musl
         # TODO: jruby images have no sudo so apt-get can't get a lock
         # - os: ubuntu-20.04
