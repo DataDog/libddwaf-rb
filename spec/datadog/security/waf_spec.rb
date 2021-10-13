@@ -1,14 +1,14 @@
-require 'datadog/waf'
+require 'datadog/security/waf'
 require 'json'
 
-RSpec.describe Datadog::WAF::LibDDWAF do
-  let(:libddwaf) { Datadog::WAF::LibDDWAF }
+RSpec.describe Datadog::Security::WAF::LibDDWAF do
+  let(:libddwaf) { Datadog::Security::WAF::LibDDWAF }
 
   it 'provides the internally stored version' do
     version = libddwaf::Version.new
     libddwaf.ddwaf_get_version(version)
 
-    expect([version[:major], version[:minor], version[:patch]].join('.')).to eq Datadog::WAF::VERSION::BASE_STRING
+    expect([version[:major], version[:minor], version[:patch]].join('.')).to eq Datadog::Security::WAF::VERSION::BASE_STRING
   end
 
   context 'Object' do
@@ -216,77 +216,77 @@ RSpec.describe Datadog::WAF::LibDDWAF do
 
   context 'ruby_to_object' do
     it 'converts nil' do
-      obj = Datadog::WAF.ruby_to_object(nil)
+      obj = Datadog::Security::WAF.ruby_to_object(nil)
       expect(obj[:type]).to eq :ddwaf_obj_invalid
     end
 
     it 'converts an unhandled object' do
-      obj = Datadog::WAF.ruby_to_object(Object.new)
+      obj = Datadog::Security::WAF.ruby_to_object(Object.new)
       expect(obj[:type]).to eq :ddwaf_obj_invalid
     end
 
     it 'converts a boolean' do
-      obj = Datadog::WAF.ruby_to_object(true)
+      obj = Datadog::Security::WAF.ruby_to_object(true)
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 4
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'true'
-      obj = Datadog::WAF.ruby_to_object(false)
+      obj = Datadog::Security::WAF.ruby_to_object(false)
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 5
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'false'
     end
 
     it 'converts a string' do
-      obj = Datadog::WAF.ruby_to_object('foo')
+      obj = Datadog::Security::WAF.ruby_to_object('foo')
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 3
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
     end
 
     it 'converts a binary string' do
-      obj = Datadog::WAF.ruby_to_object("foo\x00bar")
+      obj = Datadog::Security::WAF.ruby_to_object("foo\x00bar")
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 7
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00bar"
     end
 
     it 'converts a symbol' do
-      obj = Datadog::WAF.ruby_to_object(:foo)
+      obj = Datadog::Security::WAF.ruby_to_object(:foo)
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 3
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
     end
 
     it 'converts a positive integer' do
-      obj = Datadog::WAF.ruby_to_object(42)
+      obj = Datadog::Security::WAF.ruby_to_object(42)
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 2
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '42'
     end
 
     it 'converts a negative integer' do
-      obj = Datadog::WAF.ruby_to_object(-42)
+      obj = Datadog::Security::WAF.ruby_to_object(-42)
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 3
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '-42'
     end
 
     it 'converts a float' do
-      obj = Datadog::WAF.ruby_to_object(Math::PI)
+      obj = Datadog::Security::WAF.ruby_to_object(Math::PI)
       expect(obj[:type]).to eq :ddwaf_obj_string
       expect(obj[:nbEntries]).to eq 17
       expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '3.141592653589793'
     end
 
     it 'converts an empty array' do
-      obj = Datadog::WAF.ruby_to_object([])
+      obj = Datadog::Security::WAF.ruby_to_object([])
       expect(obj[:type]).to eq :ddwaf_obj_array
       expect(obj[:nbEntries]).to eq 0
       expect(obj[:valueUnion][:array].null?).to be true
     end
 
     it 'converts a non-empty array' do
-      obj = Datadog::WAF.ruby_to_object(('a'..'f').to_a)
+      obj = Datadog::Security::WAF.ruby_to_object(('a'..'f').to_a)
       expect(obj[:type]).to eq :ddwaf_obj_array
       expect(obj[:nbEntries]).to eq 6
       array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
@@ -300,19 +300,19 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     it 'converts an empty hash' do
-      obj = Datadog::WAF.ruby_to_object({})
+      obj = Datadog::Security::WAF.ruby_to_object({})
       expect(obj[:type]).to eq :ddwaf_obj_map
       expect(obj[:nbEntries]).to eq 0
       expect(obj[:valueUnion][:array].null?).to be true
     end
 
     it 'converts a non-empty hash' do
-      obj = Datadog::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3})
+      obj = Datadog::Security::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3})
       expect(obj[:type]).to eq :ddwaf_obj_map
       expect(obj[:nbEntries]).to eq 3
       hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
-        ptr = obj[:valueUnion][:array] + i * Datadog::WAF::LibDDWAF::Object.size
-        o = Datadog::WAF::LibDDWAF::Object.new(ptr)
+        ptr = obj[:valueUnion][:array] + i * Datadog::Security::WAF::LibDDWAF::Object.size
+        o = Datadog::Security::WAF::LibDDWAF::Object.new(ptr)
         l = o[:parameterNameLength]
         k = o[:parameterName].read_bytes(l)
         l = o[:nbEntries]
@@ -323,36 +323,36 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     it 'converts a big value' do
-      data = JSON.parse(File.read(File.join(__dir__, '../fixtures/waf_rules.json')))
-      Datadog::WAF.ruby_to_object(data)
-      Datadog::WAF.ruby_to_object(data)
-      Datadog::WAF.ruby_to_object(data)
-      Datadog::WAF.ruby_to_object(data)
-      Datadog::WAF.ruby_to_object(data)
-      Datadog::WAF.ruby_to_object(data)
-      Datadog::WAF.ruby_to_object(data)
+      data = JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
+      Datadog::Security::WAF.ruby_to_object(data)
+      Datadog::Security::WAF.ruby_to_object(data)
+      Datadog::Security::WAF.ruby_to_object(data)
+      Datadog::Security::WAF.ruby_to_object(data)
+      Datadog::Security::WAF.ruby_to_object(data)
+      Datadog::Security::WAF.ruby_to_object(data)
+      Datadog::Security::WAF.ruby_to_object(data)
     end
   end
 
   context 'object_to_ruby' do
     it 'converts a string' do
-      obj = Datadog::WAF.ruby_to_object('foo')
-      expect(Datadog::WAF.object_to_ruby(obj)).to eq('foo')
+      obj = Datadog::Security::WAF.ruby_to_object('foo')
+      expect(Datadog::Security::WAF.object_to_ruby(obj)).to eq('foo')
     end
 
     it 'converts an array' do
-      obj = Datadog::WAF.ruby_to_object(('a'..'f').to_a)
-      expect(Datadog::WAF.object_to_ruby(obj)).to eq(('a'..'f').to_a)
+      obj = Datadog::Security::WAF.ruby_to_object(('a'..'f').to_a)
+      expect(Datadog::Security::WAF.object_to_ruby(obj)).to eq(('a'..'f').to_a)
     end
 
     it 'converts objects in an array recursively' do
-      obj = Datadog::WAF.ruby_to_object(['a', 1, :foo, { bar: [42] }])
-      expect(Datadog::WAF.object_to_ruby(obj)).to eq(['a', '1', 'foo', { 'bar' => ['42'] }])
+      obj = Datadog::Security::WAF.ruby_to_object(['a', 1, :foo, { bar: [42] }])
+      expect(Datadog::Security::WAF.object_to_ruby(obj)).to eq(['a', '1', 'foo', { 'bar' => ['42'] }])
     end
 
     it 'converts objects in a map recursively' do
-      obj = Datadog::WAF.ruby_to_object({ foo: [{ bar: [42] }], 21 => 10.5 })
-      expect(Datadog::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => ['42'] }], '21' => '10.5' })
+      obj = Datadog::Security::WAF.ruby_to_object({ foo: [{ bar: [42] }], 21 => 10.5 })
+      expect(Datadog::Security::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => ['42'] }], '21' => '10.5' })
     end
   end
 
@@ -407,19 +407,19 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     let(:data3) do
-      JSON.parse(File.read(File.join(__dir__, '../fixtures/waf_rules.json')))
+      JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
     end
 
     let(:rule1) do
-      Datadog::WAF.ruby_to_object(data1)
+      Datadog::Security::WAF.ruby_to_object(data1)
     end
 
     let(:rule2) do
-      Datadog::WAF.ruby_to_object(data2)
+      Datadog::Security::WAF.ruby_to_object(data2)
     end
 
     let(:rule3) do
-      Datadog::WAF.ruby_to_object(data3)
+      Datadog::Security::WAF.ruby_to_object(data3)
     end
 
     let(:log_store) do
@@ -433,15 +433,15 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     let(:config) do
-      Datadog::WAF::LibDDWAF::Config.new
+      Datadog::Security::WAF::LibDDWAF::Config.new
     end
 
     let(:input) do
-      Datadog::WAF.ruby_to_object({ value1: [4242, 'randomString'], value2: ['rule1'] })
+      Datadog::Security::WAF.ruby_to_object({ value1: [4242, 'randomString'], value2: ['rule1'] })
     end
 
     let(:attack) do
-      Datadog::WAF.ruby_to_object({ 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } })
+      Datadog::Security::WAF.ruby_to_object({ 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } })
     end
 
 
@@ -450,7 +450,7 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     before do
-      Datadog::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+      Datadog::Security::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
     end
 
     it 'logs via the log callback' do
@@ -461,14 +461,14 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     it 'triggers a monitoring rule' do
-      handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule1, config)
+      handle = Datadog::Security::WAF::LibDDWAF.ddwaf_init(rule1, config)
       expect(handle.null?).to be false
 
-      context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      context = Datadog::Security::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
       expect(context.null?).to be false
 
-      result = Datadog::WAF::LibDDWAF::Result.new
-      code = Datadog::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
+      result = Datadog::Security::WAF::LibDDWAF::Result.new
+      code = Datadog::Security::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
 
       expect(code).to eq :ddwaf_monitor
       expect(result[:action]).to eq :ddwaf_monitor
@@ -476,24 +476,24 @@ RSpec.describe Datadog::WAF::LibDDWAF do
     end
 
     it 'does not trigger' do
-      handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule2, config)
+      handle = Datadog::Security::WAF::LibDDWAF.ddwaf_init(rule2, config)
       expect(handle.null?).to be false
 
-      context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
-      result = Datadog::WAF::LibDDWAF::Result.new
-      code = Datadog::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
+      context = Datadog::Security::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      result = Datadog::Security::WAF::LibDDWAF::Result.new
+      code = Datadog::Security::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
       expect(code).to eq :ddwaf_good
       expect(result[:action]).to eq :ddwaf_good
       expect(result[:data]).to be nil
     end
 
     it 'triggers a known attack' do
-      handle = Datadog::WAF::LibDDWAF.ddwaf_init(rule3, config)
+      handle = Datadog::Security::WAF::LibDDWAF.ddwaf_init(rule3, config)
       expect(handle.null?).to be false
 
-      context = Datadog::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
-      result = Datadog::WAF::LibDDWAF::Result.new
-      code = Datadog::WAF::LibDDWAF.ddwaf_run(context, attack, result, timeout)
+      context = Datadog::Security::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      result = Datadog::Security::WAF::LibDDWAF::Result.new
+      code = Datadog::Security::WAF::LibDDWAF.ddwaf_run(context, attack, result, timeout)
       expect(code).to eq :ddwaf_monitor
       expect(result[:action]).to eq :ddwaf_monitor
       expect(result[:data]).to_not be nil
@@ -501,7 +501,7 @@ RSpec.describe Datadog::WAF::LibDDWAF do
   end
 end
 
-RSpec.describe Datadog::WAF do
+RSpec.describe Datadog::Security::WAF do
   let(:rule) do
     {
       'version' => '1.0',
@@ -519,11 +519,11 @@ RSpec.describe Datadog::WAF do
   end
 
   let(:handle) do
-    Datadog::WAF::Handle.new(rule, max_time_store: 1024)
+    Datadog::Security::WAF::Handle.new(rule, max_time_store: 1024)
   end
 
   let(:context) do
-    Datadog::WAF::Context.new(handle)
+    Datadog::Security::WAF::Context.new(handle)
   end
 
   let(:passing_input) do
@@ -564,7 +564,7 @@ RSpec.describe Datadog::WAF do
 
   context 'run with a big ruleset' do
     let(:rule) do
-      JSON.parse(File.read(File.join(__dir__, '../fixtures/waf_rules.json')))
+      JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
     end
 
     let(:passing_input) do
@@ -586,7 +586,7 @@ RSpec.describe Datadog::WAF do
     end
 
     before do
-      Datadog::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+      Datadog::Security::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
     end
 
     it 'passes non-matching input' do

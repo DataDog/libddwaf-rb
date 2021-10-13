@@ -1,1 +1,1 @@
-require 'datadog/waf'
+require 'datadog/security/waf'

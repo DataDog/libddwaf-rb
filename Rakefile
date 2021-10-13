@@ -1,5 +1,5 @@
 require 'bundler/gem_tasks'
-require 'datadog/waf/version'
+require 'datadog/security/waf/version'
 require 'rubocop/rake_task' if Gem.loaded_specs.key? 'rubocop'
 require 'rspec/core/rake_task'
 require 'yard'
@@ -17,7 +17,7 @@ if defined?(RuboCop::RakeTask)
 end
 
 YARD::Rake::YardocTask.new(:docs) do |t|
-  t.options += ['--title', "datadog-instrumentation #{Datadog::WAF::VERSION::STRING} documentation"]
+  t.options += ['--title', "datadog-instrumentation #{Datadog::Security::WAF::VERSION::STRING} documentation"]
   t.options += ['--markup', 'markdown']
   t.options += ['--markup-provider', 'redcarpet']
 end
@@ -161,7 +161,7 @@ module Helpers
   end
 
   def self.libddwaf_dir(platform:)
-    File.join(libddwaf_vendor_dir, "libddwaf-#{Datadog::WAF::VERSION::BASE_STRING}-#{os(platform: platform)}-#{cpu(platform: platform)}")
+    File.join(libddwaf_vendor_dir, "libddwaf-#{Datadog::Security::WAF::VERSION::BASE_STRING}-#{os(platform: platform)}-#{cpu(platform: platform)}")
   end
 
   def self.shared_lib_extname(platform:)
@@ -181,7 +181,7 @@ task :fetch, [:platform] => [] do |_, args|
 
   dirname = 'vendor/libddwaf'
 
-  version = Datadog::WAF::VERSION::BASE_STRING
+  version = Datadog::Security::WAF::VERSION::BASE_STRING
   os = platform.os
   cpu = platform.cpu
   extname = '.tar.gz'
@@ -266,7 +266,7 @@ task :extract, [:platform] => [] do |_, args|
 
   dirname = 'vendor/libddwaf'
 
-  version = Datadog::WAF::VERSION::BASE_STRING
+  version = Datadog::Security::WAF::VERSION::BASE_STRING
   os = platform.os
   cpu = platform.cpu
   extname = '.tar.gz'
