@@ -3,7 +3,34 @@ on:
   - push
 
 jobs:
-  package:
+  package-ruby:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: ruby
+    name: Build package (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Linux build tools
+        if: ${{ startsWith(matrix.os, 'ubuntu-') }}
+        run: sudo apt-get install -y ruby ruby-bundler
+      - name: Bundle
+        run: |
+          bundle install
+      - name: Build package
+        run: |
+          bundle exec rake build
+      - name: Upload gem
+        uses: actions/upload-artifact@v2
+        with:
+          name: libddwaf-${{ matrix.platform }}-${{ github.run_id }}-${{ github.sha }}
+          path: pkg
+  package-binary:
     strategy:
       fail-fast: false
       matrix:
@@ -45,8 +72,48 @@ jobs:
         with:
           name: libddwaf-${{ matrix.platform }}-${{ github.run_id }}-${{ github.sha }}
           path: pkg
+  test-ruby:
+    needs: package-ruby
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: ruby
+            image: ruby:2.6
+            qemu: amd64
+            libc: gnu
+    name: Test package (${{ matrix.platform }}-${{ matrix.libc }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Enable ${{ matrix.qemu }} platform
+        id: qemu
+        if: ${{ matrix.cpu != 'amd64' }}
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt:latest --install ${{ matrix.qemu }} | tee platforms.json
+          echo "::set-output name=platforms::$(cat platforms.json)"
+      - name: Start container
+        id: container
+        run: |
+          echo ${{ matrix.image }} > container_image
+          docker run --rm -d -v "${PWD}":"${PWD}" -w "${PWD}" --platform linux/${{ matrix.qemu }} ${{ matrix.image }} /bin/sleep 64d | tee container_id
+          docker exec -w "${PWD}" $(cat container_id) uname -a
+          echo "::set-output name=id::$(cat container_id)"
+      - uses: actions/download-artifact@v2
+        with:
+          name: libddwaf-${{ matrix.platform }}-${{ github.run_id }}-${{ github.sha }}
+          path: pkg
+      - name: List artifact files
+        run: find .
+        working-directory: pkg
+      - name: Install gem
+        run: docker exec -w "${PWD}" ${{ steps.container.outputs.id }} gem install --verbose pkg/*.gem
+      - name: Run smoke test
+        run: |
+          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} ruby -e 'begin require "libddwaf"; rescue LoadError => e; puts e.message; else fail "loaded when it should not"; end'
   test-linux:
-    needs: package
+    needs: package-binary
     strategy:
       fail-fast: false
       matrix:
@@ -107,7 +174,7 @@ jobs:
         run: |
           docker exec -w "${PWD}" ${{ steps.container.outputs.id }} ruby -r 'libddwaf' -e 'v = Datadog::Security::WAF::LibDDWAF::Version.new; Datadog::Security::WAF::LibDDWAF.ddwaf_get_version(v); p [v[:major], v[:minor], v[:patch]]'
   test-darwin:
-    needs: package
+    needs: package-binary
     strategy:
       fail-fast: false
       matrix:
