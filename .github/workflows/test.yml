@@ -222,4 +222,40 @@ jobs:
       - name: Run specs
         run: |
           bundle exec rake spec
+  test-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2016
+            cpu: x86_64
+            platform: x86_64-darwin
+          - os: windows-2019
+            cpu: x86_64
+            platform: x86_64-darwin
+          - os: windows-2022
+            cpu: x86_64
+            platform: x86_64-darwin
+    name: Test (${{ matrix.os }} ${{ matrix.cpu }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check
+        run: |
+          ruby --version
+          ruby -e 'puts RUBY_PLATFORM'
+          ruby -e 'puts Gem::Platform.local.inspect'
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Bundle
+        run: |
+          bundle install
+      - name: Fetch binary library
+        run: |
+          bundle exec rake fetch[${{ matrix.platform }}]
+      - name: Extract binary library
+        run: |
+          bundle exec rake extract[${{ matrix.platform }}]
+      - name: Run specs
+        run: |
+          bundle exec rake spec
 
