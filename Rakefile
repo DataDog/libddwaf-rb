@@ -189,14 +189,20 @@ task :fetch, [:platform] => [] do |_, args|
   uri_base = 'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s'
 
   sha256_filename = {
-    'libddwaf-1.0.11-darwin-x86_64.tar.gz'  => '0f046ccc789e1ddf06923ac09c0eabd68e0e45a6ab51d0bb7171b583034871ad',
-    'libddwaf-1.0.11-darwin-arm64.tar.gz'   => '03f1edc01a18379b7ec6c967225a50224c5cc463b5982d64aad9f68c2c1e6823',
-    'libddwaf-1.0.11-linux-x86_64.tar.gz'   => 'd1a3e49c96c272620b0c5f82f9fa68fcfa871dddf2a38f9d3af374e742a1e0c0',
-    'libddwaf-1.0.11-linux-aarch64.tar.gz'  => 'af21751b2f53b3ddbaecdacda281e585642448702edc100a47b972f4939137b5',
-    'libddwaf-1.0.12-darwin-x86_64.tar.gz'  => '2a809bf7dcf3f5d86409f0b18f8ec9f8e6c9a4a913f321bb68d65abad280170d',
-    'libddwaf-1.0.12-darwin-arm64.tar.gz'   => 'e1a40846db2ce0e99b21198ff5edb239ed8e2d4857e8e42fffb3c8e574bd6ece',
-    'libddwaf-1.0.12-linux-x86_64.tar.gz'   => '1b5ba745b6b1c19261844d33c60c9dbea5f4303e27b1a03ad2e855e83491d70c',
-    'libddwaf-1.0.12-linux-aarch64.tar.gz'  => 'a1f4a5022bbcafa4d31de31be7789d00b81b361377d0f62f419873122d8be228',
+    'libddwaf-1.0.11-darwin-arm64.tar.gz'  => '03f1edc01a18379b7ec6c967225a50224c5cc463b5982d64aad9f68c2c1e6823',
+    'libddwaf-1.0.11-darwin-x86_64.tar.gz' => '0f046ccc789e1ddf06923ac09c0eabd68e0e45a6ab51d0bb7171b583034871ad',
+    'libddwaf-1.0.11-linux-aarch64.tar.gz' => 'af21751b2f53b3ddbaecdacda281e585642448702edc100a47b972f4939137b5',
+    'libddwaf-1.0.11-linux-x86_64.tar.gz'  => 'd1a3e49c96c272620b0c5f82f9fa68fcfa871dddf2a38f9d3af374e742a1e0c0',
+
+    'libddwaf-1.0.12-darwin-arm64.tar.gz'  => 'e1a40846db2ce0e99b21198ff5edb239ed8e2d4857e8e42fffb3c8e574bd6ece',
+    'libddwaf-1.0.12-darwin-x86_64.tar.gz' => '2a809bf7dcf3f5d86409f0b18f8ec9f8e6c9a4a913f321bb68d65abad280170d',
+    'libddwaf-1.0.12-linux-aarch64.tar.gz' => 'a1f4a5022bbcafa4d31de31be7789d00b81b361377d0f62f419873122d8be228',
+    'libddwaf-1.0.12-linux-x86_64.tar.gz'  => '1b5ba745b6b1c19261844d33c60c9dbea5f4303e27b1a03ad2e855e83491d70c',
+
+    'libddwaf-1.0.13-darwin-arm64.tar.gz'  => 'a1be729493d4e9936ae488e1d1278a863f427d593dcf55a03dade3cd2ac07b9c',
+    'libddwaf-1.0.13-darwin-x86_64.tar.gz' => '54bc542bb3c9900d22fd69a8df32345d5ce2f69f45ded6cc4d1445a4b7ea1ebd',
+    'libddwaf-1.0.13-linux-aarch64.tar.gz' => '30b19db220b83707533440a5e912edbc9ea068e9e62f40d401923ea9097856cf',
+    'libddwaf-1.0.13-linux-x86_64.tar.gz'  => '80b6f6f66dde8fea645e020e779d4e3860435b88270f27d8b18677cf2a422920',
   }
 
   filename = format(filename_base, version: version, os: os, cpu: cpu, extname: extname)
