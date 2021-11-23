@@ -363,6 +363,7 @@ RSpec.describe Datadog::Security::WAF::LibDDWAF do
         'events' => [
           {
             'id' => 1,
+            'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1', 'value2'], 'regex' => 'rule1' } }
@@ -371,6 +372,7 @@ RSpec.describe Datadog::Security::WAF::LibDDWAF do
           },
           {
             'id' => 2,
+            'name' => 'Rule 2',
             'tags' => { 'type' => 'flow2' },
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } }
@@ -379,6 +381,7 @@ RSpec.describe Datadog::Security::WAF::LibDDWAF do
           },
           {
             'id' => 3,
+            'name' => 'Rule 3',
             'tags' => { 'type' => 'flow2' },
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule3' } }
@@ -395,6 +398,7 @@ RSpec.describe Datadog::Security::WAF::LibDDWAF do
         'events' => [
           {
             'id' => 1,
+            'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } },
@@ -508,6 +512,7 @@ RSpec.describe Datadog::Security::WAF do
       'events' => [
         {
           'id' => 1,
+          'name' => 'Rule 1',
           'tags' => { 'type' => 'flow1' },
           'conditions' => [
             { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule1' } },
