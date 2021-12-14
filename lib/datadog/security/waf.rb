@@ -350,11 +350,16 @@ module Datadog
             fail LibDDWAF::Error, 'Could not create context'
           end
 
-          ObjectSpace.define_finalizer(self, Context.finalizer(context_obj))
+          @input_objs = []
+
+          ObjectSpace.define_finalizer(self, Context.finalizer(context_obj, @input_objs))
         end
 
-        def self.finalizer(context_obj)
+        def self.finalizer(context_obj, input_objs)
           proc do |object_id|
+            input_objs.each do |input_obj|
+              Datadog::Security::WAF::LibDDWAF.ddwaf_object_free(input_obj)
+            end
             Datadog::Security::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
           end
         end
@@ -381,6 +386,9 @@ module Datadog
             fail LibDDWAF::Error, "Could not create result object"
           end
 
+          # retain C objects in memory for subsequent calls to run
+          @input_objs << input_obj
+
           code = Datadog::Security::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
           result = Result.new(
@@ -392,7 +400,6 @@ module Datadog
 
           [ACTION_MAP_OUT[code], result]
         ensure
-          Datadog::Security::WAF::LibDDWAF.ddwaf_object_free(input_obj) if input_obj
           Datadog::Security::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
         end
       end

@@ -611,5 +611,144 @@ RSpec.describe Datadog::Security::WAF do
       expect(result.perf_data).to be_a Hash
       expect(result.perf_total_runtime).to be > 0
     end
+
+    context 'running multiple times' do
+      let(:passing_input_user_agent) do
+        passing_input
+      end
+
+      let(:matching_input_user_agent) do
+        matching_input
+      end
+
+      let(:matching_input_path) do
+        { 'server.request.uri.raw' => '/admin.php' }
+      end
+
+      let(:matching_input_status) do
+        { 'server.response.status' => 404 }
+      end
+
+      let(:matching_input_sqli) do
+        { 'server.request.query' => [['foo', '1 OR 1;']] }
+      end
+
+      it 'runs once on passing input' do
+        code, result = context.run(passing_input_user_agent)
+        expect(code).to eq :good
+        expect(result.action).to eq :good
+        expect(result.data).to be nil
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+
+        # TODO: assert run via logs
+
+        code, result = context.run(passing_input_user_agent)
+        expect(code).to eq :good
+        expect(result.action).to eq :good
+        expect(result.data).to be nil
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+
+        # TODO: assert run via logs
+      end
+
+      it 'runs once on unchanged input' do
+        code, result = context.run(matching_input_user_agent)
+        expect(code).to eq :monitor
+        expect(result.action).to eq :monitor
+        expect(result.data).to be_a Array
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+
+        # stress test rerun on unchanged input
+        1000.times do
+          code, result = context.run(matching_input_user_agent)
+          expect(code).to eq :good
+          expect(result.action).to eq :good
+          expect(result.data).to be nil
+          expect(result.perf_data).to be_a Hash
+          expect(result.perf_total_runtime).to be > 0
+        end
+
+        # TODO: also stress test changing matching values, e.g using arachni/v\d+
+        # CHECK: maybe it will bail out and return only the first one?
+      end
+
+      it 'runs twice on changed input value' do
+        code, result = context.run(passing_input_user_agent)
+        expect(code).to eq :good
+        expect(result.action).to eq :good
+        expect(result.data).to be nil
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+
+        code, result = context.run(matching_input_user_agent)
+        expect(code).to eq :monitor
+        expect(result.action).to eq :monitor
+        expect(result.data).to be_a Array
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+      end
+
+      it 'runs twice on additional input key for an independent rule' do
+        code, result = context.run(matching_input_user_agent)
+        expect(code).to eq :monitor
+        expect(result.action).to eq :monitor
+        expect(result.data).to be_a Array
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+
+        code, result = context.run(matching_input_sqli)
+        expect(code).to eq :monitor
+        expect(result.action).to eq :monitor
+        expect(result.data).to be_a Array
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+      end
+
+      it 'runs twice on additional input key for a rule needing both keys' do
+        code, result = context.run(matching_input_path)
+        expect(code).to eq :good
+        expect(result.action).to eq :good
+        expect(result.data).to be nil
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+
+        code, result = context.run(matching_input_status)
+        expect(code).to eq :monitor
+        expect(result.action).to eq :monitor
+        expect(result.data).to be_a Array
+        expect(result.perf_data).to be_a Hash
+        expect(result.perf_total_runtime).to be > 0
+      end
+
+      it 'runs twice on additional input key for a rule needing both keys with a scoped reference' do
+        lambda do
+          # for this test the first input needs to be in a short-lived scope
+          input = { 'server.request.uri.raw' => '/admin.php' }
+
+          code, result = context.run(input)
+          expect(code).to eq :good
+          expect(result.action).to eq :good
+          expect(result.data).to be nil
+          expect(result.perf_data).to be_a Hash
+          expect(result.perf_total_runtime).to be > 0
+        end.call
+
+        # garbage collect the first input
+        # context should still be able to run and use previously passed input
+        GC.start
+
+        lambda do
+          code, result = context.run(matching_input_status)
+          expect(code).to eq :monitor
+          expect(result.action).to eq :monitor
+          expect(result.data).to be_a Array
+          expect(result.perf_data).to be_a Hash
+          expect(result.perf_total_runtime).to be > 0
+        end.call
+      end
+    end
   end
 end
