@@ -15,10 +15,10 @@ module Datadog
             os_name = java.lang.System.get_property('os.name')
 
             os = case os_name
-                when /linux/i then 'linux'
-                when /mac/i   then 'darwin'
-                else raise Error, "unsupported JRuby os.name: #{os_name.inspect}"
-                end
+                 when /linux/i then 'linux'
+                 when /mac/i   then 'darwin'
+                 else raise Error, "unsupported JRuby os.name: #{os_name.inspect}"
+                 end
 
             return os
           end
@@ -55,8 +55,8 @@ module Datadog
 
         class Version < ::FFI::Struct
           layout :major, :uint16,
-                :minor, :uint16,
-                :patch, :uint16
+                 :minor, :uint16,
+                 :patch, :uint16
         end
 
         typedef Version.by_ref, :ddwaf_version
@@ -76,17 +76,17 @@ module Datadog
 
         class ObjectValueUnion < ::FFI::Union
           layout :stringValue, :charptr,
-                :uintValue,   :uint64,
-                :intValue,    :int64,
-                :array,       :pointer
+                 :uintValue,   :uint64,
+                 :intValue,    :int64,
+                 :array,       :pointer
         end
 
         class Object < ::FFI::Struct
           layout :parameterName,       :charptr,
-                :parameterNameLength, :uint64,
-                :valueUnion,          ObjectValueUnion,
-                :nbEntries,           :uint64,
-                :type,                DDWAF_OBJ_TYPE
+                 :parameterNameLength, :uint64,
+                 :valueUnion,          ObjectValueUnion,
+                 :nbEntries,           :uint64,
+                 :type,                DDWAF_OBJ_TYPE
         end
 
         typedef Object.by_ref, :ddwaf_object
@@ -118,8 +118,8 @@ module Datadog
 
         class Config < ::FFI::Struct
           layout :maxArrayLength, :uint64,
-                :maxMapDepth,    :uint64,
-                :maxTimeStore,   :uint64
+                 :maxMapDepth,    :uint64,
+                 :maxTimeStore,   :uint64
         end
 
         typedef Config.by_ref, :ddwaf_config
@@ -136,7 +136,6 @@ module Datadog
         attach_function :ddwaf_context_init, [:ddwaf_handle, :ddwaf_object_free_fn], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
-
         DDWAF_RET_CODE = enum :ddwaf_err_internal,         -4,
                               :ddwaf_err_invalid_object,   -3,
                               :ddwaf_err_invalid_argument, -2,
@@ -147,9 +146,9 @@ module Datadog
 
         class Result < ::FFI::Struct
           layout :action,           DDWAF_RET_CODE,
-                :data,             :string,
-                :perfData,         :string,
-                :perfTotalRuntime, :uint32 # in us
+                 :data,             :string,
+                 :perfData,         :string,
+                 :perfTotalRuntime, :uint32 # in us
         end
 
         typedef Result.by_ref, :ddwaf_result
@@ -161,11 +160,11 @@ module Datadog
         # logging
 
         DDWAF_LOG_LEVEL = enum :ddwaf_log_trace,
-                              :ddwaf_log_debug,
-                              :ddwaf_log_info,
-                              :ddwaf_log_warn,
-                              :ddwaf_log_error,
-                              :ddwaf_log_off
+                               :ddwaf_log_debug,
+                               :ddwaf_log_info,
+                               :ddwaf_log_warn,
+                               :ddwaf_log_error,
+                               :ddwaf_log_off
 
         callback :ddwaf_log_cb, [DDWAF_LOG_LEVEL, :string, :string, :uint, :charptr, :uint64], :void
 
