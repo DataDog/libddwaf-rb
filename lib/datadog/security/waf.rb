@@ -127,6 +127,8 @@ module Datadog
         attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
+        attach_function :ddwaf_required_addresses, [:ddwaf_handle, :pointer], :pointer
+
         # running
 
         typedef :pointer, :ddwaf_context

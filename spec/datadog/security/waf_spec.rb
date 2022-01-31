@@ -450,7 +450,7 @@ RSpec.describe Datadog::Security::WAF::LibDDWAF do
 
 
     let(:timeout) do
-      10000000
+      10_000_000 # in us
     end
 
     before do
@@ -545,6 +545,25 @@ RSpec.describe Datadog::Security::WAF do
 
   it 'creates a valid context' do
     expect(context.context_obj.null?).to be false
+  end
+
+  it 'raises an error when failing to create a handle' do
+    invalid_rule = {}
+    expect { Datadog::Security::WAF::Handle.new(invalid_rule, max_time_store: 1024) }.to raise_error Datadog::Security::WAF::LibDDWAF::Error
+  end
+
+  it 'raises an error when failing to create a context' do
+    invalid_rule = {}
+    invalid_rule_obj = Datadog::Security::WAF.ruby_to_object(invalid_rule)
+    config_obj = Datadog::Security::WAF::LibDDWAF::Config.new
+    invalid_handle_obj = Datadog::Security::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj)
+    expect(invalid_handle_obj.null?).to be true
+    invalid_handle = Datadog::Security::WAF::Handle.new(rule, max_time_store: 1024)
+    invalid_handle.instance_eval do
+      @handle_obj = invalid_handle_obj
+    end
+    expect(invalid_handle.handle_obj.null?).to be true
+    expect { Datadog::Security::WAF::Context.new(invalid_handle) }.to raise_error Datadog::Security::WAF::LibDDWAF::Error
   end
 
   context 'run' do
