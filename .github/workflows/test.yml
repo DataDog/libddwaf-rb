@@ -11,13 +11,13 @@ jobs:
           - os: ubuntu-20.04
             cpu: x86_64
             platform: x86_64-linux
-            image: ruby:3.1-rc
+            image: ruby:3.1
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: aarch64
             platform: aarch64-linux
-            image: ruby:3.1-rc
+            image: ruby:3.1
             qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
@@ -89,13 +89,13 @@ jobs:
           - os: ubuntu-20.04
             cpu: x86_64
             platform: x86_64-linux
-            image: ruby:3.1-rc-alpine
+            image: ruby:3.1-alpine
             qemu: amd64
             libc: musl
           - os: ubuntu-20.04
             cpu: aarch64
             platform: aarch64-linux
-            image: ruby:3.1-rc-alpine
+            image: ruby:3.1-alpine
             qemu: arm64
             libc: musl
           - os: ubuntu-20.04
