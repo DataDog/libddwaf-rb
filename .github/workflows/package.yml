@@ -172,7 +172,7 @@ jobs:
         run: docker exec -w "${PWD}" ${{ steps.container.outputs.id }} gem install --verbose pkg/*.gem
       - name: Run smoke test
         run: |
-          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} ruby -r 'libddwaf' -e 'v = Datadog::Security::WAF::LibDDWAF::Version.new; Datadog::Security::WAF::LibDDWAF.ddwaf_get_version(v); p [v[:major], v[:minor], v[:patch]]'
+          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} ruby -r 'libddwaf' -e 'v = Datadog::AppSec::WAF::LibDDWAF::Version.new; Datadog::AppSec::WAF::LibDDWAF.ddwaf_get_version(v); p [v[:major], v[:minor], v[:patch]]'
   test-darwin:
     needs: package-binary
     strategy:
@@ -199,4 +199,4 @@ jobs:
         run: gem install --verbose pkg/*.gem
       - name: Run smoke test
         run: |
-          ruby -r 'libddwaf' -e 'v = Datadog::Security::WAF::LibDDWAF::Version.new; Datadog::Security::WAF::LibDDWAF.ddwaf_get_version(v); p [v[:major], v[:minor], v[:patch]]'
+          ruby -r 'libddwaf' -e 'v = Datadog::AppSec::WAF::LibDDWAF::Version.new; Datadog::AppSec::WAF::LibDDWAF.ddwaf_get_version(v); p [v[:major], v[:minor], v[:patch]]'
