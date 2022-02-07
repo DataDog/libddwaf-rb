@@ -1,5 +1,5 @@
 require 'bundler/gem_tasks'
-require 'datadog/security/waf/version'
+require 'datadog/appsec/waf/version'
 require 'rubocop/rake_task' if Gem.loaded_specs.key? 'rubocop'
 require 'rspec/core/rake_task'
 require 'yard'

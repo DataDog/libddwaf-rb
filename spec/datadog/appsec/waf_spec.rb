@@ -1,4 +1,4 @@
-require 'datadog/security/waf'
+require 'datadog/appsec/waf'
 require 'json'
 
 RSpec.describe Datadog::AppSec::WAF::LibDDWAF do

@@ -1,6 +1,6 @@
 require 'ffi'
 require 'json'
-require 'datadog/security/waf/version'
+require 'datadog/appsec/waf/version'
 
 module Datadog
   module AppSec
