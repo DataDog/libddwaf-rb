@@ -1,5 +1,5 @@
 module Datadog
-  module Security
+  module AppSec
     module WAF
       module VERSION
         BASE_STRING = '1.0.14'

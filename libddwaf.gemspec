@@ -6,8 +6,8 @@ require 'datadog/security/waf/version'
 
 Gem::Specification.new do |spec|
   spec.name                  = 'libddwaf'
-  spec.version               = Datadog::Security::WAF::VERSION::STRING
-  spec.required_ruby_version = [">= #{Datadog::Security::WAF::VERSION::MINIMUM_RUBY_VERSION}"]
+  spec.version               = Datadog::AppSec::WAF::VERSION::STRING
+  spec.required_ruby_version = [">= #{Datadog::AppSec::WAF::VERSION::MINIMUM_RUBY_VERSION}"]
   spec.required_rubygems_version = '>= 2.0.0'
   spec.authors               = ['Datadog, Inc.']
   spec.email                 = ['dev@datadoghq.com']
