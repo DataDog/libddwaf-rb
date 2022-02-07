@@ -1,9 +1,9 @@
 require 'ffi'
 require 'json'
-require 'datadog/security/waf/version'
+require 'datadog/appsec/waf/version'
 
 module Datadog
-  module Security
+  module AppSec
     module WAF
       module LibDDWAF
         class Error < StandardError; end
@@ -46,7 +46,7 @@ module Datadog
         end
 
         def self.shared_lib_path
-          File.join(__dir__, "../../../vendor/libddwaf/libddwaf-#{Datadog::Security::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}/lib/libddwaf#{shared_lib_extname}")
+          File.join(__dir__, "../../../vendor/libddwaf/libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}/lib/libddwaf#{shared_lib_extname}")
         end
 
         ffi_lib [shared_lib_path]
@@ -281,8 +281,8 @@ module Datadog
           end
         when :ddwaf_obj_map
           (0...obj[:nbEntries]).each.with_object({}) do |i, h|
-            ptr = obj[:valueUnion][:array] + i * Datadog::Security::WAF::LibDDWAF::Object.size
-            o = Datadog::Security::WAF::LibDDWAF::Object.new(ptr)
+            ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
+            o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
             l = o[:parameterNameLength]
             k = o[:parameterName].read_bytes(l)
             v = object_to_ruby(LibDDWAF::Object.new(ptr))
@@ -296,7 +296,7 @@ module Datadog
           logger.debug { { level: level, func: func, file: file, message: message.read_bytes(len) }.inspect }
         end
 
-        Datadog::Security::WAF::LibDDWAF.ddwaf_set_log_cb(@log_cb, :ddwaf_log_trace)
+        Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(@log_cb, :ddwaf_log_trace)
       end
 
       class Handle
@@ -307,12 +307,12 @@ module Datadog
         DEFAULT_MAX_TIME_STORE = 0
 
         def initialize(rule, config = {})
-          rule_obj = Datadog::Security::WAF.ruby_to_object(rule)
+          rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
           if rule_obj.null? || rule_obj[:type] == :ddwaf_object_invalid
             fail LibDDWAF::Error, "Could not convert object #{rule.inspect}"
           end
 
-          config_obj = Datadog::Security::WAF::LibDDWAF::Config.new
+          config_obj = Datadog::AppSec::WAF::LibDDWAF::Config.new
           if config_obj.null?
             fail LibDDWAF::Error, 'Could not create config struct'
           end
@@ -321,19 +321,19 @@ module Datadog
           config_obj[:maxMapDepth]    = config[:max_map_depth]    || DEFAULT_MAX_MAP_DEPTH
           config_obj[:maxTimeStore]   = config[:max_time_store]   || DEFAULT_MAX_TIME_STORE
 
-          @handle_obj = Datadog::Security::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj)
+          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj)
           if @handle_obj.null?
             fail LibDDWAF::Error, 'Could not create handle'
           end
 
           ObjectSpace.define_finalizer(self, Handle.finalizer(handle_obj))
         ensure
-          Datadog::Security::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
         end
 
         def self.finalizer(handle_obj)
           proc do |object_id|
-            Datadog::Security::WAF::LibDDWAF.ddwaf_destroy(handle_obj)
+            Datadog::AppSec::WAF::LibDDWAF.ddwaf_destroy(handle_obj)
           end
         end
       end
@@ -345,9 +345,9 @@ module Datadog
 
         def initialize(handle)
           handle_obj = handle.handle_obj
-          free_func = Datadog::Security::WAF::LibDDWAF::ObjectNoFree
+          free_func = Datadog::AppSec::WAF::LibDDWAF::ObjectNoFree
 
-          @context_obj = Datadog::Security::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
+          @context_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
           if @context_obj.null?
             fail LibDDWAF::Error, 'Could not create context'
           end
@@ -360,9 +360,9 @@ module Datadog
         def self.finalizer(context_obj, input_objs)
           proc do |object_id|
             input_objs.each do |input_obj|
-              Datadog::Security::WAF::LibDDWAF.ddwaf_object_free(input_obj)
+              Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(input_obj)
             end
-            Datadog::Security::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
+            Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
           end
         end
 
@@ -378,12 +378,12 @@ module Datadog
         }
 
         def run(input, timeout = DEFAULT_TIMEOUT_US)
-          input_obj = Datadog::Security::WAF.ruby_to_object(input)
+          input_obj = Datadog::AppSec::WAF.ruby_to_object(input)
           if input_obj.null?
             fail LibDDWAF::Error, "Could not convert input: #{input.inspect}"
           end
 
-          result_obj = Datadog::Security::WAF::LibDDWAF::Result.new
+          result_obj = Datadog::AppSec::WAF::LibDDWAF::Result.new
           if result_obj.null?
             fail LibDDWAF::Error, "Could not create result object"
           end
@@ -391,7 +391,7 @@ module Datadog
           # retain C objects in memory for subsequent calls to run
           @input_objs << input_obj
 
-          code = Datadog::Security::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
+          code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
           result = Result.new(
             ACTION_MAP_OUT[result_obj[:action]],
@@ -402,7 +402,7 @@ module Datadog
 
           [ACTION_MAP_OUT[code], result]
         ensure
-          Datadog::Security::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
         end
       end
     end
