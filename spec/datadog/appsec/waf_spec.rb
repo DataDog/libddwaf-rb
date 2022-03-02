@@ -454,7 +454,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
 
     let(:timeout) do
-      10_000_000 # in us
+      1_000_000_000_000_000 # in us
     end
 
     before do
@@ -532,7 +532,7 @@ RSpec.describe Datadog::AppSec::WAF do
   end
 
   let(:timeout) do
-    10_000_000 # in us
+    1_000_000_000_000_000 # in us
   end
 
   let(:handle) do
