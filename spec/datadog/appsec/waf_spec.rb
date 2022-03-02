@@ -217,12 +217,16 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   context 'ruby_to_object' do
     it 'converts nil' do
       obj = Datadog::AppSec::WAF.ruby_to_object(nil)
-      expect(obj[:type]).to eq :ddwaf_obj_invalid
+      expect(obj[:type]).to eq :ddwaf_obj_string
+      expect(obj[:nbEntries]).to eq 0
+      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
     end
 
     it 'converts an unhandled object' do
       obj = Datadog::AppSec::WAF.ruby_to_object(Object.new)
-      expect(obj[:type]).to eq :ddwaf_obj_invalid
+      expect(obj[:type]).to eq :ddwaf_obj_string
+      expect(obj[:nbEntries]).to eq 0
+      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
     end
 
     it 'converts a boolean' do

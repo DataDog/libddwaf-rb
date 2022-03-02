@@ -253,13 +253,7 @@ module Datadog
 
           obj
         else
-          obj = LibDDWAF::Object.new
-          res = LibDDWAF.ddwaf_object_invalid(obj)
-          if res.null?
-            fail LibDDWAF::Error, "Could not convert into object: #{val}"
-          end
-
-          obj
+          ruby_to_object(''.freeze)
         end
       end
 
