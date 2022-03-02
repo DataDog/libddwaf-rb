@@ -365,7 +365,7 @@ module Datadog
           ddwaf_err_internal:         :err_internal,
           ddwaf_err_invalid_object:   :err_invalid_object,
           ddwaf_err_invalid_argument: :err_invalid_argument,
-          ddwaf_err_timeout:          :err_invalid_object,
+          ddwaf_err_timeout:          :err_timeout,
           ddwaf_good:                 :good,
           ddwaf_monitor:              :monitor,
           ddwaf_block:                :block,
