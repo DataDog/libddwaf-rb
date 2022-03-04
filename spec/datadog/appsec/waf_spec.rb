@@ -1,3 +1,4 @@
+require 'spec_helper'
 require 'datadog/appsec/waf'
 require 'json'
 
@@ -567,6 +568,13 @@ RSpec.describe Datadog::AppSec::WAF do
     []
   end
 
+  let(:perf_store) do
+    {
+      perf_total_runtime: [],
+      top_rule_runtime: [],
+    }
+  end
+
   let(:log_cb) do
     proc do |level, func, file, line, message, len|
       log_store << { level: level, func: func, file: file, message: message.read_bytes(len) }
@@ -574,6 +582,7 @@ RSpec.describe Datadog::AppSec::WAF do
   end
 
   before(:each) do
+    expect(perf_store).to eq({ perf_total_runtime: [], top_rule_runtime: [] })
     expect(log_store).to eq([])
     Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
     expect(log_store.size).to eq 1
@@ -586,6 +595,8 @@ RSpec.describe Datadog::AppSec::WAF do
       log_store.each do |log|
         puts log.inspect
       end
+      puts "== #{example.full_description}"
+      puts perf_store.inspect
       puts "== #{example.full_description}"
     end
   end
@@ -620,6 +631,7 @@ RSpec.describe Datadog::AppSec::WAF do
   context 'run' do
     it 'passes non-matching input' do
       code, result = context.run(passing_input)
+      perf_store[:perf_total_runtime] << result.perf_total_runtime
       expect(code).to eq :good
       expect(result.action).to eq :good
       expect(result.data).to be nil
@@ -629,6 +641,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
     it 'catches a match' do
       code, result = context.run(matching_input)
+      perf_store[:perf_total_runtime] << result.perf_total_runtime
       expect(code).to eq :monitor
       expect(result.action).to eq :monitor
       expect(result.data).to be_a Array
@@ -656,6 +669,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
     it 'passes non-matching input' do
       code, result = context.run(passing_input, timeout)
+      perf_store[:perf_total_runtime] << result.perf_total_runtime
       expect(code).to eq :good
       expect(result.action).to eq :good
       expect(result.data).to be nil
@@ -668,6 +682,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
     it 'catches a match' do
       code, result = context.run(matching_input, timeout)
+      perf_store[:perf_total_runtime] << result.perf_total_runtime
       expect(code).to eq :monitor
       expect(result.action).to eq :monitor
       expect(result.data).to be_a Array
@@ -714,6 +729,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       it 'runs once on passing input' do
         code, result = context.run(passing_input_user_agent, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :good
         expect(result.action).to eq :good
         expect(result.data).to be nil
@@ -725,6 +741,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(passing_input_user_agent, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :good
         expect(result.action).to eq :good
         expect(result.data).to be nil
@@ -738,6 +755,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       it 'runs once on unchanged input' do
         code, result = context.run(matching_input_user_agent, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :monitor
         expect(result.action).to eq :monitor
         expect(result.data).to be_a Array
@@ -745,6 +763,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.perf_total_runtime).to be > 0
 
         code, result = context.run(matching_input_user_agent, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :good
         expect(result.action).to eq :good
         expect(result.data).to be nil
@@ -764,6 +783,7 @@ RSpec.describe Datadog::AppSec::WAF do
           skip 'slow'
 
           code, result = context.run(matching_input_user_agent, timeout)
+          perf_store[:perf_total_runtime] << result.perf_total_runtime
           expect(code).to eq :monitor
           expect(result.action).to eq :monitor
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
@@ -774,6 +794,7 @@ RSpec.describe Datadog::AppSec::WAF do
           # stress test rerun on unchanged input
           100.times do
             code, result = context.run(matching_input_user_agent, timeout)
+            perf_store[:perf_total_runtime] << result.perf_total_runtime
             expect(code).to eq :good
             expect(result.action).to eq :good
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
@@ -794,6 +815,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
         it 'runs but does not match' do
           code, result = context.run(matching_input_user_agent, timeout)
+          perf_store[:perf_total_runtime] << result.perf_total_runtime
 
           expect(result.data).to be_nil
           expect(result.perf_data).to be_nil
@@ -808,6 +830,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       it 'runs twice on changed input value' do
         code, result = context.run(passing_input_user_agent, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :good
         expect(result.action).to eq :good
         expect(result.data).to be nil
@@ -819,6 +842,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_user_agent, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :monitor
         expect(result.action).to eq :monitor
         expect(result.data).to be_a Array
@@ -833,6 +857,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       it 'runs twice on additional input key for an independent rule' do
         code, result = context.run(matching_input_user_agent, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :monitor
         expect(result.action).to eq :monitor
         expect(result.data).to be_a Array
@@ -845,6 +870,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_sqli)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :monitor
         expect(result.action).to eq :monitor
         expect(result.data).to be_a Array
@@ -860,6 +886,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       it 'runs twice on additional input key for a rule needing both keys to match' do
         code, result = context.run(matching_input_path, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :good
         expect(result.action).to eq :good
         expect(result.data).to be nil
@@ -871,6 +898,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_status, timeout)
+        perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :monitor
         expect(result.action).to eq :monitor
         expect(result.data).to be_a Array
@@ -889,6 +917,7 @@ RSpec.describe Datadog::AppSec::WAF do
           input = { 'server.request.uri.raw' => '/admin.php' }
 
           code, result = context.run(input, timeout)
+          perf_store[:perf_total_runtime] << result.perf_total_runtime
           expect(code).to eq :good
           expect(result.action).to eq :good
           expect(result.data).to be nil
@@ -906,6 +935,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
         lambda do
           code, result = context.run(matching_input_status, timeout)
+          perf_store[:perf_total_runtime] << result.perf_total_runtime
           expect(code).to eq :monitor
           expect(result.action).to eq :monitor
           expect(result.data).to be_a Array
