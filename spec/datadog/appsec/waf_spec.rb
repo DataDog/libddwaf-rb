@@ -545,7 +545,7 @@ RSpec.describe Datadog::AppSec::WAF do
   end
 
   let(:timeout) do
-    10_000_000 # in us
+    100_000 # in us
   end
 
   let(:handle) do
