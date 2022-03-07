@@ -545,7 +545,7 @@ RSpec.describe Datadog::AppSec::WAF do
   end
 
   let(:timeout) do
-    100_000 # in us
+    10_000_000 # in us
   end
 
   let(:handle) do
@@ -630,7 +630,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
   context 'run' do
     it 'passes non-matching input' do
-      code, result = context.run(passing_input)
+      code, result = context.run(passing_input, timeout)
       perf_store[:perf_total_runtime] << result.perf_total_runtime
       expect(code).to eq :good
       expect(result.action).to eq :good
@@ -640,7 +640,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'catches a match' do
-      code, result = context.run(matching_input)
+      code, result = context.run(matching_input, timeout)
       perf_store[:perf_total_runtime] << result.perf_total_runtime
       expect(code).to eq :monitor
       expect(result.action).to eq :monitor
@@ -869,7 +869,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
-        code, result = context.run(matching_input_sqli)
+        code, result = context.run(matching_input_sqli, timeout)
         perf_store[:perf_total_runtime] << result.perf_total_runtime
         expect(code).to eq :monitor
         expect(result.action).to eq :monitor
