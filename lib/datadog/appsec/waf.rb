@@ -138,19 +138,18 @@ module Datadog
         attach_function :ddwaf_context_init, [:ddwaf_handle, :ddwaf_object_free_fn], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
-        DDWAF_RET_CODE = enum :ddwaf_err_internal,         -4,
-                              :ddwaf_err_invalid_object,   -3,
-                              :ddwaf_err_invalid_argument, -2,
-                              :ddwaf_err_timeout,          -1,
+        DDWAF_RET_CODE = enum :ddwaf_err_internal,         -3,
+                              :ddwaf_err_invalid_object,   -2,
+                              :ddwaf_err_invalid_argument, -1,
                               :ddwaf_good,                  0,
                               :ddwaf_monitor,               1,
                               :ddwaf_block,                 2
 
         class Result < ::FFI::Struct
-          layout :action,           DDWAF_RET_CODE,
+          layout :timeout,          :bool,
+                 :perfTotalRuntime, :uint32, # in us
                  :data,             :string,
-                 :perfData,         :string,
-                 :perfTotalRuntime, :uint32 # in us
+                 :perfData,         :string
         end
 
         typedef Result.by_ref, :ddwaf_result
@@ -332,7 +331,7 @@ module Datadog
         end
       end
 
-      Result = Struct.new(:action, :data, :perf_data, :perf_total_runtime)
+      Result = Struct.new(:action, :data, :perf_data, :perf_total_runtime, :timeout)
 
       class Context
         attr_reader :context_obj
@@ -365,7 +364,6 @@ module Datadog
           ddwaf_err_internal:         :err_internal,
           ddwaf_err_invalid_object:   :err_invalid_object,
           ddwaf_err_invalid_argument: :err_invalid_argument,
-          ddwaf_err_timeout:          :err_timeout,
           ddwaf_good:                 :good,
           ddwaf_monitor:              :monitor,
           ddwaf_block:                :block,
@@ -388,10 +386,11 @@ module Datadog
           code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
           result = Result.new(
-            ACTION_MAP_OUT[result_obj[:action]],
+            ACTION_MAP_OUT[code],
             (JSON.parse(result_obj[:data]) if result_obj[:data] != nil),
             (JSON.parse(result_obj[:perfData]) if result_obj[:perfData] != nil),
             result_obj[:perfTotalRuntime],
+            result_obj[:timeout],
           )
 
           [ACTION_MAP_OUT[code], result]
