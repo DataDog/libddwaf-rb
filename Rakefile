@@ -204,10 +204,30 @@ task :fetch, [:platform] => [] do |_, args|
     'libddwaf-1.0.13-linux-aarch64.tar.gz' => '30b19db220b83707533440a5e912edbc9ea068e9e62f40d401923ea9097856cf',
     'libddwaf-1.0.13-linux-x86_64.tar.gz'  => '80b6f6f66dde8fea645e020e779d4e3860435b88270f27d8b18677cf2a422920',
 
-    'libddwaf-1.0.14-darwin-arm64.tar.gz'   => '8bda9b34f7d6e56973c7f227f4a1537a300f3d8c0e73274d285484d0fdd16da2',
-    'libddwaf-1.0.14-darwin-x86_64.tar.gz'  => '6444ac85dc4dfc9ffb398649329f2a2cbe069e71fd983e87e8128b348eeff17c',
-    'libddwaf-1.0.14-linux-aarch64.tar.gz'  => '6b9699bcbf5903f32d38db6e683add3e12f0d781165fac3fa11eab25dd79ac9c',
-    'libddwaf-1.0.14-linux-x86_64.tar.gz'   => 'fedc4d4fc4bfde7731acf56a06c0dec2b489d75f79e2f8062c7c4311c6476b77',
+    'libddwaf-1.0.14-darwin-arm64.tar.gz'  => '8bda9b34f7d6e56973c7f227f4a1537a300f3d8c0e73274d285484d0fdd16da2',
+    'libddwaf-1.0.14-darwin-x86_64.tar.gz' => '6444ac85dc4dfc9ffb398649329f2a2cbe069e71fd983e87e8128b348eeff17c',
+    'libddwaf-1.0.14-linux-aarch64.tar.gz' => '6b9699bcbf5903f32d38db6e683add3e12f0d781165fac3fa11eab25dd79ac9c',
+    'libddwaf-1.0.14-linux-x86_64.tar.gz'  => 'fedc4d4fc4bfde7731acf56a06c0dec2b489d75f79e2f8062c7c4311c6476b77',
+
+    'libddwaf-1.0.15-darwin-arm64.tar.gz'  => '7340915f1bcfa56c2fcc9998c7811f22b9f98c9ff68d559425a378cc300ba373',
+    'libddwaf-1.0.15-darwin-x86_64.tar.gz' => '83b1d8bb58a80f3b4e8d3aeb952382053a95f4a57b49aa22c4c114f366643664',
+    'libddwaf-1.0.15-linux-aarch64.tar.gz' => '10867711c069ffffc24c6badd6de8fb38eb1ec99377092706b954b94cd4e9325',
+    'libddwaf-1.0.15-linux-x86_64.tar.gz'  => '346627afe7e8957deff41a973a36e1f3a8172611aa11a642ad8f2b5619fdc7c6',
+
+    'libddwaf-1.0.16-darwin-arm64.tar.gz'  => 'e369a137c4d86ec6d70ba97c5d9105fcdf265a1694b04b1791fbe14f1866e8de',
+    'libddwaf-1.0.16-darwin-x86_64.tar.gz' => 'bbf4c596ee7e8139c2d22e7da79aea71d2aebdbc4181218bfbbd4dee4d8d28e6',
+    'libddwaf-1.0.16-linux-aarch64.tar.gz' => '9b421356ca8dfbaae150c0528237ba6ec27c72d933a1e8ec02bfd991791032ea',
+    'libddwaf-1.0.16-linux-x86_64.tar.gz'  => '21857275be172cd0dce7550ecda20585290d22f72f9be754abc52d8e62b6096d',
+
+    'libddwaf-1.0.17-darwin-arm64.tar.gz'  => 'fb5653468dd402f0b06ac305b2efe50e4341422d0e40d13ebb3c3d1989733b57',
+    'libddwaf-1.0.17-darwin-x86_64.tar.gz' => '06ea6692d18b85d3ec152026d955de3aa96b969a7d7ffad93cda87bce4dfa43e',
+    'libddwaf-1.0.17-linux-aarch64.tar.gz' => 'cd29cf1815fe70861a2332d479f367d999c69c0e0a723a88bcffc93ff1c367ae',
+    'libddwaf-1.0.17-linux-x86_64.tar.gz'  => 'af7e6205269871c2226eb131e3702d0f505f91fe40eb0aec1982c9cb90636e6e',
+
+    'libddwaf-1.0.18-darwin-arm64.tar.gz'  => '242a046a235120c851cd473f53a264235e9747f17f4a93b747b50f4fd40a75de',
+    'libddwaf-1.0.18-darwin-x86_64.tar.gz' => '4daa5c6ff3ab5150a7cab9522cd5e65e3aa3c611ecda7b36fb081f8794bbca28',
+    'libddwaf-1.0.18-linux-aarch64.tar.gz' => '63ed8e663133e7be32f63a16ed73900220b5b31c8937d9b05549641231a34a04',
+    'libddwaf-1.0.18-linux-x86_64.tar.gz'  => 'ae667f31cfa69f9f85c2fe4d963285361a5893d9bec3d5328a3ac9453c4cdd11',
   }
 
   filename = format(filename_base, version: version, os: os, cpu: cpu, extname: extname)
@@ -215,7 +235,7 @@ task :fetch, [:platform] => [] do |_, args|
   sha256 = sha256_filename[filename]
 
   if sha256.nil?
-    fail 'unsupported platform: #{filename}'
+    fail "hash not found: #{filename}"
   end
 
   if File.exist?(filepath) && Digest::SHA256.hexdigest(File.read(filepath)) == sha256
