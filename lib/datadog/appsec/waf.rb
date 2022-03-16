@@ -286,7 +286,7 @@ module Datadog
 
       def self.logger=(logger)
         @log_cb = proc do |level, func, file, line, message, len|
-          logger.debug { { level: level, func: func, file: file, message: message.read_bytes(len) }.inspect }
+          logger.debug { { level: level, func: func, file: file, line: line, message: message.read_bytes(len) }.inspect }
         end
 
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(@log_cb, :ddwaf_log_trace)

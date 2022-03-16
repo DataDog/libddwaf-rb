@@ -437,7 +437,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     let(:log_cb) do
       proc do |level, func, file, line, message, len|
-        log_store << { level: level, func: func, file: file, message: message.read_bytes(len) }
+        log_store << { level: level, func: func, file: file, line: line, message: message.read_bytes(len) }
       end
     end
 
@@ -475,10 +475,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'logs via the log callback' do
-      expect(log_store).to include({:file=>"PowerWAFInterface.cpp",
-                                    :func=>"ddwaf_set_log_cb",
-                                    :level=>:ddwaf_log_info,
-                                    :message=>"Sending log messages to binding, min level trace"})
+      expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
     end
 
     it 'triggers a monitoring rule' do
@@ -592,7 +589,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
   let(:log_cb) do
     proc do |level, func, file, line, message, len|
-      log_store << { level: level, func: func, file: file, message: message.read_bytes(len) }
+      log_store << { level: level, func: func, file: file, line: line, message: message.read_bytes(len) }
     end
   end
 
