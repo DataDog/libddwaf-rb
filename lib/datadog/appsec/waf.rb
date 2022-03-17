@@ -91,6 +91,8 @@ module Datadog
 
         typedef Object.by_ref, :ddwaf_object
 
+        ## setters
+
         attach_function :ddwaf_object_invalid, [:ddwaf_object], :ddwaf_object
         attach_function :ddwaf_object_string, [:ddwaf_object, :string], :ddwaf_object
         attach_function :ddwaf_object_stringl, [:ddwaf_object, :charptr, :size_t], :ddwaf_object
@@ -108,6 +110,19 @@ module Datadog
         attach_function :ddwaf_object_map_addl, [:ddwaf_object, :charptr, :size_t, :pointer], :bool
         attach_function :ddwaf_object_map_addl_nc, [:ddwaf_object, :charptr, :size_t, :pointer], :bool
 
+        ## getters
+
+        attach_function :ddwaf_object_type, [:ddwaf_object], DDWAF_OBJ_TYPE
+        attach_function :ddwaf_object_size, [:ddwaf_object], :uint64
+        attach_function :ddwaf_object_length, [:ddwaf_object], :size_t
+        attach_function :ddwaf_object_get_key, [:ddwaf_object, :size_t], :charptr
+        attach_function :ddwaf_object_get_string, [:ddwaf_object, :size_t], :charptr
+        attach_function :ddwaf_object_get_unsigned, [:ddwaf_object], :uint64
+        attach_function :ddwaf_object_get_signed, [:ddwaf_object], :int64
+        attach_function :ddwaf_object_get_index, [:ddwaf_object, :size_t], :ddwaf_object
+
+        ## freeers
+
         ObjectFree = attach_function :ddwaf_object_free, [:ddwaf_object], :void
         ObjectNoFree = ::FFI::Pointer::NULL
 
@@ -118,13 +133,24 @@ module Datadog
 
         class Config < ::FFI::Struct
           layout :maxArrayLength, :uint64,
-                 :maxMapDepth,    :uint64,
-                 :maxTimeStore,   :uint64
+                 :maxMapDepth,    :uint64
         end
 
         typedef Config.by_ref, :ddwaf_config
 
-        attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config], :ddwaf_handle
+        class RuleSetInfo < ::FFI::Struct
+          layout :loaded, :uint16,
+                 :failed, :uint16,
+                 :errors, Object,
+                 :version, :string
+        end
+
+        typedef RuleSetInfo.by_ref, :ddwaf_ruleset_info
+        RuleSetInfoNone = Datadog::AppSec::WAF::LibDDWAF::RuleSetInfo.new(::FFI::Pointer::NULL)
+
+        attach_function :ddwaf_ruleset_info_free, [:ddwaf_ruleset_info], :void
+
+        attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_ruleset_info], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
         attach_function :ddwaf_required_addresses, [:ddwaf_handle, :pointer], :pointer
@@ -147,9 +173,8 @@ module Datadog
 
         class Result < ::FFI::Struct
           layout :timeout,          :bool,
-                 :perfTotalRuntime, :uint32, # in us
                  :data,             :string,
-                 :perfData,         :string
+                 :total_runtime,    :uint64
         end
 
         typedef Result.by_ref, :ddwaf_result
@@ -297,7 +322,6 @@ module Datadog
 
         DEFAULT_MAX_ARRAY_LENGTH = 0
         DEFAULT_MAX_MAP_DEPTH = 0
-        DEFAULT_MAX_TIME_STORE = 0
 
         def initialize(rule, config = {})
           rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
@@ -312,15 +336,17 @@ module Datadog
 
           config_obj[:maxArrayLength] = config[:max_array_length] || DEFAULT_MAX_ARRAY_LENGTH
           config_obj[:maxMapDepth]    = config[:max_map_depth]    || DEFAULT_MAX_MAP_DEPTH
-          config_obj[:maxTimeStore]   = config[:max_time_store]   || DEFAULT_MAX_TIME_STORE
 
-          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj)
+          ruleset_info = LibDDWAF::RuleSetInfoNone
+
+          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, ruleset_info)
           if @handle_obj.null?
             fail LibDDWAF::Error, 'Could not create handle'
           end
 
           ObjectSpace.define_finalizer(self, Handle.finalizer(handle_obj))
         ensure
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_ruleset_info_free(ruleset_info) if ruleset_info
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
         end
 
@@ -331,7 +357,7 @@ module Datadog
         end
       end
 
-      Result = Struct.new(:action, :data, :perf_data, :perf_total_runtime, :timeout)
+      Result = Struct.new(:action, :data, :total_runtime, :timeout)
 
       class Context
         attr_reader :context_obj
@@ -388,8 +414,7 @@ module Datadog
           result = Result.new(
             ACTION_MAP_OUT[code],
             (JSON.parse(result_obj[:data]) if result_obj[:data] != nil),
-            (JSON.parse(result_obj[:perfData]) if result_obj[:perfData] != nil),
-            result_obj[:perfTotalRuntime],
+            result_obj[:total_runtime],
             result_obj[:timeout],
           )
 
