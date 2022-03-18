@@ -73,6 +73,25 @@ module Datadog
                               :ddwaf_obj_map,      1 << 4
 
         typedef :pointer, :charptr
+        typedef :pointer, :charptrptr
+
+        class UInt32Ptr < ::FFI::Struct
+          layout :value, :uint32
+        end
+
+        typedef UInt32Ptr.by_ref, :uint32ptr
+
+        class UInt64Ptr < ::FFI::Struct
+          layout :value, :uint64
+        end
+
+        typedef UInt64Ptr.by_ref, :uint64ptr
+
+        class SizeTPtr < ::FFI::Struct
+          layout :value, :size_t
+        end
+
+        typedef SizeTPtr.by_ref, :sizeptr
 
         class ObjectValueUnion < ::FFI::Union
           layout :stringValue, :charptr,
@@ -115,8 +134,8 @@ module Datadog
         attach_function :ddwaf_object_type, [:ddwaf_object], DDWAF_OBJ_TYPE
         attach_function :ddwaf_object_size, [:ddwaf_object], :uint64
         attach_function :ddwaf_object_length, [:ddwaf_object], :size_t
-        attach_function :ddwaf_object_get_key, [:ddwaf_object, :size_t], :charptr
-        attach_function :ddwaf_object_get_string, [:ddwaf_object, :size_t], :charptr
+        attach_function :ddwaf_object_get_key, [:ddwaf_object, :sizeptr], :charptr
+        attach_function :ddwaf_object_get_string, [:ddwaf_object, :sizeptr], :charptr
         attach_function :ddwaf_object_get_unsigned, [:ddwaf_object], :uint64
         attach_function :ddwaf_object_get_signed, [:ddwaf_object], :int64
         attach_function :ddwaf_object_get_index, [:ddwaf_object, :size_t], :ddwaf_object
@@ -153,7 +172,7 @@ module Datadog
         attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_ruleset_info], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
-        attach_function :ddwaf_required_addresses, [:ddwaf_handle, :pointer], :pointer
+        attach_function :ddwaf_required_addresses, [:ddwaf_handle, :uint32ptr], :charptrptr
 
         # running
 
