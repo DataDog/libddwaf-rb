@@ -786,6 +786,44 @@ RSpec.describe Datadog::AppSec::WAF do
         # CHECK: maybe it will bail out and return only the first one?
       end
 
+      context 'on a sizeable rule' do
+        let(:long_rule) { 'crs-930-120' }
+
+        it 'matches the first entry' do
+          first_matching_input = {
+            'server.request.body' => { 'a' => '.htaccess' }
+          }
+          code, result = context.run(first_matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :monitor
+          expect(result.action).to eq :monitor
+          expect(result.data).to be_a Array
+          expect(result.total_runtime).to be > 0
+          expect(result.timeout).to eq false
+
+          expect(result.data.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{long_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        end
+
+        it 'matches the last entry' do
+          last_matching_input = {
+            'server.request.body' => { 'a' => 'yarn.lock' }
+          }
+          code, result = context.run(last_matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :monitor
+          expect(result.action).to eq :monitor
+          expect(result.data).to be_a Array
+          expect(result.total_runtime).to be > 0
+          expect(result.timeout).to eq false
+
+          expect(result.data.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{long_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        end
+      end
+
       context 'stress testing' do
         it 'runs once on unchanged input' do
           skip 'slow'
