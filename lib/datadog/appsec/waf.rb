@@ -151,8 +151,19 @@ module Datadog
         typedef Object.by_ref, :ddwaf_rule
 
         class Config < ::FFI::Struct
-          layout :maxArrayLength, :uint64,
-                 :maxMapDepth,    :uint64
+          class Limits < ::FFI::Struct
+            layout :max_container_size,  :uint32,
+                   :max_container_depth, :uint32,
+                   :max_string_length,   :uint32
+          end
+
+          class Obfuscator < ::FFI::Struct
+            layout :key_regex,   :string,
+                   :value_regex, :string
+          end
+
+          layout :limits,     Limits,
+                 :obfuscator, Obfuscator
         end
 
         typedef Config.by_ref, :ddwaf_config
@@ -339,8 +350,9 @@ module Datadog
       class Handle
         attr_reader :handle_obj
 
-        DEFAULT_MAX_ARRAY_LENGTH = 0
-        DEFAULT_MAX_MAP_DEPTH = 0
+        DEFAULT_MAX_CONTAINER_SIZE  = 0
+        DEFAULT_MAX_CONTAINER_DEPTH = 0
+        DEFAULT_MAX_STRING_LENGTH   = 0
 
         def initialize(rule, config = {})
           rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
@@ -353,8 +365,9 @@ module Datadog
             fail LibDDWAF::Error, 'Could not create config struct'
           end
 
-          config_obj[:maxArrayLength] = config[:max_array_length] || DEFAULT_MAX_ARRAY_LENGTH
-          config_obj[:maxMapDepth]    = config[:max_map_depth]    || DEFAULT_MAX_MAP_DEPTH
+          config_obj[:limits][:max_container_size]  = config[:max_container_size]  || DEFAULT_MAX_CONTAINER_SIZE
+          config_obj[:limits][:max_container_depth] = config[:max_container_depth] || DEFAULT_MAX_CONTAINER_DEPTH
+          config_obj[:limits][:max_string_length]   = config[:max_string_length]   || DEFAULT_MAX_STRING_LENGTH
 
           ruleset_info = LibDDWAF::RuleSetInfoNone
 

@@ -243,6 +243,11 @@ task :fetch, [:platform] => [] do |_, args|
     'libddwaf-1.2.1-darwin-x86_64.tar.gz' => '2c3ff1eadc4d9d3fc2fdca6f8795409dd9f11f12e3d98108c59fb6c3d34b0bdf',
     'libddwaf-1.2.1-linux-aarch64.tar.gz' => '88111f8f33b5206ac60a6b886c1cda5197ba085f48c5c2cbe5ff3eafb7baa461',
     'libddwaf-1.2.1-linux-x86_64.tar.gz'  => '108dce1c96625890709b0d2e65b9bbf6cdbf9e6b570d071f2fe6170f8ff00f32',
+
+    'libddwaf-1.3.0-darwin-arm64.tar.gz'  => 'cd5bce11dee1951b5c72dbaa862a7c04cefecadff6737231b4da979994f47883',
+    'libddwaf-1.3.0-darwin-x86_64.tar.gz' => '7c1a66308d8977233761ad35cccf96bdd3c6ef3b7b3e7e978176abfe626d96d5',
+    'libddwaf-1.3.0-linux-aarch64.tar.gz' => 'f173e4037a55ea8abbe05728672bea9707579a4ae75f2ceee8e64d560da312a8',
+    'libddwaf-1.3.0-linux-x86_64.tar.gz'  => '54da81f96a11cc40fd40f1adb569d4d41651da27c0a123202d71823a661a14b6',
   }
 
   filename = format(filename_base, version: version, os: os, cpu: cpu, extname: extname)
