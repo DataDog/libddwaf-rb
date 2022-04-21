@@ -6,7 +6,13 @@ module Datadog
   module AppSec
     module WAF
       module LibDDWAF
-        class Error < StandardError; end
+        class Error < StandardError
+          attr_reader :ruleset_info
+
+          def initialize(msg, ruleset_info: nil)
+            @ruleset_info = ruleset_info
+          end
+        end
 
         extend ::FFI::Library
 
@@ -354,6 +360,8 @@ module Datadog
         DEFAULT_MAX_CONTAINER_DEPTH = 0
         DEFAULT_MAX_STRING_LENGTH   = 0
 
+        attr_reader :ruleset_info
+
         def initialize(rule, config = {})
           rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
           if rule_obj.null? || rule_obj[:type] == :ddwaf_object_invalid
@@ -369,11 +377,19 @@ module Datadog
           config_obj[:limits][:max_container_depth] = config[:max_container_depth] || DEFAULT_MAX_CONTAINER_DEPTH
           config_obj[:limits][:max_string_length]   = config[:max_string_length]   || DEFAULT_MAX_STRING_LENGTH
 
-          ruleset_info = LibDDWAF::RuleSetInfoNone
+          ruleset_info = LibDDWAF::RuleSetInfo.new
 
           @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, ruleset_info)
+
+          @ruleset_info = {
+            loaded: ruleset_info[:loaded],
+            failed: ruleset_info[:failed],
+            errors: WAF.object_to_ruby(ruleset_info[:errors]),
+            version: ruleset_info[:version],
+          }
+
           if @handle_obj.null?
-            fail LibDDWAF::Error, 'Could not create handle'
+            fail LibDDWAF::Error.new('Could not create handle', ruleset_info: @ruleset_info)
           end
 
           ObjectSpace.define_finalizer(self, Handle.finalizer(handle_obj))

@@ -419,6 +419,61 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
     end
 
+    let(:data4) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '0.1.2'
+        },
+        'rules' => [
+          {
+            'id' => 1,
+            'name' => 'Rule 1',
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              { 'operator' => 'match_regex', 'parameters' => { 'inputs' => [{ 'address' => 'value1'}], 'regex' => 'rule2' } }
+            ],
+            'action' => 'record',
+          },
+        ]
+      }
+    end
+
+    let(:bad_data) do
+      {
+        'version' => '1.0',
+        'events' => [
+          {
+            'id' => 1,
+            'name' => 'Rule 1',
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1', 'value2'], 'regex' => 'rule1' } }
+            ],
+            'action' => 'record',
+          },
+          {
+            'id' => 2,
+            'badname' => 'Rule 2',
+            'tags' => { 'type' => 'flow2' },
+            'conditions' => [
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } }
+            ],
+            'action' => 'record',
+          },
+          {
+            'id' => 3,
+            'name' => 'Rule 3',
+            'tags' => { 'type' => 'flow2' },
+            'conditions' => [
+              { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule3' } }
+            ],
+            'action' => 'record',
+          }
+        ]
+      }
+    end
+
     let(:rule1) do
       Datadog::AppSec::WAF.ruby_to_object(data1)
     end
@@ -429,6 +484,14 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     let(:rule3) do
       Datadog::AppSec::WAF.ruby_to_object(data3)
+    end
+
+    let(:rule4) do
+      Datadog::AppSec::WAF.ruby_to_object(data4)
+    end
+
+    let(:bad_rule) do
+      Datadog::AppSec::WAF.ruby_to_object(bad_data)
     end
 
     let(:log_store) do
@@ -458,7 +521,6 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     let(:ruleset_info) do
-      #Datadog::AppSec::WAF::LibDDWAF::RuleSetInfoNone
       Datadog::AppSec::WAF::LibDDWAF::RuleSetInfo.new
     end
 
@@ -481,6 +543,55 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'logs via the log callback' do
       expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
+    end
+
+    context 'with no ruleset information' do
+      let(:ruleset_info) do
+        Datadog::AppSec::WAF::LibDDWAF::RuleSetInfoNone
+      end
+
+      it 'creates a handle' do
+        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
+        expect(handle.null?).to be false
+      end
+    end
+
+    context 'with ruleset information' do
+      it 'records successful old ruleset information' do
+        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
+        expect(handle.null?).to be false
+
+        expect(ruleset_info[:loaded]).to eq(3)
+        expect(ruleset_info[:failed]).to eq(0)
+        expect(ruleset_info[:errors]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+        expect(ruleset_info[:errors][:type]).to eq(:ddwaf_obj_map)
+        expect(ruleset_info[:errors][:nbEntries]).to eq(0)
+        expect(ruleset_info[:version]).to be_nil
+      end
+
+      it 'records successful new ruleset information' do
+        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule4, config, ruleset_info)
+        expect(handle.null?).to be false
+
+        expect(ruleset_info[:loaded]).to eq(1)
+        expect(ruleset_info[:failed]).to eq(0)
+        expect(ruleset_info[:errors]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+        expect(ruleset_info[:errors][:type]).to eq(:ddwaf_obj_map)
+        expect(ruleset_info[:errors][:nbEntries]).to eq(0)
+        expect(ruleset_info[:version]).to eq('0.1.2')
+      end
+
+      it 'records failing ruleset information' do
+        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(bad_rule, config, ruleset_info)
+        expect(handle.null?).to be false
+
+        expect(ruleset_info[:loaded]).to eq(2)
+        expect(ruleset_info[:failed]).to eq(1)
+        expect(ruleset_info[:errors]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+        expect(ruleset_info[:errors][:type]).to eq(:ddwaf_obj_map)
+        expect(ruleset_info[:errors][:nbEntries]).to eq(1)
+        expect(ruleset_info[:version]).to be_nil
+      end
     end
 
     it 'triggers a monitoring rule' do
@@ -542,14 +653,20 @@ end
 RSpec.describe Datadog::AppSec::WAF do
   let(:rule) do
     {
-      'version' => '1.0',
-      'events' => [
+      'version' => '2.2',
+      'metadata' => {
+        'rules_version' => '1.2.3'
+      },
+      'rules' => [
         {
           'id' => 1,
           'name' => 'Rule 1',
           'tags' => { 'type' => 'flow1' },
           'conditions' => [
-            { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule1' } },
+            {
+              'operator' => 'match_regex',
+              'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule1' }
+            },
           ],
           'action' => 'record',
         }
@@ -642,6 +759,104 @@ RSpec.describe Datadog::AppSec::WAF do
     end
     expect(invalid_handle.handle_obj.null?).to be true
     expect { Datadog::AppSec::WAF::Context.new(invalid_handle) }.to raise_error Datadog::AppSec::WAF::LibDDWAF::Error
+  end
+
+  it 'records good ruleset info' do
+    expect(handle.ruleset_info).to be_a Hash
+    expect(handle.ruleset_info[:loaded]).to eq(1)
+    expect(handle.ruleset_info[:failed]).to eq(0)
+    expect(handle.ruleset_info[:errors]).to be_a(Hash)
+    expect(handle.ruleset_info[:errors]).to be_empty
+    expect(handle.ruleset_info[:version]).to eq('1.2.3')
+  end
+
+  context 'with a partially bad ruleset' do
+    let(:rule) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '1.2.3'
+        },
+        'rules' => [
+          {
+            'id' => 1,
+            'name' => 'Rule 1',
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              {
+                'operator' => 'match_regex',
+                'parameters' => { 'inputs' => [{ 'address' => 'value1' }], 'regex' => 'badregex(' }
+              },
+            ],
+            'action' => 'record',
+          },
+          {
+            'id' => 2,
+            'name' => 'Rule 2',
+            'tags' => { 'type' => 'flow2' },
+            'conditions' => [
+              {
+                'operator' => 'match_regex',
+                'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule2' }
+              },
+            ],
+            'action' => 'record',
+          }
+        ]
+      }
+    end
+
+    it 'records bad ruleset info' do
+      expect(handle.ruleset_info).to be_a Hash
+      expect(handle.ruleset_info[:loaded]).to eq(1)
+      expect(handle.ruleset_info[:failed]).to eq(1)
+      expect(handle.ruleset_info[:errors]).to be_a(Hash)
+      expect(handle.ruleset_info[:errors]).to_not be_empty
+      expect(handle.ruleset_info[:version]).to eq('1.2.3')
+    end
+  end
+
+  context 'with a fully bad ruleset' do
+    let(:rule) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '1.2.3'
+        },
+        'rules' => [
+          {
+            'id' => 1,
+            'name' => 'Rule 1',
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              {
+                'operator' => 'match_regex',
+                'parameters' => { 'inputs' => [{ 'address' => 'value1' }], 'regex' => 'badregex(' }
+              },
+            ],
+            'action' => 'record',
+          }
+        ]
+      }
+    end
+
+    let(:handle_exception) do
+      begin
+        handle
+      rescue StandardError => e
+        return e
+      end
+    end
+
+    it 'records bad ruleset info in the exception' do
+      expect(handle_exception).to be_a(Datadog::AppSec::WAF::LibDDWAF::Error)
+      expect(handle_exception.ruleset_info).to be_a Hash
+      expect(handle_exception.ruleset_info[:loaded]).to eq(0)
+      expect(handle_exception.ruleset_info[:failed]).to eq(1)
+      expect(handle_exception.ruleset_info[:errors]).to be_a(Hash)
+      expect(handle_exception.ruleset_info[:errors]).to_not be_empty
+      expect(handle_exception.ruleset_info[:version]).to eq('1.2.3')
+    end
   end
 
   context 'run' do
