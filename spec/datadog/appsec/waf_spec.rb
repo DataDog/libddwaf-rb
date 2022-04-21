@@ -923,6 +923,126 @@ RSpec.describe Datadog::AppSec::WAF do
       expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
     end
 
+    context 'with limits' do
+      context 'exceeding max_container_size' do
+        let(:handle) do
+          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_size: 1 })
+        end
+
+        let(:matching_input) do
+          { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP', 'foo' => 'bar' } }
+        end
+
+        it 'passes on matching input outside of limit' do
+          code, result = context.run(matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :err_invalid_object
+          expect(result.action).to eq :err_invalid_object
+          expect(result.data).to be nil
+          expect(result.total_runtime).to eq(0)
+          expect(result.timeout).to eq false
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to be_nil
+          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        end
+      end
+
+      context 'exceeding max_container_depth' do
+        let(:handle) do
+          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_depth: 1 })
+        end
+
+        let(:matching_input) do
+          { 'server.request.headers.no_cookies' => { 'user-agent' => ['Nessus SOAP'] } }
+        end
+
+        it 'passes on matching input outside of limit' do
+          code, result = context.run(matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :err_invalid_object
+          expect(result.action).to eq :err_invalid_object
+          expect(result.data).to be nil
+          expect(result.total_runtime).to eq(0)
+          expect(result.timeout).to eq false
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to be_nil
+          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        end
+      end
+
+      context 'exceeding max_string_length' do
+        let(:handle) do
+          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_string_length: 1 })
+        end
+
+        let(:matching_input) do
+          { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } }
+        end
+
+        it 'passes on matching input outside of limit' do
+          code, result = context.run(matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+
+          skip 'not implemented in libddwaf yet'
+          expect(code).to eq :err_invalid_object
+          expect(result.action).to eq :err_invalid_object
+          expect(result.data).to be nil
+          expect(result.total_runtime).to eq(0)
+          expect(result.timeout).to eq false
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to be_nil
+          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        end
+      end
+    end
+
+    context 'with obfuscator' do
+      context 'matching a key' do
+        let(:handle) do
+          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
+        end
+
+        let(:matching_input) do
+          { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } }
+        end
+
+        it 'obfuscates the key' do
+          code, result = context.run(matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :monitor
+          expect(result.action).to eq :monitor
+          expect(result.data).to be_a Array
+          expect(result.data.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
+          expect(result.data.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
+          expect(result.total_runtime).to be > 0
+          expect(result.timeout).to eq false
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        end
+      end
+
+      context 'matching a value' do
+        let(:handle) do
+          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { value_regex: 'SOAP' })
+        end
+
+        let(:matching_input) do
+          { 'server.request.headers.no_cookies' => { 'user-agent' => ['Nessus SOAP'] } }
+        end
+
+        it 'obfuscates the value' do
+          code, result = context.run(matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :monitor
+          expect(result.action).to eq :monitor
+          expect(result.data).to be_a Array
+          expect(result.data.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
+          expect(result.data.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
+          expect(result.total_runtime).to be > 0
+          expect(result.timeout).to eq false
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        end
+      end
+    end
+
     context 'running multiple times' do
       let(:passing_input_user_agent) do
         passing_input
