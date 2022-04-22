@@ -6,7 +6,13 @@ module Datadog
   module AppSec
     module WAF
       module LibDDWAF
-        class Error < StandardError; end
+        class Error < StandardError
+          attr_reader :ruleset_info
+
+          def initialize(msg, ruleset_info: nil)
+            @ruleset_info = ruleset_info
+          end
+        end
 
         extend ::FFI::Library
 
@@ -158,8 +164,8 @@ module Datadog
           end
 
           class Obfuscator < ::FFI::Struct
-            layout :key_regex,   :string,
-                   :value_regex, :string
+            layout :key_regex,   :pointer, # :charptr
+                   :value_regex, :pointer  # :charptr
           end
 
           layout :limits,     Limits,
@@ -354,7 +360,9 @@ module Datadog
         DEFAULT_MAX_CONTAINER_DEPTH = 0
         DEFAULT_MAX_STRING_LENGTH   = 0
 
-        def initialize(rule, config = {})
+        attr_reader :ruleset_info
+
+        def initialize(rule, limits: {}, obfuscator: {})
           rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
           if rule_obj.null? || rule_obj[:type] == :ddwaf_object_invalid
             fail LibDDWAF::Error, "Could not convert object #{rule.inspect}"
@@ -365,15 +373,25 @@ module Datadog
             fail LibDDWAF::Error, 'Could not create config struct'
           end
 
-          config_obj[:limits][:max_container_size]  = config[:max_container_size]  || DEFAULT_MAX_CONTAINER_SIZE
-          config_obj[:limits][:max_container_depth] = config[:max_container_depth] || DEFAULT_MAX_CONTAINER_DEPTH
-          config_obj[:limits][:max_string_length]   = config[:max_string_length]   || DEFAULT_MAX_STRING_LENGTH
+          config_obj[:limits][:max_container_size]  = limits[:max_container_size]  || DEFAULT_MAX_CONTAINER_SIZE
+          config_obj[:limits][:max_container_depth] = limits[:max_container_depth] || DEFAULT_MAX_CONTAINER_DEPTH
+          config_obj[:limits][:max_string_length]   = limits[:max_string_length]   || DEFAULT_MAX_STRING_LENGTH
+          config_obj[:obfuscator][:key_regex]       = FFI::MemoryPointer.from_string(obfuscator[:key_regex])   if obfuscator[:key_regex]
+          config_obj[:obfuscator][:value_regex]     = FFI::MemoryPointer.from_string(obfuscator[:value_regex]) if obfuscator[:value_regex]
 
-          ruleset_info = LibDDWAF::RuleSetInfoNone
+          ruleset_info = LibDDWAF::RuleSetInfo.new
 
           @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, ruleset_info)
+
+          @ruleset_info = {
+            loaded: ruleset_info[:loaded],
+            failed: ruleset_info[:failed],
+            errors: WAF.object_to_ruby(ruleset_info[:errors]),
+            version: ruleset_info[:version],
+          }
+
           if @handle_obj.null?
-            fail LibDDWAF::Error, 'Could not create handle'
+            fail LibDDWAF::Error.new('Could not create handle', ruleset_info: @ruleset_info)
           end
 
           ObjectSpace.define_finalizer(self, Handle.finalizer(handle_obj))
