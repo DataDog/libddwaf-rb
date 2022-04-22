@@ -594,6 +594,15 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
     end
 
+    it 'lists required addresses' do
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
+      expect(handle.null?).to be false
+
+      count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
+      list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_required_addresses(handle, count)
+      expect(list.get_array_of_string(0, count[:value])).to eq ['value1', 'value2']
+    end
+
     it 'triggers a monitoring rule' do
       handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
       expect(handle.null?).to be false
@@ -740,6 +749,10 @@ RSpec.describe Datadog::AppSec::WAF do
 
   it 'creates a valid context' do
     expect(context.context_obj.null?).to be false
+  end
+
+  it 'lists required addresses' do
+    expect(handle.required_addresses).to eq ['value2']
   end
 
   it 'raises an error when failing to create a handle' do
