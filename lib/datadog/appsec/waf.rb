@@ -189,7 +189,7 @@ module Datadog
         attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_ruleset_info], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
-        attach_function :ddwaf_required_addresses, [:ddwaf_handle, :uint32ptr], :charptrptr
+        attach_function :ddwaf_required_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr
 
         # running
 
@@ -404,6 +404,15 @@ module Datadog
           proc do |object_id|
             Datadog::AppSec::WAF::LibDDWAF.ddwaf_destroy(handle_obj)
           end
+        end
+
+        def required_addresses
+          count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
+          list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_required_addresses(handle_obj, count)
+
+          return [] if count == 0 # list is null
+
+          list.get_array_of_string(0, count[:value])
         end
       end
 
