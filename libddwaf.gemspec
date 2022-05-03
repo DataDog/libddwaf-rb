@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
     libddwaf packages a WAF implementation in C++, exposed to Ruby
   EOS
 
-  spec.homepage = 'https://github.com/DataDog/libddwaf'
+  spec.homepage = 'https://github.com/DataDog/libddwaf-rb'
   spec.license  = 'BSD-3-Clause'
 
   if spec.respond_to?(:metadata)
