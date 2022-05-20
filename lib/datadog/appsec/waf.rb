@@ -47,6 +47,7 @@ module Datadog
 
             cpu = case os_arch
                   when 'amd64' then 'x86_64'
+                  when 'aarch64' then 'aarch64'
                   else raise Error, "unsupported JRuby os.arch: #{os_arch.inspect}"
                   end
 

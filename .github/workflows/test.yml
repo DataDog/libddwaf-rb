@@ -147,6 +147,12 @@ jobs:
         #   image: jruby:9.2.8.0
         #   qemu: amd64
         #   libc: gnu
+        # - os: ubuntu-20.04
+        #   cpu: x86_64
+        #   platform: aarch64-linux-gnu
+        #   image: jruby:9.3.4.0
+        #   qemu: arm64
+        #   libc: gnu
     name: Test (${{ matrix.image }}, ${{ matrix.cpu }})
     runs-on: ${{ matrix.os }}
     steps:
