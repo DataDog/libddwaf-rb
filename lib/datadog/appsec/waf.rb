@@ -290,7 +290,7 @@ module Datadog
           end
 
           val.each do |k, v|
-            res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.size, ruby_to_object(v))
+            res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, ruby_to_object(v))
             unless res
               fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
             end
@@ -299,7 +299,7 @@ module Datadog
           obj
         when String
           obj = LibDDWAF::Object.new
-          res = LibDDWAF.ddwaf_object_stringl(obj, val, val.size)
+          res = LibDDWAF.ddwaf_object_stringl(obj, val, val.bytesize)
           if res.null?
             fail LibDDWAF::Error, "Could not convert into object: #{val}"
           end
@@ -307,7 +307,8 @@ module Datadog
           obj
         when Symbol
           obj = LibDDWAF::Object.new
-          res = LibDDWAF.ddwaf_object_stringl(obj, val.to_s, val.size)
+          str = val.to_s
+          res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
           if res.null?
             fail LibDDWAF::Error, "Could not convert into object: #{val}"
           end
