@@ -32,6 +32,15 @@ module Datadog
           Gem::Platform.local.os
         end
 
+        def self.local_version
+          return nil unless local_os == 'linux'
+
+          # Old rubygems don't handle non-gnu linux correctly
+          return $1 if RUBY_PLATFORM =~ /linux-(.+)$/
+
+          'gnu'
+        end
+
         def self.local_cpu
           if RUBY_ENGINE == 'jruby'
             os_arch = java.lang.System.get_property('os.arch')
@@ -47,12 +56,28 @@ module Datadog
           Gem::Platform.local.cpu
         end
 
+        def self.vendor_dir
+          File.join(__dir__, '../../../vendor')
+        end
+
+        def self.libddwaf_vendor_dir
+          File.join(vendor_dir, 'libddwaf')
+        end
+
+        def self.shared_lib_triplet
+          local_version ? "#{local_os}-#{local_version}-#{local_cpu}" : "#{local_os}-#{local_cpu}"
+        end
+
+        def self.libddwaf_dir
+          File.join(libddwaf_vendor_dir, "libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{shared_lib_triplet}")
+        end
+
         def self.shared_lib_extname
           Gem::Platform.local.os == 'darwin' ? '.dylib' : '.so'
         end
 
         def self.shared_lib_path
-          File.join(__dir__, "../../../vendor/libddwaf/libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}/lib/libddwaf#{shared_lib_extname}")
+          File.join(libddwaf_dir, 'lib', "libddwaf#{shared_lib_extname}")
         end
 
         ffi_lib [shared_lib_path]

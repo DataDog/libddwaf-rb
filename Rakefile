@@ -137,15 +137,51 @@ module Helpers
   end
 
   def self.local_os
+    if RUBY_ENGINE == 'jruby'
+      os_name = java.lang.System.get_property('os.name')
+
+      os = case os_name
+           when /linux/i then 'linux'
+           when /mac/i   then 'darwin'
+           else raise Error, "unsupported JRuby os.name: #{os_name.inspect}"
+           end
+
+      return os
+    end
+
     Gem::Platform.local.os
   end
 
+  def self.local_version
+    return nil unless local_os == 'linux'
+
+    # Old rubygems don't handle non-gnu linux correctly
+    return $1 if RUBY_PLATFORM =~ /linux-(.+)$/
+
+    'gnu'
+  end
+
   def self.local_cpu
+    if RUBY_ENGINE == 'jruby'
+      os_arch = java.lang.System.get_property('os.arch')
+
+      cpu = case os_arch
+            when 'amd64' then 'x86_64'
+            else raise Error, "unsupported JRuby os.arch: #{os_arch.inspect}"
+            end
+
+      return cpu
+    end
+
     Gem::Platform.local.cpu
   end
 
   def self.os(platform:)
     platform.os
+  end
+
+  def self.version(platform:)
+    platform.version
   end
 
   def self.cpu(platform:)
@@ -160,32 +196,68 @@ module Helpers
     File.join(vendor_dir, 'libddwaf')
   end
 
+  def self.shared_lib_triplet(platform:)
+    platform.version ? "#{platform.os}-#{platform.version}-#{platform.cpu}" : "#{platform.os}-#{platform.cpu}"
+  end
+
+  def self.libddwaf_version
+    Datadog::AppSec::WAF::VERSION::BASE_STRING
+  end
+
+  def self.libddwaf_basename(platform:)
+    "libddwaf-#{libddwaf_version}-#{shared_lib_triplet(platform: platform)}"
+  end
+
+  def self.libddwaf_filename(platform:)
+    "#{libddwaf_basename(platform: platform)}.tar.gz"
+  end
+
   def self.libddwaf_dir(platform:)
-    File.join(libddwaf_vendor_dir, "libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{os(platform: platform)}-#{cpu(platform: platform)}")
+    File.join(libddwaf_vendor_dir, libddwaf_basename(platform: platform))
   end
 
   def self.shared_lib_extname(platform:)
     platform.os == 'darwin' ? '.dylib' : '.so'
   end
 
+  def self.shared_lib_filename(platform:)
+    "libddwaf#{shared_lib_extname(platform: platform)}"
+  end
+
   def self.shared_lib_path(platform:)
-    File.join(libddwaf_dir(platform: platform), "lib/libddwaf#{shared_lib_extname(platform: platform)}")
+    File.join(libddwaf_dir(platform: platform), 'lib', shared_lib_filename(platform: platform))
+  end
+
+  def self.parse_platform(platform_string = nil)
+    # use provided platform string, defaulting to the local platform
+    # dup the local platform as we may side-effectfully patch the platform instance
+    platform = platform_string ? Gem::Platform.new(platform_string) : Gem::Platform.local.dup
+
+    if platform.os == 'darwin'
+      # darwin has a single libddwaf build, strip any version passed
+      platform.instance_eval { @version = nil }
+    end
+
+    if platform.os == 'linux' && platform.version.nil? && (platform_string || RUBY_PLATFORM) =~ /linux-(.+)$/
+      # old rubygems cannot handle non-gnu libc in version
+      # if a platform arg was not passed, platform is the local platform
+      # use either platform string to set the version correctly
+      platform.instance_eval { @version = $1 }
+    end
+
+    platform
   end
 end
 
 task :fetch, [:platform] => [] do |_, args|
-  platform = args.to_h[:platform] ? Gem::Platform.new(args.to_h[:platform]) : Gem::Platform.local.dup
+  platform = Helpers.parse_platform(args.to_h[:platform])
 
   require 'net/http'
   require 'fileutils'
 
-  dirname = 'vendor/libddwaf'
+  dirname = Helpers.libddwaf_vendor_dir
 
-  version = Datadog::AppSec::WAF::VERSION::BASE_STRING
-  os = platform.os
-  cpu = platform.cpu
-  extname = '.tar.gz'
-  filename_base = 'libddwaf-%<version>s-%<os>s-%<cpu>s%<extname>s'
+  version = Helpers.libddwaf_version
   uri_base = 'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s'
 
   sha256_filename = {
@@ -250,12 +322,12 @@ task :fetch, [:platform] => [] do |_, args|
     'libddwaf-1.3.0-linux-x86_64.tar.gz'  => '54da81f96a11cc40fd40f1adb569d4d41651da27c0a123202d71823a661a14b6',
   }
 
-  filename = format(filename_base, version: version, os: os, cpu: cpu, extname: extname)
+  filename = Helpers.libddwaf_filename(platform: platform)
   filepath = File.join(dirname, filename)
   sha256 = sha256_filename[filename]
 
   if sha256.nil?
-    fail "hash not found: #{filename}"
+    fail "hash not found: #{filename.inspect}"
   end
 
   if File.exist?(filepath) && Digest::SHA256.hexdigest(File.read(filepath)) == sha256
@@ -308,34 +380,97 @@ task :fetch, [:platform] => [] do |_, args|
 end
 
 task :extract, [:platform] => [] do |_, args|
-  platform = args.to_h[:platform] ? Gem::Platform.new(args.to_h[:platform]) : Gem::Platform.local.dup
+  platform = Helpers.parse_platform(args.to_h[:platform])
+
+  if File.exist?(Helpers.shared_lib_path(platform: platform))
+    next
+  end
 
   Rake::Task['fetch'].execute(Rake::TaskArguments.new([:platform], [platform]))
 
   require 'rubygems/package'
   require 'fileutils'
 
-  dirname = 'vendor/libddwaf'
-
-  version = Datadog::AppSec::WAF::VERSION::BASE_STRING
-  os = platform.os
-  cpu = platform.cpu
-  extname = '.tar.gz'
-  filename_base = 'libddwaf-%<version>s-%<os>s-%<cpu>s%<extname>s'
-
-  filename = format(filename_base, version: version, os: os, cpu: cpu, extname: extname)
+  dirname = Helpers.libddwaf_vendor_dir
+  filename = Helpers.libddwaf_filename(platform: platform)
   filepath = File.join(dirname, filename)
 
   File.open(filepath, 'rb') do |f|
-    FileUtils.rm_rf(File.join(dirname, File.basename(filename, extname)))
+    FileUtils.rm_rf(Helpers.libddwaf_dir(platform: platform))
     Gem::Package.new('').extract_tar_gz(f, dirname)
   end
 end
 
 task :binary, [:platform] => [] do |_, args|
-  platform = args.to_h[:platform] ? Gem::Platform.new(args.to_h[:platform]) : Gem::Platform.local.dup
+  subplatform_for = {
+    # lean gems
+    'x86_64-linux-gnu'       => ['x86_64-linux-gnu'],
+    'x86_64-linux-musl'      => ['x86_64-linux-musl'],
+    'aarch64-linux-gnu'      => ['aarch64-linux-gnu'],
+    'aarch64-linux-musl'     => ['aarch64-linux-musl'],
+    'x86_64-darwin'          => ['x86_64-darwin'],
+    'arm64-darwin'           => ['arm64-darwin'],
 
-  Rake::Task['extract'].execute(Rake::TaskArguments.new([:platform], [platform]))
+    # portable gems
+    'x86_64-linux:llvm'      => ['x86_64-linux'],
+    'aarch64-linux:llvm'     => ['aarch64-linux'],
+
+    # fat gems
+    'x86_64-linux:gnu+musl' => [
+      'x86_64-linux-gnu',
+      'x86_64-linux-musl',
+    ],
+    'aarch64-linux:gnu+musl' => [
+      'aarch64-linux-gnu',
+      'aarch64-linux-musl',
+    ],
+    'java' => [
+      'x86_64-linux-gnu',
+      'x86_64-linux-musl',
+      'aarch64-linux-gnu',
+      'aarch64-linux-musl',
+      'x86_64-darwin',
+      'arm64-darwin',
+    ],
+  }
+
+  # alias default portable build
+  subplatform_for['x86_64-linux']  = subplatform_for['x86_64-linux:gnu+musl']
+  subplatform_for['aarch64-linux'] = subplatform_for['aarch64-linux:gnu+musl']
+
+  # preprocess argument
+  platform_arg = args.to_h[:platform]
+  if platform_arg.nil?
+    platform_arg = if RUBY_PLATFORM =~ /-linux$/
+                     # no arg + -linux$ should build linux-gnu only
+                     RUBY_PLATFORM + '-gnu'
+                   elsif RUBY_PLATFORM =~ /^(.+-darwin)/
+                     # no arg + darwin should build darwin$
+                     $1
+                   elsif RUBY_PLATFORM =~ /-linux-musl$/
+                     # no arg + -linux-musl$ should build linux-musl on old rubygems
+                     RUBY_PLATFORM
+                   else
+                     RUBY_PLATFORM
+                   end
+  end
+  platform_string, _opts = platform_arg.split(':')
+  platform = Helpers.parse_platform(platform_string)
+
+  subplatforms = subplatform_for[platform_arg]
+
+  if subplatforms.nil?
+    fail "target platform not found: #{platform_arg.inspect}"
+  end
+
+  # loop for multiple deps on a single target, accumulating each shared lib path
+  shared_lib_paths = subplatforms.map do |subplatform_string|
+    subplatform = Helpers.parse_platform(subplatform_string)
+
+    Rake::Task['extract'].execute(Rake::TaskArguments.new([:platform], [subplatform]))
+
+    Helpers.shared_lib_path(platform: subplatform)
+  end
 
   gemspec = Helpers.binary_gemspec(platform: platform)
   gemspec.extensions.clear
@@ -344,8 +479,7 @@ task :binary, [:platform] => [] do |_, args|
   gemspec.files += Dir['lib/**/*.rb']
   gemspec.files += ['NOTICE'] + Dir['LICENSE*']
 
-  gemspec.files += Dir[File.join(Helpers.libddwaf_dir(platform: platform), 'include/**/*.h')]
-  gemspec.files += Dir[File.join(Helpers.libddwaf_dir(platform: platform), "lib/**/*#{Helpers.shared_lib_extname(platform: platform)}")]
+  gemspec.files += shared_lib_paths
 
   FileUtils.chmod(0o0644, gemspec.files)
   FileUtils.mkdir_p('pkg')
