@@ -116,6 +116,7 @@ docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" rub
 ### JRuby
 
 ```
+# these are too old for aarch64
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" jruby:9.2.8.0 sh -c 'apt-get update && apt-get install -y build-essential git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" jruby:9.3.0.0 sh -c 'apt-get update && apt-get install -y build-essential git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 ```

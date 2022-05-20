@@ -22,7 +22,7 @@ jobs:
       - name: Bundle
         run: |
           bundle install
-      - name: Build package
+      - name: Build gem
         run: |
           bundle exec rake build
       - name: Upload gem
@@ -41,6 +41,21 @@ jobs:
           - os: ubuntu-20.04
             cpu: aarch64
             platform: aarch64-linux
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: x86_64-linux-gnu
+          - os: ubuntu-20.04
+            cpu: aarch64
+            platform: aarch64-linux-gnu
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: x86_64-linux-musl
+          - os: ubuntu-20.04
+            cpu: aarch64
+            platform: aarch64-linux-musl
+          - os: ubuntu-20.04
+            cpu: universal
+            platform: java
           - os: macos-10.15
             cpu: x86_64
             platform: x86_64-darwin
@@ -58,13 +73,7 @@ jobs:
       - name: Bundle
         run: |
           bundle install
-      - name: Fetch binary library
-        run: |
-          bundle exec rake fetch[${{ matrix.platform }}]
-      - name: Extract binary library
-        run: |
-          bundle exec rake extract[${{ matrix.platform }}]
-      - name: Build package
+      - name: Build binary gem
         run: |
           bundle exec rake binary[${{ matrix.platform }}]
       - name: Upload gem
@@ -142,7 +151,37 @@ jobs:
             image: ruby:2.6-alpine
             qemu: aarch64
             libc: musl
-    name: Test package (${{ matrix.platform }}-${{ matrix.libc }})
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: x86_64-linux-gnu
+            image: ruby:2.6
+            qemu: amd64
+            libc: gnu
+          - os: ubuntu-20.04
+            cpu: aarch64
+            platform: aarch64-linux-gnu
+            image: ruby:2.6
+            qemu: aarch64
+            libc: gnu
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: x86_64-linux-musl
+            image: ruby:2.6-alpine
+            qemu: amd64
+            libc: musl
+          - os: ubuntu-20.04
+            cpu: aarch64
+            platform: aarch64-linux-musl
+            image: ruby:2.6-alpine
+            qemu: aarch64
+            libc: musl
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: java
+            image: jruby:9.3.0.0
+            qemu: amd64
+            libc: gnu
+    name: Test package (${{ matrix.platform }}, ${{ matrix.libc }}, ${{ matrix.cpu }})
     runs-on: ${{ matrix.os }}
     steps:
       - name: Enable ${{ matrix.qemu }} platform
