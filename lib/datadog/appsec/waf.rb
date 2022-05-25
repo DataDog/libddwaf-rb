@@ -472,7 +472,7 @@ module Datadog
           end
         end
 
-        DEFAULT_TIMEOUT_US = 10_0000
+        DEFAULT_TIMEOUT_US = 10_000
         ACTION_MAP_OUT = {
           ddwaf_err_internal:         :err_internal,
           ddwaf_err_invalid_object:   :err_invalid_object,
