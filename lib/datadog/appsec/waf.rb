@@ -449,15 +449,16 @@ module Datadog
         attr_reader :context_obj
 
         def initialize(handle)
+          @retained = []
+
           handle_obj = handle.handle_obj
+          retain(handle_obj)
           free_func = Datadog::AppSec::WAF::LibDDWAF::ObjectNoFree
 
           @context_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
           if @context_obj.null?
             fail LibDDWAF::Error, 'Could not create context'
           end
-
-          @input_objs = []
 
           ObjectSpace.define_finalizer(self, Context.finalizer(context_obj, @input_objs))
         end
@@ -493,7 +494,7 @@ module Datadog
           end
 
           # retain C objects in memory for subsequent calls to run
-          @input_objs << input_obj
+          retain(input_obj)
 
           code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
@@ -507,6 +508,12 @@ module Datadog
           [ACTION_MAP_OUT[code], result]
         ensure
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
+        end
+
+        private
+
+        def retain(object)
+          @retained << object
         end
       end
     end
