@@ -257,6 +257,15 @@ module Datadog
         callback :ddwaf_log_cb, [DDWAF_LOG_LEVEL, :string, :string, :uint, :charptr, :uint64], :void
 
         attach_function :ddwaf_set_log_cb, [:ddwaf_log_cb, DDWAF_LOG_LEVEL], :bool
+
+        DEFAULT_MAX_CONTAINER_SIZE  = 0
+        DEFAULT_MAX_CONTAINER_DEPTH = 0
+        DEFAULT_MAX_STRING_LENGTH   = 0
+
+        DDWAF_MAX_CONTAINER_SIZE = 256
+        DDWAF_MAX_CONTAINER_DEPTH = 20
+        DDWAF_MAX_STRING_LENGTH = 4096
+        DDWAF_RUN_TIMEOUT = 5000
       end
 
       def self.version
@@ -266,7 +275,7 @@ module Datadog
         [version[:major], version[:minor], version[:patch]]
       end
 
-      def self.ruby_to_object(val)
+      def self.ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil)
         case val
         when Array
           obj = LibDDWAF::Object.new
@@ -275,12 +284,19 @@ module Datadog
             fail LibDDWAF::Error, "Could not convert into object: #{val}"
           end
 
-          val.each do |e|
-            res = LibDDWAF.ddwaf_object_array_add(obj, ruby_to_object(e))
+          max_index = max_container_size - 1 if max_container_size
+          val.each.with_index do |e, i|
+            member = ruby_to_object(e,
+                                    max_container_size: max_container_size,
+                                    max_container_depth: (max_container_depth - 1 if max_container_depth),
+                                    max_string_length: max_string_length)
+            res = LibDDWAF.ddwaf_object_array_add(obj, member)
             unless res
               fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
             end
-          end
+
+            break if max_index && i >= max_index
+          end unless max_container_depth == 0
 
           obj
         when Hash
@@ -290,16 +306,25 @@ module Datadog
             fail LibDDWAF::Error, "Could not convert into object: #{val}"
           end
 
-          val.each do |k, v|
-            res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, ruby_to_object(v))
+          max_index = max_container_size - 1 if max_container_size
+          val.each.with_index do |(k, v), i|
+            k = k.to_s[0, max_string_length] if max_string_length
+            member = ruby_to_object(v,
+                                    max_container_size: max_container_size,
+                                    max_container_depth: (max_container_depth - 1 if max_container_depth),
+                                    max_string_length: max_string_length)
+            res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, member)
             unless res
               fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
             end
-          end
+
+            break if max_index && i >= max_index
+          end unless max_container_depth == 0
 
           obj
         when String
           obj = LibDDWAF::Object.new
+          val = val.to_s[0, max_string_length] if max_string_length
           res = LibDDWAF.ddwaf_object_stringl(obj, val, val.bytesize)
           if res.null?
             fail LibDDWAF::Error, "Could not convert into object: #{val}"
@@ -308,6 +333,7 @@ module Datadog
           obj
         when Symbol
           obj = LibDDWAF::Object.new
+          val = val.to_s[0, max_string_length] if max_string_length
           str = val.to_s
           res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
           if res.null?
@@ -383,10 +409,6 @@ module Datadog
       class Handle
         attr_reader :handle_obj
 
-        DEFAULT_MAX_CONTAINER_SIZE  = 0
-        DEFAULT_MAX_CONTAINER_DEPTH = 0
-        DEFAULT_MAX_STRING_LENGTH   = 0
-
         attr_reader :ruleset_info
 
         def initialize(rule, limits: {}, obfuscator: {})
@@ -400,9 +422,9 @@ module Datadog
             fail LibDDWAF::Error, 'Could not create config struct'
           end
 
-          config_obj[:limits][:max_container_size]  = limits[:max_container_size]  || DEFAULT_MAX_CONTAINER_SIZE
-          config_obj[:limits][:max_container_depth] = limits[:max_container_depth] || DEFAULT_MAX_CONTAINER_DEPTH
-          config_obj[:limits][:max_string_length]   = limits[:max_string_length]   || DEFAULT_MAX_STRING_LENGTH
+          config_obj[:limits][:max_container_size]  = limits[:max_container_size]  || LibDDWAF::DEFAULT_MAX_CONTAINER_SIZE
+          config_obj[:limits][:max_container_depth] = limits[:max_container_depth] || LibDDWAF::DEFAULT_MAX_CONTAINER_DEPTH
+          config_obj[:limits][:max_string_length]   = limits[:max_string_length]   || LibDDWAF::DEFAULT_MAX_STRING_LENGTH
           config_obj[:obfuscator][:key_regex]       = FFI::MemoryPointer.from_string(obfuscator[:key_regex])   if obfuscator[:key_regex]
           config_obj[:obfuscator][:value_regex]     = FFI::MemoryPointer.from_string(obfuscator[:value_regex]) if obfuscator[:value_regex]
 
@@ -483,7 +505,14 @@ module Datadog
         }
 
         def run(input, timeout = DEFAULT_TIMEOUT_US)
-          input_obj = Datadog::AppSec::WAF.ruby_to_object(input)
+          max_container_size  = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
+          max_container_depth = LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH
+          max_string_length   = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
+
+          input_obj = Datadog::AppSec::WAF.ruby_to_object(input,
+                                                          max_container_size: max_container_size,
+                                                          max_container_depth: max_container_depth,
+                                                          max_string_length: max_string_length)
           if input_obj.null?
             fail LibDDWAF::Error, "Could not convert input: #{input.inspect}"
           end

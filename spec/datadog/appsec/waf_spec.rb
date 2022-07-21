@@ -337,6 +337,165 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       Datadog::AppSec::WAF.ruby_to_object(data)
       Datadog::AppSec::WAF.ruby_to_object(data)
     end
+
+    context 'with limits' do
+      let(:max_container_size)  { 3 }
+      let(:max_container_depth) { 3 }
+      let(:max_string_length)   { 10 }
+
+      context 'with container size limit' do
+
+        it 'converts an array up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object(('a'..'f').to_a, max_container_size: max_container_size)
+          expect(obj[:type]).to eq :ddwaf_obj_array
+          expect(obj[:nbEntries]).to eq 3
+          array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
+            ptr = obj[:valueUnion][:array] + i * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+            l = o[:nbEntries]
+            v = o[:valueUnion][:stringValue].read_bytes(l)
+            a << v
+          end
+          expect(array).to eq ('a'..'c').to_a
+        end
+
+        it 'converts a hash up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size)
+          expect(obj[:type]).to eq :ddwaf_obj_map
+          expect(obj[:nbEntries]).to eq 3
+          hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
+            ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
+            o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            l = o[:nbEntries]
+            v = o[:valueUnion][:stringValue].read_bytes(l)
+            h[k] = v
+          end
+          expect(hash).to eq({ 'foo' => '1', 'bar' => '2', 'baz' => '3' })
+        end
+      end
+
+      context 'with container depth limit' do
+        it 'converts nested arrays up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: max_container_depth)
+          expect(obj[:type]).to eq :ddwaf_obj_array
+          expect(obj[:nbEntries]).to eq 2
+
+          ptr1 = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+          ptr2 = obj[:valueUnion][:array] + 1 * libddwaf::Object.size
+          o1 = libddwaf::Object.new(ptr1)
+          o2 = libddwaf::Object.new(ptr2)
+
+          expect(o1[:type]).to eq :ddwaf_obj_string
+          l = o1[:nbEntries]
+          v = o1[:valueUnion][:stringValue].read_bytes(l)
+          expect(v).to eq '1'
+
+          expect(o2[:type]).to eq :ddwaf_obj_array
+          expect(o2[:nbEntries]).to eq 2
+
+          ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
+          ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
+          o1 = libddwaf::Object.new(ptr1)
+          o2 = libddwaf::Object.new(ptr2)
+
+          expect(o1[:type]).to eq :ddwaf_obj_string
+          l = o1[:nbEntries]
+          v = o1[:valueUnion][:stringValue].read_bytes(l)
+          expect(v).to eq '2'
+
+          expect(o2[:type]).to eq :ddwaf_obj_array
+          expect(o2[:nbEntries]).to eq 2
+
+          ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
+          ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
+          o1 = libddwaf::Object.new(ptr1)
+          o2 = libddwaf::Object.new(ptr2)
+
+          expect(o1[:type]).to eq :ddwaf_obj_string
+          l = o1[:nbEntries]
+          v = o1[:valueUnion][:stringValue].read_bytes(l)
+          expect(v).to eq '3'
+
+          expect(o2[:type]).to eq :ddwaf_obj_array
+          expect(o2[:nbEntries]).to eq 0
+        end
+
+        it 'converts nested hashes up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object({foo: { bar: { baz: { qux: 4}}}}, max_container_depth: max_container_depth)
+          expect(obj[:type]).to eq :ddwaf_obj_map
+          expect(obj[:nbEntries]).to eq 1
+
+          ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+          o = libddwaf::Object.new(ptr)
+
+          l = o[:parameterNameLength]
+          k = o[:parameterName].read_bytes(l)
+          expect(k).to eq 'foo'
+
+          expect(o[:type]).to eq :ddwaf_obj_map
+          expect(o[:nbEntries]).to eq 1
+
+          ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
+          o = libddwaf::Object.new(ptr)
+
+          l = o[:parameterNameLength]
+          k = o[:parameterName].read_bytes(l)
+          expect(k).to eq 'bar'
+
+          expect(o[:type]).to eq :ddwaf_obj_map
+          expect(o[:nbEntries]).to eq 1
+
+          ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
+          o = libddwaf::Object.new(ptr)
+
+          l = o[:parameterNameLength]
+          k = o[:parameterName].read_bytes(l)
+          expect(k).to eq 'baz'
+
+          expect(o[:type]).to eq :ddwaf_obj_map
+          expect(o[:nbEntries]).to eq 0
+        end
+      end
+
+      context 'with string length limit' do
+        it 'converts a string up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object('foo' << 'o' * 80, max_string_length: max_string_length)
+          expect(obj[:type]).to eq :ddwaf_obj_string
+          expect(obj[:nbEntries]).to eq 10
+          expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
+        end
+
+        it 'converts a binary string up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object("foo\x00bar" << 'r' * 80, max_string_length: max_string_length)
+          expect(obj[:type]).to eq :ddwaf_obj_string
+          expect(obj[:nbEntries]).to eq 10
+          expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00barrrr"
+        end
+
+        it 'converts a symbol up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object(('foo' << 'o' * 80).to_sym, max_string_length: max_string_length)
+          expect(obj[:type]).to eq :ddwaf_obj_string
+          expect(obj[:nbEntries]).to eq 10
+          expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
+        end
+
+        it 'converts hash keys up to the limit' do
+          obj = Datadog::AppSec::WAF.ruby_to_object({('foo' << 'o' * 80) => 42}, max_string_length: max_string_length)
+          expect(obj[:type]).to eq :ddwaf_obj_map
+          expect(obj[:nbEntries]).to eq 1
+
+          ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+          o = libddwaf::Object.new(ptr)
+
+          l = o[:parameterNameLength]
+          k = o[:parameterName].read_bytes(l)
+          expect(l).to eq 10
+          expect(k).to eq 'fooooooooo'
+        end
+      end
+    end
   end
 
   context 'object_to_ruby' do
