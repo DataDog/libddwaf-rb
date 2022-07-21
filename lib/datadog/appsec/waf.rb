@@ -421,6 +421,7 @@ module Datadog
           if config_obj.null?
             fail LibDDWAF::Error, 'Could not create config struct'
           end
+          retain(config_obj)
 
           config_obj[:limits][:max_container_size]  = limits[:max_container_size]  || LibDDWAF::DEFAULT_MAX_CONTAINER_SIZE
           config_obj[:limits][:max_container_depth] = limits[:max_container_depth] || LibDDWAF::DEFAULT_MAX_CONTAINER_DEPTH
@@ -463,6 +464,16 @@ module Datadog
 
           list.get_array_of_string(0, count[:value])
         end
+
+        private
+
+        def retained
+          @retained ||= []
+        end
+
+        def retain(object)
+          retained << object
+        end
       end
 
       Result = Struct.new(:action, :data, :total_runtime, :timeout)
@@ -471,10 +482,8 @@ module Datadog
         attr_reader :context_obj
 
         def initialize(handle)
-          @retained = []
-
           handle_obj = handle.handle_obj
-          retain(handle_obj)
+          retain(handle)
           free_func = Datadog::AppSec::WAF::LibDDWAF::ObjectNoFree
 
           @context_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
@@ -482,13 +491,15 @@ module Datadog
             fail LibDDWAF::Error, 'Could not create context'
           end
 
-          ObjectSpace.define_finalizer(self, Context.finalizer(context_obj, @input_objs))
+          ObjectSpace.define_finalizer(self, Context.finalizer(context_obj, retained))
         end
 
-        def self.finalizer(context_obj, input_objs)
+        def self.finalizer(context_obj, retained_objs)
           proc do |object_id|
-            input_objs.each do |input_obj|
-              Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(input_obj)
+            retained_objs.each do |retained_obj|
+              next unless retained_obj.is_a?(Datadog::AppSec::WAF::LibDDWAF::Object)
+
+              Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(retained_obj)
             end
             Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
           end
@@ -541,8 +552,12 @@ module Datadog
 
         private
 
+        def retained
+          @retained ||= []
+        end
+
         def retain(object)
-          @retained << object
+          retained << object
         end
       end
     end
