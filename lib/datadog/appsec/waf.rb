@@ -445,19 +445,21 @@ module Datadog
             fail LibDDWAF::Error.new('Could not create handle', ruleset_info: @ruleset_info)
           end
 
-          ObjectSpace.define_finalizer(self, Handle.finalizer(handle_obj))
+          validate!
         ensure
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_ruleset_info_free(ruleset_info) if ruleset_info
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
         end
 
-        def self.finalizer(handle_obj)
-          proc do |object_id|
-            Datadog::AppSec::WAF::LibDDWAF.ddwaf_destroy(handle_obj)
-          end
+        def finalize
+          invalidate!
+
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_destroy(handle_obj)
         end
 
         def required_addresses
+          valid!
+
           count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
           list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_required_addresses(handle_obj, count)
 
@@ -468,12 +470,34 @@ module Datadog
 
         private
 
+        def validate!
+          @valid = true
+        end
+
+        def invalidate!
+          @valid = false
+        end
+
+        def valid?
+          @valid
+        end
+
+        def valid!
+          return if valid?
+
+          fail LibDDWAF::Error, "Attempt to use an invalid instance: #{inspect}"
+        end
+
         def retained
           @retained ||= []
         end
 
         def retain(object)
           retained << object
+        end
+
+        def release(object)
+          retained.delete(object)
         end
       end
 
@@ -492,18 +516,19 @@ module Datadog
             fail LibDDWAF::Error, 'Could not create context'
           end
 
-          ObjectSpace.define_finalizer(self, Context.finalizer(context_obj, retained))
+          validate!
         end
 
-        def self.finalizer(context_obj, retained_objs)
-          proc do |object_id|
-            retained_objs.each do |retained_obj|
-              next unless retained_obj.is_a?(Datadog::AppSec::WAF::LibDDWAF::Object)
+        def finalize
+          invalidate!
 
-              Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(retained_obj)
-            end
-            Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
+          retained.each do |retained_obj|
+            next unless retained_obj.is_a?(Datadog::AppSec::WAF::LibDDWAF::Object)
+
+            Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(retained_obj)
           end
+
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
         end
 
         ACTION_MAP_OUT = {
@@ -516,6 +541,8 @@ module Datadog
         }
 
         def run(input, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
+          valid!
+
           max_container_size  = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
           max_container_depth = LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH
           max_string_length   = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
@@ -552,12 +579,34 @@ module Datadog
 
         private
 
+        def validate!
+          @valid = true
+        end
+
+        def invalidate!
+          @valid = false
+        end
+
+        def valid?
+          @valid
+        end
+
+        def valid!
+          return if valid?
+
+          fail LibDDWAF::Error, "Attempt to use an invalid instance: #{inspect}"
+        end
+
         def retained
           @retained ||= []
         end
 
         def retain(object)
           retained << object
+        end
+
+        def release(object)
+          retained.delete(object)
         end
       end
     end
