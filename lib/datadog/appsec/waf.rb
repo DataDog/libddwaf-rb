@@ -506,7 +506,6 @@ module Datadog
           end
         end
 
-        DEFAULT_TIMEOUT_US = 10_000
         ACTION_MAP_OUT = {
           ddwaf_err_internal:         :err_internal,
           ddwaf_err_invalid_object:   :err_invalid_object,
@@ -516,7 +515,7 @@ module Datadog
           ddwaf_block:                :block,
         }
 
-        def run(input, timeout = DEFAULT_TIMEOUT_US)
+        def run(input, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           max_container_size  = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
           max_container_depth = LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH
           max_string_length   = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
