@@ -57,8 +57,12 @@ module Datadog
           Gem::Platform.local.cpu
         end
 
+        def self.source_dir
+          __dir__ || raise('__dir__ is nil: eval?')
+        end
+
         def self.vendor_dir
-          File.join(__dir__, '../../../vendor')
+          File.join(source_dir, '../../../vendor')
         end
 
         def self.libddwaf_vendor_dir
@@ -103,6 +107,7 @@ module Datadog
                               :ddwaf_obj_string,   1 << 2,
                               :ddwaf_obj_array,    1 << 3,
                               :ddwaf_obj_map,      1 << 4
+        typedef DDWAF_OBJ_TYPE, :ddwaf_obj_type
 
         typedef :pointer, :charptr
         typedef :pointer, :charptrptr
@@ -137,7 +142,7 @@ module Datadog
                  :parameterNameLength, :uint64,
                  :valueUnion,          ObjectValueUnion,
                  :nbEntries,           :uint64,
-                 :type,                DDWAF_OBJ_TYPE
+                 :type,                :ddwaf_obj_type
         end
 
         typedef Object.by_ref, :ddwaf_object
@@ -232,6 +237,7 @@ module Datadog
                               :ddwaf_good,                  0,
                               :ddwaf_monitor,               1,
                               :ddwaf_block,                 2
+        typedef DDWAF_RET_CODE, :ddwaf_ret_code
 
         class Result < ::FFI::Struct
           layout :timeout,          :bool,
@@ -242,7 +248,7 @@ module Datadog
         typedef Result.by_ref, :ddwaf_result
         typedef :uint64, :timeout_us
 
-        attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_result, :timeout_us], DDWAF_RET_CODE, blocking: true
+        attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_result, :timeout_us], :ddwaf_ret_code, blocking: true
         attach_function :ddwaf_result_free, [:ddwaf_result], :void
 
         # logging
@@ -253,10 +259,11 @@ module Datadog
                                :ddwaf_log_warn,
                                :ddwaf_log_error,
                                :ddwaf_log_off
+        typedef DDWAF_LOG_LEVEL, :ddwaf_log_level
 
-        callback :ddwaf_log_cb, [DDWAF_LOG_LEVEL, :string, :string, :uint, :charptr, :uint64], :void
+        callback :ddwaf_log_cb, [:ddwaf_log_level, :string, :string, :uint, :charptr, :uint64], :void
 
-        attach_function :ddwaf_set_log_cb, [:ddwaf_log_cb, DDWAF_LOG_LEVEL], :bool
+        attach_function :ddwaf_set_log_cb, [:ddwaf_log_cb, :ddwaf_log_level], :bool
 
         DEFAULT_MAX_CONTAINER_SIZE  = 0
         DEFAULT_MAX_CONTAINER_DEPTH = 0
@@ -291,12 +298,12 @@ module Datadog
                                     max_container_size: max_container_size,
                                     max_container_depth: (max_container_depth - 1 if max_container_depth),
                                     max_string_length: max_string_length)
-            res = LibDDWAF.ddwaf_object_array_add(obj, member)
-            unless res
-              fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
+            e_res = LibDDWAF.ddwaf_object_array_add(obj, member)
+            unless e_res
+              fail LibDDWAF::Error, "Could not add to array object: #{e.inspect}"
             end
 
-            break if max_index && i >= max_index
+            break val if max_index && i >= max_index
           end unless max_container_depth == 0
 
           obj
@@ -308,25 +315,28 @@ module Datadog
           end
 
           max_index = max_container_size - 1 if max_container_size
-          val.each.with_index do |(k, v), i|
+          val.each.with_index do |e, i|
+            k, v = e[0], e[1] # for Steep, which doesn't handle |(k, v), i|
+
             k = k.to_s[0, max_string_length] if max_string_length
             member = ruby_to_object(v,
                                     max_container_size: max_container_size,
                                     max_container_depth: (max_container_depth - 1 if max_container_depth),
                                     max_string_length: max_string_length)
-            res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, member)
-            unless res
+            kv_res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, member)
+            unless kv_res
               fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
             end
 
-            break if max_index && i >= max_index
+            break val if max_index && i >= max_index
           end unless max_container_depth == 0
 
           obj
         when String
           obj = LibDDWAF::Object.new
           val = val.to_s[0, max_string_length] if max_string_length
-          res = LibDDWAF.ddwaf_object_stringl(obj, val, val.bytesize)
+          str = val.to_s
+          res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
           if res.null?
             fail LibDDWAF::Error, "Could not convert into object: #{val}"
           end
@@ -400,11 +410,25 @@ module Datadog
       end
 
       def self.logger=(logger)
-        @log_cb = proc do |level, func, file, line, message, len|
-          logger.debug { { level: level, func: func, file: file, line: line, message: message.read_bytes(len) }.inspect }
+        # @type var log_cb: ^(::Symbol, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
+        log_cb = lambda do |level, func, file, line, message, len|
+          # @type var message: ::FFI::Pointer
+          logger.debug do
+            {
+              level: level,
+              func: func,
+              file: file,
+              line: line,
+              message: message.read_bytes(len)
+            }.inspect
+          end
         end
 
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(@log_cb, :ddwaf_log_trace)
+        Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+
+        # retain. also, assign late to prevent old @log_cb being GC'd while
+        # still in use C side before the new one is set
+        @log_cb = log_cb
       end
 
       class Handle
@@ -501,7 +525,16 @@ module Datadog
         end
       end
 
-      Result = Struct.new(:action, :data, :total_runtime, :timeout)
+      class Result
+        attr_reader :action, :data, :total_runtime, :timeout
+
+        def initialize(action, data, total_runtime, timeout)
+          @action = action
+          @data = data
+          @total_runtime = total_runtime
+          @timeout = timeout
+        end
+      end
 
       class Context
         attr_reader :context_obj

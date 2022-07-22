@@ -36,3 +36,6 @@ else
 end
 
 gem 'yard', '~> 0.9'
+
+gem 'steep'
+gem 'rbs'
