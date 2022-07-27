@@ -1,0 +1,49 @@
+name: Lint
+on:
+  - push
+
+jobs:
+  style-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.1
+    name: Style check
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Bundle
+        run: |
+          bundle install
+      - name: Run Rubocop
+        run: |
+          bundle exec rubocop -D
+  type-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.1
+    name: Type check
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Bundle
+        run: |
+          bundle install
+      - name: Run Steep
+        run: |
+          bundle exec steep check
