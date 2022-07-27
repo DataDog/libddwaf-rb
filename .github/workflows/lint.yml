@@ -4,18 +4,10 @@ on:
 
 jobs:
   style-check:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:3.1
     name: Style check
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
     container:
-      image: ${{ matrix.image }}
+      image: ruby:3.1
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -26,18 +18,10 @@ jobs:
         run: |
           bundle exec rubocop -D
   type-check:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:3.1
     name: Type check
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
     container:
-      image: ${{ matrix.image }}
+      image: ruby:3.1
     steps:
       - name: Checkout
         uses: actions/checkout@v2
