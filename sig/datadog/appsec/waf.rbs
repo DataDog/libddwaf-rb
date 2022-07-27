@@ -115,7 +115,10 @@ module Datadog
         DDWAF_LOG_LEVEL: ::FFI::Enum
 
         type ddwaf_log_level = ::Symbol
-        type ddwaf_log_cb = ^(ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
+
+        # TODO: signature is as below but steep 1.1 does not yet support method/proc/block mapping
+        # type ddwaf_log_cb = ^(ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
+        type ddwaf_log_cb = ::Method | ::Proc
         def self.ddwaf_set_log_cb: (ddwaf_log_cb, ddwaf_log_level) -> bool
 
         DEFAULT_MAX_CONTAINER_SIZE: ::Integer
@@ -136,6 +139,11 @@ module Datadog
       def self.ruby_to_object: (data val, ?max_container_size: ::Integer?, ?max_container_depth: ::Integer?, ?max_string_length: ::Integer?) -> ::Datadog::AppSec::WAF::LibDDWAF::Object
       def self.object_to_ruby: (::Datadog::AppSec::WAF::LibDDWAF::Object obj) -> data
 
+      self.@logger: ::Logger
+      self.@log_callback: LibDDWAF::ddwaf_log_cb
+
+      def self.log_callback: (LibDDWAF::ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
+      def self.logger: () -> ::Logger
       def self.logger=: (::Logger logger) -> void
 
       class Handle
