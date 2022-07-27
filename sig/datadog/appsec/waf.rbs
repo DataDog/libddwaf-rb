@@ -156,10 +156,15 @@ module Datadog
 
         private
 
+        @valid: bool
+
         def validate!: () -> void
         def invalidate!: () -> void
         def valid?: () -> (nil | bool)
         def valid!: () -> void
+
+        @retained: Array[untyped]
+
         def retained: () -> Array[untyped]
         def retain: (top object) -> void
         def release: (top object) -> void
@@ -188,10 +193,15 @@ module Datadog
 
         private
 
+        @valid: bool
+
         def validate!: () -> void
         def invalidate!: () -> void
         def valid?: () -> (nil | bool)
         def valid!: () -> void
+
+        @retained: Array[untyped]
+
         def retained: () -> Array[untyped]
         def retain: (top object) -> void
         def release: (top object) -> void
