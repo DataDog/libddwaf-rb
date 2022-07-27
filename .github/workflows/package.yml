@@ -56,10 +56,10 @@ jobs:
           - os: ubuntu-20.04
             cpu: universal
             platform: java
-          - os: macos-10.15
+          - os: macos-12
             cpu: x86_64
             platform: x86_64-darwin
-          - os: macos-10.15
+          - os: macos-12
             cpu: arm64
             platform: arm64-darwin
     name: Build package (${{ matrix.platform }})
@@ -218,10 +218,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-10.15
+          - os: macos-12
             cpu: x86_64
             platform: x86_64-darwin
-        # - os: macos-11.0
+        # - os: macos-12
         #   cpu: arm64
         #   platform: arm64-darwin
     name: Test package (${{ matrix.platform }})
