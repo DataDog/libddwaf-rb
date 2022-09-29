@@ -89,15 +89,7 @@ module Datadog
 
         # version
 
-        class Version < ::FFI::Struct
-          layout :major, :uint16,
-                 :minor, :uint16,
-                 :patch, :uint16
-        end
-
-        typedef Version.by_ref, :ddwaf_version
-
-        attach_function :ddwaf_get_version, [:ddwaf_version], :void
+        attach_function :ddwaf_get_version, [], :string
 
         # ddwaf::object data structure
 
@@ -106,7 +98,8 @@ module Datadog
                               :ddwaf_obj_unsigned, 1 << 1,
                               :ddwaf_obj_string,   1 << 2,
                               :ddwaf_obj_array,    1 << 3,
-                              :ddwaf_obj_map,      1 << 4
+                              :ddwaf_obj_map,      1 << 4,
+                              :ddwaf_obj_bool,     1 << 5
         typedef DDWAF_OBJ_TYPE, :ddwaf_obj_type
 
         typedef :pointer, :charptr
@@ -134,7 +127,8 @@ module Datadog
           layout :stringValue, :charptr,
                  :uintValue,   :uint64,
                  :intValue,    :int64,
-                 :array,       :pointer
+                 :array,       :pointer,
+                 :boolean,     :bool
         end
 
         class Object < ::FFI::Struct
@@ -157,6 +151,7 @@ module Datadog
         attach_function :ddwaf_object_signed, [:ddwaf_object, :int64], :ddwaf_object
         attach_function :ddwaf_object_unsigned_force, [:ddwaf_object, :uint64], :ddwaf_object
         attach_function :ddwaf_object_signed_force, [:ddwaf_object, :int64], :ddwaf_object
+        attach_function :ddwaf_object_bool, [:ddwaf_object, :bool], :ddwaf_object
 
         attach_function :ddwaf_object_array, [:ddwaf_object], :ddwaf_object
         attach_function :ddwaf_object_array_add, [:ddwaf_object, :ddwaf_object], :bool
@@ -187,6 +182,8 @@ module Datadog
         typedef :pointer, :ddwaf_handle
         typedef Object.by_ref, :ddwaf_rule
 
+        callback :ddwaf_object_free_fn, [:ddwaf_object], :void
+
         class Config < ::FFI::Struct
           class Limits < ::FFI::Struct
             layout :max_container_size,  :uint32,
@@ -200,7 +197,8 @@ module Datadog
           end
 
           layout :limits,     Limits,
-                 :obfuscator, Obfuscator
+                 :obfuscator, Obfuscator,
+                 :free_fn,    :pointer #:ddwaf_object_free_fn
         end
 
         typedef Config.by_ref, :ddwaf_config
@@ -221,27 +219,36 @@ module Datadog
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
         attach_function :ddwaf_required_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr
+        attach_function :ddwaf_required_rule_data_ids, [:ddwaf_handle, UInt32Ptr], :charptrptr
+
+        # updating
+
+        DDWAF_RET_CODE = enum :ddwaf_err_internal,         -3,
+                              :ddwaf_err_invalid_object,   -2,
+                              :ddwaf_err_invalid_argument, -1,
+                              :ddwaf_ok,                    0,
+                              :ddwaf_match,                 1
+        typedef DDWAF_RET_CODE, :ddwaf_ret_code
+
+        attach_function :ddwaf_update_rule_data, [:ddwaf_handle, :ddwaf_object], :ddwaf_ret_code
+        attach_function :ddwaf_toggle_rules, [:ddwaf_handle, :ddwaf_object], :ddwaf_ret_code
 
         # running
 
         typedef :pointer, :ddwaf_context
 
-        callback :ddwaf_object_free_fn, [:ddwaf_object], :void
-
-        attach_function :ddwaf_context_init, [:ddwaf_handle, :ddwaf_object_free_fn], :ddwaf_context
+        attach_function :ddwaf_context_init, [:ddwaf_handle], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
-        DDWAF_RET_CODE = enum :ddwaf_err_internal,         -3,
-                              :ddwaf_err_invalid_object,   -2,
-                              :ddwaf_err_invalid_argument, -1,
-                              :ddwaf_good,                  0,
-                              :ddwaf_monitor,               1,
-                              :ddwaf_block,                 2
-        typedef DDWAF_RET_CODE, :ddwaf_ret_code
+        class ResultActions < ::FFI::Struct
+          layout :array, :charptrptr,
+                 :size,  :uint32
+        end
 
         class Result < ::FFI::Struct
           layout :timeout,          :bool,
                  :data,             :string,
+                 :actions,          ResultActions,
                  :total_runtime,    :uint64
         end
 
@@ -283,7 +290,7 @@ module Datadog
         [version[:major], version[:minor], version[:patch]]
       end
 
-      def self.ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil)
+      def self.ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil, coerce: true)
         case val
         when Array
           obj = LibDDWAF::Object.new
@@ -297,7 +304,8 @@ module Datadog
             member = ruby_to_object(e,
                                     max_container_size: max_container_size,
                                     max_container_depth: (max_container_depth - 1 if max_container_depth),
-                                    max_string_length: max_string_length)
+                                    max_string_length: max_string_length,
+                                    coerce: coerce)
             e_res = LibDDWAF.ddwaf_object_array_add(obj, member)
             unless e_res
               fail LibDDWAF::Error, "Could not add to array object: #{e.inspect}"
@@ -322,7 +330,8 @@ module Datadog
             member = ruby_to_object(v,
                                     max_container_size: max_container_size,
                                     max_container_depth: (max_container_depth - 1 if max_container_depth),
-                                    max_string_length: max_string_length)
+                                    max_string_length: max_string_length,
+                                    coerce: coerce)
             kv_res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, member)
             unless kv_res
               fail LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
@@ -338,7 +347,7 @@ module Datadog
           str = val.to_s
           res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
           if res.null?
-            fail LibDDWAF::Error, "Could not convert into object: #{val}"
+            fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
           end
 
           obj
@@ -348,15 +357,21 @@ module Datadog
           str = val.to_s
           res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
           if res.null?
-            fail LibDDWAF::Error, "Could not convert into object: #{val}"
+            fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
           end
 
           obj
         when Integer
           obj = LibDDWAF::Object.new
-          res = LibDDWAF.ddwaf_object_string(obj, val.to_s)
+          res = if coerce
+                  LibDDWAF.ddwaf_object_string(obj, val.to_s)
+                elsif val < 0
+                  LibDDWAF.ddwaf_object_signed_force(obj, val)
+                else
+                  LibDDWAF.ddwaf_object_unsigned_force(obj, val)
+                end
           if res.null?
-            fail LibDDWAF::Error, "Could not convert into object: #{val}"
+            fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
           end
 
           obj
@@ -364,15 +379,19 @@ module Datadog
           obj = LibDDWAF::Object.new
           res = LibDDWAF.ddwaf_object_string(obj, val.to_s)
           if res.null?
-            fail LibDDWAF::Error, "Could not convert into object: #{val}"
+            fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
           end
 
           obj
         when TrueClass, FalseClass
           obj = LibDDWAF::Object.new
-          res = LibDDWAF.ddwaf_object_string(obj, val.to_s)
+          res = if coerce
+                  LibDDWAF.ddwaf_object_string(obj, val.to_s)
+                else
+                  LibDDWAF.ddwaf_object_bool(obj, val)
+                end
           if res.null?
-            fail LibDDWAF::Error, "Could not convert into object: #{val}"
+            fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
           end
 
           obj
@@ -385,6 +404,8 @@ module Datadog
         case obj[:type]
         when :ddwaf_obj_invalid
           nil
+        when :ddwaf_obj_bool
+          obj[:valueUnion][:boolean]
         when :ddwaf_obj_string
           obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])
         when :ddwaf_obj_signed
@@ -439,6 +460,14 @@ module Datadog
         @logger = logger
       end
 
+      RESULT_CODE = {
+        ddwaf_err_internal:         :err_internal,
+        ddwaf_err_invalid_object:   :err_invalid_object,
+        ddwaf_err_invalid_argument: :err_invalid_argument,
+        ddwaf_ok:                   :ok,
+        ddwaf_match:                :match,
+      }
+
       class Handle
         attr_reader :handle_obj
 
@@ -461,6 +490,7 @@ module Datadog
           config_obj[:limits][:max_string_length]   = limits[:max_string_length]   || LibDDWAF::DEFAULT_MAX_STRING_LENGTH
           config_obj[:obfuscator][:key_regex]       = FFI::MemoryPointer.from_string(obfuscator[:key_regex])   if obfuscator[:key_regex]
           config_obj[:obfuscator][:value_regex]     = FFI::MemoryPointer.from_string(obfuscator[:value_regex]) if obfuscator[:value_regex]
+          config_obj[:free_fn] = Datadog::AppSec::WAF::LibDDWAF::ObjectNoFree
 
           ruleset_info = LibDDWAF::RuleSetInfo.new
 
@@ -500,6 +530,19 @@ module Datadog
           list.get_array_of_string(0, count[:value])
         end
 
+        def update_rule_data(data)
+          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update_rule_data(@handle_obj, Datadog::AppSec::WAF.ruby_to_object(data, coerce: false))
+
+          RESULT_CODE[res]
+        end
+
+        def toggle_rules(map)
+          # { rule_id [String]: [boolean] }
+          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_toggle_rules(Datadog::AppSec::WAF.ruby_to_object(map, coerce: false))
+
+          RESULT_CODE[res]
+        end
+
         private
 
         def validate!
@@ -534,13 +577,14 @@ module Datadog
       end
 
       class Result
-        attr_reader :action, :data, :total_runtime, :timeout
+        attr_reader :status, :data, :total_runtime, :timeout, :actions
 
-        def initialize(action, data, total_runtime, timeout)
-          @action = action
+        def initialize(status, data, total_runtime, timeout, actions)
+          @status = status
           @data = data
           @total_runtime = total_runtime
           @timeout = timeout
+          @actions = actions
         end
       end
 
@@ -550,9 +594,8 @@ module Datadog
         def initialize(handle)
           handle_obj = handle.handle_obj
           retain(handle)
-          free_func = Datadog::AppSec::WAF::LibDDWAF::ObjectNoFree
 
-          @context_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle_obj, free_func)
+          @context_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle_obj)
           if @context_obj.null?
             fail LibDDWAF::Error, 'Could not create context'
           end
@@ -571,15 +614,6 @@ module Datadog
 
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
         end
-
-        ACTION_MAP_OUT = {
-          ddwaf_err_internal:         :err_internal,
-          ddwaf_err_invalid_object:   :err_invalid_object,
-          ddwaf_err_invalid_argument: :err_invalid_argument,
-          ddwaf_good:                 :good,
-          ddwaf_monitor:              :monitor,
-          ddwaf_block:                :block,
-        }
 
         def run(input, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           valid!
@@ -606,14 +640,21 @@ module Datadog
 
           code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
+          actions = if result_obj[:actions][:size] > 0
+                      result_obj[:actions][:array].get_array_of_string(0, result_obj[:actions][:size])
+                    else
+                      []
+                    end
+
           result = Result.new(
-            ACTION_MAP_OUT[code],
+            RESULT_CODE[code],
             (JSON.parse(result_obj[:data]) if result_obj[:data] != nil),
             result_obj[:total_runtime],
             result_obj[:timeout],
+            actions,
           )
 
-          [ACTION_MAP_OUT[code], result]
+          [RESULT_CODE[code], result]
         ensure
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
         end

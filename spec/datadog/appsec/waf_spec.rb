@@ -6,10 +6,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   let(:libddwaf) { Datadog::AppSec::WAF::LibDDWAF }
 
   it 'provides the internally stored version' do
-    version = libddwaf::Version.new
-    libddwaf.ddwaf_get_version(version)
+    version = libddwaf.ddwaf_get_version
 
-    expect([version[:major], version[:minor], version[:patch]].join('.')).to eq Datadog::AppSec::WAF::VERSION::BASE_STRING
+    expect(version).to eq Datadog::AppSec::WAF::VERSION::BASE_STRING
   end
 
   context 'Object' do
@@ -19,6 +18,26 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_invalid
+      libddwaf.ddwaf_object_free(object)
+    end
+
+    it 'creates ddwaf_object_bool with true' do
+      object = libddwaf::Object.new
+      r = libddwaf.ddwaf_object_bool(object, true)
+      expect(r.null?).to be false
+      expect(r.pointer).to eq object.pointer
+      expect(object[:type]).to eq :ddwaf_obj_bool
+      expect(object[:valueUnion][:boolean]).to be true
+      libddwaf.ddwaf_object_free(object)
+    end
+
+    it 'creates ddwaf_object_bool with false' do
+      object = libddwaf::Object.new
+      r = libddwaf.ddwaf_object_bool(object, false)
+      expect(r.null?).to be false
+      expect(r.pointer).to eq object.pointer
+      expect(object[:type]).to eq :ddwaf_obj_bool
+      expect(object[:valueUnion][:boolean]).to be false
       libddwaf.ddwaf_object_free(object)
     end
 
@@ -216,289 +235,562 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   end
 
   context 'ruby_to_object' do
-    it 'converts nil' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(nil)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 0
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
-    end
-
-    it 'converts an unhandled object' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(Object.new)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 0
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
-    end
-
-    it 'converts a boolean' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(true)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 4
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'true'
-      obj = Datadog::AppSec::WAF.ruby_to_object(false)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 5
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'false'
-    end
-
-    it 'converts a string' do
-      obj = Datadog::AppSec::WAF.ruby_to_object('foo')
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 3
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
-    end
-
-    it 'converts a binary string' do
-      obj = Datadog::AppSec::WAF.ruby_to_object("foo\x00bar")
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 7
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00bar"
-    end
-
-    it 'converts a symbol' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(:foo)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 3
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
-    end
-
-    it 'converts a positive integer' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(42)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 2
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '42'
-    end
-
-    it 'converts a negative integer' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(-42)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 3
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '-42'
-    end
-
-    it 'converts a float' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(Math::PI)
-      expect(obj[:type]).to eq :ddwaf_obj_string
-      expect(obj[:nbEntries]).to eq 17
-      expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '3.141592653589793'
-    end
-
-    it 'converts an empty array' do
-      obj = Datadog::AppSec::WAF.ruby_to_object([])
-      expect(obj[:type]).to eq :ddwaf_obj_array
-      expect(obj[:nbEntries]).to eq 0
-      expect(obj[:valueUnion][:array].null?).to be true
-    end
-
-    it 'converts a non-empty array' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(('a'..'f').to_a)
-      expect(obj[:type]).to eq :ddwaf_obj_array
-      expect(obj[:nbEntries]).to eq 6
-      array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
-        ptr = obj[:valueUnion][:array] + i * libddwaf::Object.size
-        o = libddwaf::Object.new(ptr)
-        l = o[:nbEntries]
-        v = o[:valueUnion][:stringValue].read_bytes(l)
-        a << v
+    context 'with coerction to string' do
+      it 'converts nil' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(nil)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
       end
-      expect(array).to eq ('a'..'f').to_a
-    end
 
-    it 'converts an empty hash' do
-      obj = Datadog::AppSec::WAF.ruby_to_object({})
-      expect(obj[:type]).to eq :ddwaf_obj_map
-      expect(obj[:nbEntries]).to eq 0
-      expect(obj[:valueUnion][:array].null?).to be true
-    end
-
-    it 'converts a non-empty hash' do
-      obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3})
-      expect(obj[:type]).to eq :ddwaf_obj_map
-      expect(obj[:nbEntries]).to eq 3
-      hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
-        ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
-        o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
-        l = o[:parameterNameLength]
-        k = o[:parameterName].read_bytes(l)
-        l = o[:nbEntries]
-        v = o[:valueUnion][:stringValue].read_bytes(l)
-        h[k] = v
+      it 'converts an unhandled object' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(Object.new)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
       end
-      expect(hash).to eq({ 'foo' => '1', 'bar' => '2', 'baz' => '3' })
-    end
 
-    it 'converts a big value' do
-      data = JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
-      Datadog::AppSec::WAF.ruby_to_object(data)
-      Datadog::AppSec::WAF.ruby_to_object(data)
-      Datadog::AppSec::WAF.ruby_to_object(data)
-      Datadog::AppSec::WAF.ruby_to_object(data)
-      Datadog::AppSec::WAF.ruby_to_object(data)
-      Datadog::AppSec::WAF.ruby_to_object(data)
-      Datadog::AppSec::WAF.ruby_to_object(data)
-    end
+      it 'converts a boolean' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(true)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 4
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'true'
+        obj = Datadog::AppSec::WAF.ruby_to_object(false)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 5
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'false'
+      end
 
-    context 'with limits' do
-      let(:max_container_size)  { 3 }
-      let(:max_container_depth) { 3 }
-      let(:max_string_length)   { 10 }
+      it 'converts a string' do
+        obj = Datadog::AppSec::WAF.ruby_to_object('foo')
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 3
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
+      end
 
-      context 'with container size limit' do
+      it 'converts a binary string' do
+        obj = Datadog::AppSec::WAF.ruby_to_object("foo\x00bar")
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 7
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00bar"
+      end
 
-        it 'converts an array up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object(('a'..'f').to_a, max_container_size: max_container_size)
-          expect(obj[:type]).to eq :ddwaf_obj_array
-          expect(obj[:nbEntries]).to eq 3
-          array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
-            ptr = obj[:valueUnion][:array] + i * libddwaf::Object.size
-            o = libddwaf::Object.new(ptr)
-            l = o[:nbEntries]
-            v = o[:valueUnion][:stringValue].read_bytes(l)
-            a << v
+      it 'converts a symbol' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(:foo)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 3
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
+      end
+
+      it 'converts a positive integer' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(42)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 2
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '42'
+      end
+
+      it 'converts a negative integer' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(-42)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 3
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '-42'
+      end
+
+      it 'converts a float' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(Math::PI)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 17
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '3.141592653589793'
+      end
+
+      it 'converts an empty array' do
+        obj = Datadog::AppSec::WAF.ruby_to_object([])
+        expect(obj[:type]).to eq :ddwaf_obj_array
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:array].null?).to be true
+      end
+
+      it 'converts a non-empty array' do
+        obj = Datadog::AppSec::WAF.ruby_to_object((1..6).to_a)
+        expect(obj[:type]).to eq :ddwaf_obj_array
+        expect(obj[:nbEntries]).to eq 6
+        array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
+          ptr = obj[:valueUnion][:array] + i * libddwaf::Object.size
+          o = libddwaf::Object.new(ptr)
+          l = o[:nbEntries]
+          v = o[:valueUnion][:stringValue].read_bytes(l)
+          a << v
+        end
+        expect(array).to eq ('1'..'6').to_a
+      end
+
+      it 'converts an empty hash' do
+        obj = Datadog::AppSec::WAF.ruby_to_object({})
+        expect(obj[:type]).to eq :ddwaf_obj_map
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:array].null?).to be true
+      end
+
+      it 'converts a non-empty hash' do
+        obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3})
+        expect(obj[:type]).to eq :ddwaf_obj_map
+        expect(obj[:nbEntries]).to eq 3
+        hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
+          ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
+          o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
+          l = o[:parameterNameLength]
+          k = o[:parameterName].read_bytes(l)
+          l = o[:nbEntries]
+          v = o[:valueUnion][:stringValue].read_bytes(l)
+          h[k] = v
+        end
+        expect(hash).to eq({ 'foo' => '1', 'bar' => '2', 'baz' => '3' })
+      end
+
+      it 'converts a big value' do
+        data = JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
+        Datadog::AppSec::WAF.ruby_to_object(data)
+      end
+
+      context 'with limits' do
+        let(:max_container_size)  { 3 }
+        let(:max_container_depth) { 3 }
+        let(:max_string_length)   { 10 }
+
+        context 'with container size limit' do
+          it 'converts an array up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object((1..6).to_a, max_container_size: max_container_size)
+            expect(obj[:type]).to eq :ddwaf_obj_array
+            expect(obj[:nbEntries]).to eq 3
+            array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
+              ptr = obj[:valueUnion][:array] + i * libddwaf::Object.size
+              o = libddwaf::Object.new(ptr)
+              l = o[:nbEntries]
+              v = o[:valueUnion][:stringValue].read_bytes(l)
+              a << v
+            end
+            expect(array).to eq ('1'..'3').to_a
           end
-          expect(array).to eq ('a'..'c').to_a
+
+          it 'converts a hash up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 3
+            hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
+              ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
+              o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
+              l = o[:parameterNameLength]
+              k = o[:parameterName].read_bytes(l)
+              l = o[:nbEntries]
+              v = o[:valueUnion][:stringValue].read_bytes(l)
+              h[k] = v
+            end
+            expect(hash).to eq({ 'foo' => '1', 'bar' => '2', 'baz' => '3' })
+          end
         end
 
-        it 'converts a hash up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size)
-          expect(obj[:type]).to eq :ddwaf_obj_map
-          expect(obj[:nbEntries]).to eq 3
-          hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
-            ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
-            o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
+        context 'with container depth limit' do
+          it 'converts nested arrays up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: max_container_depth)
+            expect(obj[:type]).to eq :ddwaf_obj_array
+            expect(obj[:nbEntries]).to eq 2
+
+            ptr1 = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+            ptr2 = obj[:valueUnion][:array] + 1 * libddwaf::Object.size
+            o1 = libddwaf::Object.new(ptr1)
+            o2 = libddwaf::Object.new(ptr2)
+
+            expect(o1[:type]).to eq :ddwaf_obj_string
+            l = o1[:nbEntries]
+            v = o1[:valueUnion][:stringValue].read_bytes(l)
+            expect(v).to eq '1'
+
+            expect(o2[:type]).to eq :ddwaf_obj_array
+            expect(o2[:nbEntries]).to eq 2
+
+            ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
+            ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
+            o1 = libddwaf::Object.new(ptr1)
+            o2 = libddwaf::Object.new(ptr2)
+
+            expect(o1[:type]).to eq :ddwaf_obj_string
+            l = o1[:nbEntries]
+            v = o1[:valueUnion][:stringValue].read_bytes(l)
+            expect(v).to eq '2'
+
+            expect(o2[:type]).to eq :ddwaf_obj_array
+            expect(o2[:nbEntries]).to eq 2
+
+            ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
+            ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
+            o1 = libddwaf::Object.new(ptr1)
+            o2 = libddwaf::Object.new(ptr2)
+
+            expect(o1[:type]).to eq :ddwaf_obj_string
+            l = o1[:nbEntries]
+            v = o1[:valueUnion][:stringValue].read_bytes(l)
+            expect(v).to eq '3'
+
+            expect(o2[:type]).to eq :ddwaf_obj_array
+            expect(o2[:nbEntries]).to eq 0
+          end
+
+          it 'converts nested hashes up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object({foo: { bar: { baz: { qux: 4}}}}, max_container_depth: max_container_depth)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 1
+
+            ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
             l = o[:parameterNameLength]
             k = o[:parameterName].read_bytes(l)
-            l = o[:nbEntries]
-            v = o[:valueUnion][:stringValue].read_bytes(l)
-            h[k] = v
+            expect(k).to eq 'foo'
+
+            expect(o[:type]).to eq :ddwaf_obj_map
+            expect(o[:nbEntries]).to eq 1
+
+            ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            expect(k).to eq 'bar'
+
+            expect(o[:type]).to eq :ddwaf_obj_map
+            expect(o[:nbEntries]).to eq 1
+
+            ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            expect(k).to eq 'baz'
+
+            expect(o[:type]).to eq :ddwaf_obj_map
+            expect(o[:nbEntries]).to eq 0
           end
-          expect(hash).to eq({ 'foo' => '1', 'bar' => '2', 'baz' => '3' })
+        end
+
+        context 'with string length limit' do
+          it 'converts a string up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object('foo' << 'o' * 80, max_string_length: max_string_length)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
+          end
+
+          it 'converts a binary string up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object("foo\x00bar" << 'r' * 80, max_string_length: max_string_length)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00barrrr"
+          end
+
+          it 'converts a symbol up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object(('foo' << 'o' * 80).to_sym, max_string_length: max_string_length)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
+          end
+
+          it 'converts hash keys up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object({('foo' << 'o' * 80) => 42}, max_string_length: max_string_length)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 1
+
+            ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            expect(l).to eq 10
+            expect(k).to eq 'fooooooooo'
+          end
         end
       end
+    end
 
-      context 'with container depth limit' do
-        it 'converts nested arrays up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: max_container_depth)
-          expect(obj[:type]).to eq :ddwaf_obj_array
-          expect(obj[:nbEntries]).to eq 2
+    context 'without coercion to string' do
+      it 'converts nil' do
+        # TODO: coerced because of arrays and maps
 
-          ptr1 = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
-          ptr2 = obj[:valueUnion][:array] + 1 * libddwaf::Object.size
-          o1 = libddwaf::Object.new(ptr1)
-          o2 = libddwaf::Object.new(ptr2)
-
-          expect(o1[:type]).to eq :ddwaf_obj_string
-          l = o1[:nbEntries]
-          v = o1[:valueUnion][:stringValue].read_bytes(l)
-          expect(v).to eq '1'
-
-          expect(o2[:type]).to eq :ddwaf_obj_array
-          expect(o2[:nbEntries]).to eq 2
-
-          ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
-          ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
-          o1 = libddwaf::Object.new(ptr1)
-          o2 = libddwaf::Object.new(ptr2)
-
-          expect(o1[:type]).to eq :ddwaf_obj_string
-          l = o1[:nbEntries]
-          v = o1[:valueUnion][:stringValue].read_bytes(l)
-          expect(v).to eq '2'
-
-          expect(o2[:type]).to eq :ddwaf_obj_array
-          expect(o2[:nbEntries]).to eq 2
-
-          ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
-          ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
-          o1 = libddwaf::Object.new(ptr1)
-          o2 = libddwaf::Object.new(ptr2)
-
-          expect(o1[:type]).to eq :ddwaf_obj_string
-          l = o1[:nbEntries]
-          v = o1[:valueUnion][:stringValue].read_bytes(l)
-          expect(v).to eq '3'
-
-          expect(o2[:type]).to eq :ddwaf_obj_array
-          expect(o2[:nbEntries]).to eq 0
-        end
-
-        it 'converts nested hashes up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object({foo: { bar: { baz: { qux: 4}}}}, max_container_depth: max_container_depth)
-          expect(obj[:type]).to eq :ddwaf_obj_map
-          expect(obj[:nbEntries]).to eq 1
-
-          ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
-          o = libddwaf::Object.new(ptr)
-
-          l = o[:parameterNameLength]
-          k = o[:parameterName].read_bytes(l)
-          expect(k).to eq 'foo'
-
-          expect(o[:type]).to eq :ddwaf_obj_map
-          expect(o[:nbEntries]).to eq 1
-
-          ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
-          o = libddwaf::Object.new(ptr)
-
-          l = o[:parameterNameLength]
-          k = o[:parameterName].read_bytes(l)
-          expect(k).to eq 'bar'
-
-          expect(o[:type]).to eq :ddwaf_obj_map
-          expect(o[:nbEntries]).to eq 1
-
-          ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
-          o = libddwaf::Object.new(ptr)
-
-          l = o[:parameterNameLength]
-          k = o[:parameterName].read_bytes(l)
-          expect(k).to eq 'baz'
-
-          expect(o[:type]).to eq :ddwaf_obj_map
-          expect(o[:nbEntries]).to eq 0
-        end
+        obj = Datadog::AppSec::WAF.ruby_to_object(nil, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
       end
 
-      context 'with string length limit' do
-        it 'converts a string up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object('foo' << 'o' * 80, max_string_length: max_string_length)
-          expect(obj[:type]).to eq :ddwaf_obj_string
-          expect(obj[:nbEntries]).to eq 10
-          expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
-        end
+      it 'converts an unhandled object' do
+        # TODO: coerced because of arrays and maps
 
-        it 'converts a binary string up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object("foo\x00bar" << 'r' * 80, max_string_length: max_string_length)
-          expect(obj[:type]).to eq :ddwaf_obj_string
-          expect(obj[:nbEntries]).to eq 10
-          expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00barrrr"
-        end
+        obj = Datadog::AppSec::WAF.ruby_to_object(Object.new, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
+      end
 
-        it 'converts a symbol up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object(('foo' << 'o' * 80).to_sym, max_string_length: max_string_length)
-          expect(obj[:type]).to eq :ddwaf_obj_string
-          expect(obj[:nbEntries]).to eq 10
-          expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
-        end
+      it 'converts a boolean' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(true, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_bool
+        expect(obj[:valueUnion][:boolean]).to eq true
+        obj = Datadog::AppSec::WAF.ruby_to_object(false, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_bool
+        expect(obj[:valueUnion][:boolean]).to eq false
+      end
 
-        it 'converts hash keys up to the limit' do
-          obj = Datadog::AppSec::WAF.ruby_to_object({('foo' << 'o' * 80) => 42}, max_string_length: max_string_length)
-          expect(obj[:type]).to eq :ddwaf_obj_map
-          expect(obj[:nbEntries]).to eq 1
+      it 'converts a string' do
+        obj = Datadog::AppSec::WAF.ruby_to_object('foo', coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 3
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
+      end
 
-          ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+      it 'converts a binary string' do
+        obj = Datadog::AppSec::WAF.ruby_to_object("foo\x00bar", coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 7
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00bar"
+      end
+
+      it 'converts a symbol' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(:foo, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 3
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'foo'
+      end
+
+      it 'converts a positive integer' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(42, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_unsigned
+        expect(obj[:valueUnion][:uintValue]).to eq 42
+      end
+
+      it 'converts a negative integer' do
+        obj = Datadog::AppSec::WAF.ruby_to_object(-42, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_signed
+        expect(obj[:valueUnion][:intValue]).to eq -42
+      end
+
+      it 'converts a float' do
+        # TODO: no coercion because no ddwaf type
+
+        obj = Datadog::AppSec::WAF.ruby_to_object(Math::PI, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:nbEntries]).to eq 17
+        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '3.141592653589793'
+      end
+
+      it 'converts an empty array' do
+        obj = Datadog::AppSec::WAF.ruby_to_object([], coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_array
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:array].null?).to be true
+      end
+
+      it 'converts a non-empty array' do
+        obj = Datadog::AppSec::WAF.ruby_to_object((1..6).to_a, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_array
+        expect(obj[:nbEntries]).to eq 6
+        array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
+          ptr = obj[:valueUnion][:array] + i * libddwaf::Object.size
           o = libddwaf::Object.new(ptr)
+          v = o[:valueUnion][:uintValue]
+          a << v
+        end
+        expect(array).to eq (1..6).to_a
+      end
 
+      it 'converts an empty hash' do
+        obj = Datadog::AppSec::WAF.ruby_to_object({}, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_map
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:array].null?).to be true
+      end
+
+      it 'converts a non-empty hash' do
+        obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3}, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_map
+        expect(obj[:nbEntries]).to eq 3
+        hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
+          ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
+          o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
           l = o[:parameterNameLength]
           k = o[:parameterName].read_bytes(l)
-          expect(l).to eq 10
-          expect(k).to eq 'fooooooooo'
+          v = o[:valueUnion][:uintValue]
+          h[k] = v
+        end
+        expect(hash).to eq({ 'foo' => 1, 'bar' => 2, 'baz' => 3 })
+      end
+
+      it 'converts a big value' do
+        data = JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
+        Datadog::AppSec::WAF.ruby_to_object(data)
+      end
+
+      context 'with limits' do
+        let(:max_container_size)  { 3 }
+        let(:max_container_depth) { 3 }
+        let(:max_string_length)   { 10 }
+
+        context 'with container size limit' do
+          it 'converts an array up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object((1..6).to_a, max_container_size: max_container_size, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_array
+            expect(obj[:nbEntries]).to eq 3
+            array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
+              ptr = obj[:valueUnion][:array] + i * libddwaf::Object.size
+              o = libddwaf::Object.new(ptr)
+              v = o[:valueUnion][:uintValue]
+              a << v
+            end
+            expect(array).to eq (1..3).to_a
+          end
+
+          it 'converts a hash up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 3
+            hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
+              ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
+              o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
+              l = o[:parameterNameLength]
+              k = o[:parameterName].read_bytes(l)
+              v = o[:valueUnion][:uintValue]
+              h[k] = v
+            end
+            expect(hash).to eq({ 'foo' => 1, 'bar' => 2, 'baz' => 3 })
+          end
+        end
+
+        context 'with container depth limit' do
+          it 'converts nested arrays up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: max_container_depth, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_array
+            expect(obj[:nbEntries]).to eq 2
+
+            ptr1 = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+            ptr2 = obj[:valueUnion][:array] + 1 * libddwaf::Object.size
+            o1 = libddwaf::Object.new(ptr1)
+            o2 = libddwaf::Object.new(ptr2)
+
+            expect(o1[:type]).to eq :ddwaf_obj_unsigned
+            v = o1[:valueUnion][:uintValue]
+            expect(v).to eq 1
+
+            expect(o2[:type]).to eq :ddwaf_obj_array
+            expect(o2[:nbEntries]).to eq 2
+
+            ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
+            ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
+            o1 = libddwaf::Object.new(ptr1)
+            o2 = libddwaf::Object.new(ptr2)
+
+            expect(o1[:type]).to eq :ddwaf_obj_unsigned
+            v = o1[:valueUnion][:uintValue]
+            expect(v).to eq 2
+
+            expect(o2[:type]).to eq :ddwaf_obj_array
+            expect(o2[:nbEntries]).to eq 2
+
+            ptr1 = o2[:valueUnion][:array] + 0 * libddwaf::Object.size
+            ptr2 = o2[:valueUnion][:array] + 1 * libddwaf::Object.size
+            o1 = libddwaf::Object.new(ptr1)
+            o2 = libddwaf::Object.new(ptr2)
+
+            expect(o1[:type]).to eq :ddwaf_obj_unsigned
+            v = o1[:valueUnion][:uintValue]
+            expect(v).to eq 3
+
+            expect(o2[:type]).to eq :ddwaf_obj_array
+            expect(o2[:nbEntries]).to eq 0
+          end
+
+          it 'converts nested hashes up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object({foo: { bar: { baz: { qux: 4}}}}, max_container_depth: max_container_depth, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 1
+
+            ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            expect(k).to eq 'foo'
+
+            expect(o[:type]).to eq :ddwaf_obj_map
+            expect(o[:nbEntries]).to eq 1
+
+            ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            expect(k).to eq 'bar'
+
+            expect(o[:type]).to eq :ddwaf_obj_map
+            expect(o[:nbEntries]).to eq 1
+
+            ptr = o[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            expect(k).to eq 'baz'
+
+            expect(o[:type]).to eq :ddwaf_obj_map
+            expect(o[:nbEntries]).to eq 0
+          end
+        end
+
+        context 'with string length limit' do
+          it 'converts a string up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object('foo' << 'o' * 80, max_string_length: max_string_length, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
+          end
+
+          it 'converts a binary string up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object("foo\x00bar" << 'r' * 80, max_string_length: max_string_length, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00barrrr"
+          end
+
+          it 'converts a symbol up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object(('foo' << 'o' * 80).to_sym, max_string_length: max_string_length, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq 'fooooooooo'
+          end
+
+          it 'converts hash keys up to the limit' do
+            obj = Datadog::AppSec::WAF.ruby_to_object({('foo' << 'o' * 80) => 42}, max_string_length: max_string_length, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 1
+
+            ptr = obj[:valueUnion][:array] + 0 * libddwaf::Object.size
+            o = libddwaf::Object.new(ptr)
+
+            l = o[:parameterNameLength]
+            k = o[:parameterName].read_bytes(l)
+            expect(l).to eq 10
+            expect(k).to eq 'fooooooooo'
+          end
         end
       end
     end
   end
 
   context 'object_to_ruby' do
+    it 'converts a boolean' do
+      obj = Datadog::AppSec::WAF.ruby_to_object(true, coerce: false)
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq(true)
+      obj = Datadog::AppSec::WAF.ruby_to_object(false, coerce: false)
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq(false)
+    end
+
     it 'converts a string' do
       obj = Datadog::AppSec::WAF.ruby_to_object('foo')
       expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq('foo')
@@ -510,13 +802,13 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'converts objects in an array recursively' do
-      obj = Datadog::AppSec::WAF.ruby_to_object(['a', 1, :foo, { bar: [42] }])
-      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq(['a', '1', 'foo', { 'bar' => ['42'] }])
+      obj = Datadog::AppSec::WAF.ruby_to_object(['a', 1, :foo, { bar: [42] }], coerce: false)
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq(['a', 1, 'foo', { 'bar' => [42] }])
     end
 
     it 'converts objects in a map recursively' do
-      obj = Datadog::AppSec::WAF.ruby_to_object({ foo: [{ bar: [42] }], 21 => 10.5 })
-      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => ['42'] }], '21' => '10.5' })
+      obj = Datadog::AppSec::WAF.ruby_to_object({ foo: [{ bar: [42] }], 21 => 10.5 }, coerce: false)
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => [42] }], '21' => '10.5' })
     end
   end
 
@@ -598,6 +890,26 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       }
     end
 
+    let(:data5) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '0.1.2'
+        },
+        'rules' => [
+          {
+            'id' => 1,
+            'name' => 'Rule 1',
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              { 'operator' => 'match_regex', 'parameters' => { 'inputs' => [{ 'address' => 'value1'}], 'regex' => 'rule2' } }
+            ],
+            'on_match' => ['action1', 'action2', 'action3', 'action4']
+          },
+        ],
+      }
+    end
+
     let(:bad_data) do
       {
         'version' => '1.0',
@@ -649,6 +961,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       Datadog::AppSec::WAF.ruby_to_object(data4)
     end
 
+    let(:rule5) do
+      Datadog::AppSec::WAF.ruby_to_object(data5)
+    end
+
     let(:bad_rule) do
       Datadog::AppSec::WAF.ruby_to_object(bad_data)
     end
@@ -673,6 +989,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     let(:attack) do
       Datadog::AppSec::WAF.ruby_to_object({ 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } })
+    end
+
+    let(:block) do
+      Datadog::AppSec::WAF.ruby_to_object({ value1: 'rule2' })
     end
 
     let(:timeout) do
@@ -766,54 +1086,78 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
       expect(handle.null?).to be false
 
-      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
       expect(context.null?).to be false
 
       result = Datadog::AppSec::WAF::LibDDWAF::Result.new
       code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
 
-      expect(code).to eq :ddwaf_monitor
+      expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
       expect(result[:data]).to_not be nil
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
+      expect(result[:actions][:size]).to eq 0
     end
 
     it 'does not trigger' do
       handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule2, config, ruleset_info)
       expect(handle.null?).to be false
 
-      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
       result = Datadog::AppSec::WAF::LibDDWAF::Result.new
       code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
-      expect(code).to eq :ddwaf_good
+      expect(code).to eq :ddwaf_ok
       expect(result[:timeout]).to eq false
       expect(result[:data]).to be nil
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
+      expect(result[:actions][:size]).to eq 0
     end
 
     it 'does not trigger a monitoring rule due to timeout' do
       handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
       expect(handle.null?).to be false
 
-      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
       expect(context.null?).to be false
 
       result = Datadog::AppSec::WAF::LibDDWAF::Result.new
       code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, input, result, 1)
 
-      expect(code).to eq :ddwaf_good
+      expect(code).to eq :ddwaf_ok
       expect(result[:timeout]).to eq true
       expect(result[:data]).to be nil
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
+      expect(result[:actions][:size]).to eq 0
     end
 
     it 'triggers a known attack' do
       handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule3, config, ruleset_info)
       expect(handle.null?).to be false
 
-      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle, FFI::Pointer::NULL)
+      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
       result = Datadog::AppSec::WAF::LibDDWAF::Result.new
       code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, attack, result, timeout)
-      expect(code).to eq :ddwaf_monitor
+      expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
       expect(result[:data]).to_not be nil
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
+      expect(result[:actions][:size]).to eq 0
+    end
+
+    it 'triggers a known actionable attack' do
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule5, config, ruleset_info)
+      expect(handle.null?).to be false
+
+      context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
+      result = Datadog::AppSec::WAF::LibDDWAF::Result.new
+      code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, block, result, timeout)
+      expect(code).to eq :ddwaf_match
+      expect(result[:timeout]).to eq false
+      expect(result[:data]).to_not be nil
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
+      expect(result[:actions][:size]).to eq 4
+      # TODO: not sure why libddwaf reverses actions
+      expect(result[:actions][:array].get_array_of_string(0, 4)).to eq ['action1', 'action2', 'action3', 'action4'].reverse
     end
   end
 end
@@ -1035,21 +1379,156 @@ RSpec.describe Datadog::AppSec::WAF do
     it 'passes non-matching input' do
       code, result = context.run(passing_input, timeout)
       perf_store[:total_runtime] << result.total_runtime
-      expect(code).to eq :good
-      expect(result.action).to eq :good
+      expect(code).to eq :ok
+      expect(result.status).to eq :ok
       expect(result.data).to be nil
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
+      expect(result.actions).to eq []
     end
 
     it 'catches a match' do
       code, result = context.run(matching_input, timeout)
       perf_store[:total_runtime] << result.total_runtime
-      expect(code).to eq :monitor
-      expect(result.action).to eq :monitor
+      expect(code).to eq :match
+      expect(result.status).to eq :match
       expect(result.data).to be_a Array
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
+      expect(result.actions).to eq []
+    end
+  end
+
+  context 'run with a blocking rule' do
+    let(:rule) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '1.4.1'
+        },
+        'rules' => [
+          {
+            'id' => 'blk-001-001',
+            'name' => 'Block IP Addresses',
+            'tags' => { 'type' => 'block_ip', 'category' => 'security_response' },
+            'conditions' => [
+              {
+                'operator' => 'ip_match',
+                'parameters' => { 'inputs' => [{ 'address' => 'http.client_ip' }], 'data' => 'blocked_ips' }
+              }
+            ],
+            'transformers' => [],
+            'on_match' => ['block']
+          }
+        ]
+      }
+    end
+
+    let(:passing_input) do
+      { 'http.client_ip' => '1.1.1.1' }
+    end
+
+    let(:matching_ip) do
+      '1.2.3.4'
+    end
+
+    let(:matching_input) do
+      { 'http.client_ip' => matching_ip }
+    end
+
+    let(:matching_input_rule) do
+      'blk-001-001'
+    end
+
+    let(:data_id) do
+      'blocked_ips'
+    end
+
+    let(:data_type) do
+      'data_with_expiration'
+    end
+
+    let(:data) do
+      [
+        {
+          'id' => data_id,
+          'type' => data_type,
+          'data' => [{ 'value' => matching_ip, 'expiration' => (Time.now + 1000).to_i }]
+        }
+      ]
+    end
+
+    context 'without rule data' do
+      it 'passes any input' do
+        code, result = context.run(passing_input, timeout)
+        perf_store[:total_runtime] << result.total_runtime
+        expect(code).to eq :ok
+        expect(result.status).to eq :ok
+        expect(result.data).to be nil
+        expect(result.total_runtime).to be > 0
+        expect(result.timeout).to eq false
+        expect(result.actions).to eq []
+        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+      end
+    end
+
+    context 'with invalid rule data' do
+      context 'at top level' do
+        let(:data) { 'foo' }
+
+        it 'fails to update' do
+          expect(handle.update_rule_data(data)).to eq :err_invalid_object
+          expect(log_store.find { |log| log[:message] =~ /bad cast/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Updating rules with id/ }).to be_nil
+        end
+      end
+
+      context 'nested' do
+        let(:data) { ['foo'] }
+
+        it 'fails to update' do
+          expect(handle.update_rule_data(data)).to eq :ok # TODO: should be :err_invalid_object?
+          expect(log_store.find { |log| log[:message] =~ /bad cast/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Updating rules with id/ }).to be_nil
+        end
+      end
+    end
+
+    context 'with valid rule data' do
+      before do
+        code = handle.update_rule_data(data)
+
+        expect(code).to eq :ok
+        expect(log_store.find { |log| log[:message] =~ /Updating rules with id '#{data_id}' and type '#{data_type}'/ }).to_not be_nil
+      end
+
+      it 'passes non-matching input' do
+        code, result = context.run(passing_input, timeout)
+        perf_store[:total_runtime] << result.total_runtime
+        expect(code).to eq :ok
+        expect(result.status).to eq :ok
+        expect(result.data).to be nil
+        expect(result.total_runtime).to be > 0
+        expect(result.timeout).to eq false
+        expect(result.actions).to eq []
+        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+      end
+
+      it 'catches a match' do
+        code, result = context.run(matching_input, timeout)
+        perf_store[:total_runtime] << result.total_runtime
+        expect(code).to eq :match
+        expect(result.status).to eq :match
+        expect(result.data).to be_a Array
+        expect(result.total_runtime).to be > 0
+        expect(result.timeout).to eq false
+        expect(result.actions).to eq ['block']
+        expect(result.data.find { |r| r['rule']['id'] == matching_input_rule }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+      end
     end
   end
 
@@ -1073,11 +1552,12 @@ RSpec.describe Datadog::AppSec::WAF do
     it 'passes non-matching input' do
       code, result = context.run(passing_input, timeout)
       perf_store[:total_runtime] << result.total_runtime
-      expect(code).to eq :good
-      expect(result.action).to eq :good
+      expect(code).to eq :ok
+      expect(result.status).to eq :ok
       expect(result.data).to be nil
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
+      expect(result.actions).to eq []
       expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
       expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
     end
@@ -1085,36 +1565,97 @@ RSpec.describe Datadog::AppSec::WAF do
     it 'catches a match' do
       code, result = context.run(matching_input, timeout)
       perf_store[:total_runtime] << result.total_runtime
-      expect(code).to eq :monitor
-      expect(result.action).to eq :monitor
+      expect(code).to eq :match
+      expect(result.status).to eq :match
       expect(result.data).to be_a Array
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
+      expect(result.actions).to eq []
       expect(result.data.find { |r| r['rule']['id'] == matching_input_rule }).to_not be_nil
       expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
       expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
     end
 
-    context 'with limits' do
+    context 'with configured limits' do
       context 'exceeding max_container_size' do
         let(:handle) do
           Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_size: 1 })
         end
 
-        let(:matching_input) do
-          { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP', 'foo' => 'bar' } }
+        context 'when key is ouside of limit yet found by path' do
+          let(:matching_input) do
+            { 1 => 1, 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP', 2 => 2 } }
+          end
+
+          it 'matches on matching input' do
+            code, result = context.run(matching_input, timeout)
+            perf_store[:total_runtime] << result.total_runtime
+            expect(code).to eq :match
+            expect(result.status).to eq :match
+            expect(result.data).to be_a Array
+            expect(result.total_runtime).to be > 0
+            expect(result.timeout).to eq false
+            expect(result.actions).to eq []
+            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+            expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+          end
         end
 
-        it 'passes on matching input outside of limit' do
-          code, result = context.run(matching_input, timeout)
-          perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :err_invalid_object
-          expect(result.action).to eq :err_invalid_object
-          expect(result.data).to be nil
-          expect(result.total_runtime).to eq(0)
-          expect(result.timeout).to eq false
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to be_nil
-          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        context 'when sub-key is outside of limit yet found by path' do
+          let(:matching_input) do
+            { 1 => 1, 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP', 2 => 2 } }
+          end
+
+          it 'matches on matching input' do
+            code, result = context.run(matching_input, timeout)
+            perf_store[:total_runtime] << result.total_runtime
+            expect(code).to eq :match
+            expect(result.status).to eq :match
+            expect(result.data).to be_a Array
+            expect(result.total_runtime).to be > 0
+            expect(result.timeout).to eq false
+            expect(result.actions).to eq []
+            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+            expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+          end
+        end
+
+        context 'when sub-key is outside of limit yet found by path and value exceeds limit' do
+          let(:matching_input) do
+            { 1 => 1, 'server.request.headers.no_cookies' => { 2 => 2, 'user-agent' => { 3 => 3, 4 => 'Nessus SOAP' } } }
+          end
+
+          it 'passes on matching input outside of limit' do
+            code, result = context.run(matching_input, timeout)
+            perf_store[:total_runtime] << result.total_runtime
+            expect(code).to eq :ok
+            expect(result.status).to eq :ok
+            expect(result.data).to be nil
+            expect(result.total_runtime).to be > 0
+            expect(result.timeout).to eq false
+            expect(result.actions).to eq []
+            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+            expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+          end
+        end
+
+        context 'when sub-key is outside of limit yet found by path and value does not exceeds limit' do
+          let(:matching_input) do
+            { 1 => 1, 'server.request.headers.no_cookies' => { 2 => 2, 'user-agent' => { 4 => 'Nessus SOAP' } } }
+          end
+
+          it 'matches input inside of limit' do
+            code, result = context.run(matching_input, timeout)
+            perf_store[:total_runtime] << result.total_runtime
+            expect(code).to eq :match
+            expect(result.status).to eq :match
+            expect(result.data).to be_a Array
+            expect(result.total_runtime).to be > 0
+            expect(result.timeout).to eq false
+            expect(result.actions).to eq []
+            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+            expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+          end
         end
       end
 
@@ -1130,12 +1671,13 @@ RSpec.describe Datadog::AppSec::WAF do
         it 'passes on matching input outside of limit' do
           code, result = context.run(matching_input, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :err_invalid_object
-          expect(result.action).to eq :err_invalid_object
+          expect(code).to eq :ok
+          expect(result.status).to eq :ok
           expect(result.data).to be nil
-          expect(result.total_runtime).to eq(0)
+          expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to be_nil
+          expect(result.actions).to eq []
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
       end
@@ -1153,13 +1695,13 @@ RSpec.describe Datadog::AppSec::WAF do
           code, result = context.run(matching_input, timeout)
           perf_store[:total_runtime] << result.total_runtime
 
-          skip 'not implemented in libddwaf yet'
-          expect(code).to eq :err_invalid_object
-          expect(result.action).to eq :err_invalid_object
+          expect(code).to eq :ok
+          expect(result.status).to eq :ok
           expect(result.data).to be nil
-          expect(result.total_runtime).to eq(0)
+          expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to be_nil
+          expect(result.actions).to eq []
+          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
       end
@@ -1178,13 +1720,14 @@ RSpec.describe Datadog::AppSec::WAF do
         it 'obfuscates the key' do
           code, result = context.run(matching_input, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :monitor
-          expect(result.action).to eq :monitor
+          expect(code).to eq :match
+          expect(result.status).to eq :match
           expect(result.data).to be_a Array
           expect(result.data.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
           expect(result.data.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
+          expect(result.actions).to eq []
           expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
@@ -1202,13 +1745,14 @@ RSpec.describe Datadog::AppSec::WAF do
         it 'obfuscates the value' do
           code, result = context.run(matching_input, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :monitor
-          expect(result.action).to eq :monitor
+          expect(code).to eq :match
+          expect(result.status).to eq :match
           expect(result.data).to be_a Array
           expect(result.data.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
           expect(result.data.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
+          expect(result.actions).to eq []
           expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
@@ -1251,22 +1795,24 @@ RSpec.describe Datadog::AppSec::WAF do
       it 'runs once on passing input' do
         code, result = context.run(passing_input_user_agent, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :good
-        expect(result.action).to eq :good
+        expect(code).to eq :ok
+        expect(result.status).to eq :ok
         expect(result.data).to be nil
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(passing_input_user_agent, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :good
-        expect(result.action).to eq :good
+        expect(code).to eq :ok
+        expect(result.status).to eq :ok
         expect(result.data).to be nil
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
@@ -1275,19 +1821,21 @@ RSpec.describe Datadog::AppSec::WAF do
       it 'runs once on unchanged input' do
         code, result = context.run(matching_input_user_agent, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :monitor
-        expect(result.action).to eq :monitor
+        expect(code).to eq :match
+        expect(result.status).to eq :match
         expect(result.data).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         code, result = context.run(matching_input_user_agent, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :good
-        expect(result.action).to eq :good
+        expect(code).to eq :ok
+        expect(result.status).to eq :ok
         expect(result.data).to be nil
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         # TODO: also stress test changing matching values, e.g using arachni/v\d+
         # CHECK: maybe it will bail out and return only the first one?
@@ -1298,15 +1846,16 @@ RSpec.describe Datadog::AppSec::WAF do
 
         it 'matches the first entry' do
           first_matching_input = {
-            'server.request.body' => { 'a' => '.htaccess' }
+            'server.request.body' => { 'a' => '/.htaccess' }
           }
           code, result = context.run(first_matching_input, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :monitor
-          expect(result.action).to eq :monitor
+          expect(code).to eq :match
+          expect(result.status).to eq :match
           expect(result.data).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
+          expect(result.actions).to eq []
 
           expect(result.data.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Running .* #{long_rule}/ }).to_not be_nil
@@ -1315,12 +1864,12 @@ RSpec.describe Datadog::AppSec::WAF do
 
         it 'matches the last entry' do
           last_matching_input = {
-            'server.request.body' => { 'a' => 'yarn.lock' }
+            'server.request.body' => { 'a' => '/yarn.lock' }
           }
           code, result = context.run(last_matching_input, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :monitor
-          expect(result.action).to eq :monitor
+          expect(code).to eq :match
+          expect(result.status).to eq :match
           expect(result.data).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
@@ -1337,23 +1886,25 @@ RSpec.describe Datadog::AppSec::WAF do
 
           code, result = context.run(matching_input_user_agent, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :monitor
-          expect(result.action).to eq :monitor
+          expect(code).to eq :match
+          expect(result.status).to eq :match
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
           expect(result.data).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
+          expect(result.actions).to eq []
 
           # stress test rerun on unchanged input
           100.times do
             code, result = context.run(matching_input_user_agent, timeout)
             perf_store[:total_runtime] << result.total_runtime
-            expect(code).to eq :good
-            expect(result.action).to eq :good
+            expect(code).to eq :ok
+            expect(result.status).to eq :ok
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
             expect(result.data).to be nil
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
+            expect(result.actions).to eq []
           end
 
           # TODO: also stress test changing matching values, e.g using arachni/v\d+
@@ -1370,34 +1921,38 @@ RSpec.describe Datadog::AppSec::WAF do
           code, result = context.run(matching_input_user_agent, timeout)
           perf_store[:total_runtime] << result.total_runtime
 
-          expect(code).to eq :good
+          expect(code).to eq :ok
+          expect(result.status).to eq :ok
           expect(result.data).to be_nil
           expect(result.total_runtime).to be > 0
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to_not be_nil
 
           expect(result.timeout).to eq true
+          expect(result.actions).to eq []
         end
       end
 
       it 'runs twice on changed input value' do
         code, result = context.run(passing_input_user_agent, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :good
-        expect(result.action).to eq :good
+        expect(code).to eq :ok
+        expect(result.status).to eq :ok
         expect(result.data).to be nil
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_user_agent, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :monitor
-        expect(result.action).to eq :monitor
+        expect(code).to eq :match
+        expect(result.status).to eq :match
         expect(result.data).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(result.data.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
@@ -1407,11 +1962,12 @@ RSpec.describe Datadog::AppSec::WAF do
       it 'runs twice on additional input key for an independent rule' do
         code, result = context.run(matching_input_user_agent, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :monitor
-        expect(result.action).to eq :monitor
+        expect(code).to eq :match
+        expect(result.status).to eq :match
         expect(result.data).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(result.data.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
@@ -1419,11 +1975,12 @@ RSpec.describe Datadog::AppSec::WAF do
 
         code, result = context.run(matching_input_sqli, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :monitor
-        expect(result.action).to eq :monitor
+        expect(code).to eq :match
+        expect(result.status).to eq :match
         expect(result.data).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(result.data.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to be_nil
         expect(result.data.find { |r| r['rule']['id'] == matching_input_sqli_rule }).to_not be_nil
@@ -1434,22 +1991,24 @@ RSpec.describe Datadog::AppSec::WAF do
       it 'runs twice on additional input key for a rule needing both keys to match' do
         code, result = context.run(matching_input_path, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :good
-        expect(result.action).to eq :good
+        expect(code).to eq :ok
+        expect(result.status).to eq :ok
         expect(result.data).to be nil
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_status, timeout)
         perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :monitor
-        expect(result.action).to eq :monitor
+        expect(code).to eq :match
+        expect(result.status).to eq :match
         expect(result.data).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
+        expect(result.actions).to eq []
 
         expect(result.data.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
@@ -1463,11 +2022,12 @@ RSpec.describe Datadog::AppSec::WAF do
 
           code, result = context.run(input, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :good
-          expect(result.action).to eq :good
+          expect(code).to eq :ok
+          expect(result.status).to eq :ok
           expect(result.data).to be nil
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
+          expect(result.actions).to eq []
 
           expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
@@ -1480,11 +2040,12 @@ RSpec.describe Datadog::AppSec::WAF do
         lambda do
           code, result = context.run(matching_input_status, timeout)
           perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :monitor
-          expect(result.action).to eq :monitor
+          expect(code).to eq :match
+          expect(result.status).to eq :match
           expect(result.data).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
+          expect(result.actions).to eq []
 
           expect(result.data.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
