@@ -40,6 +40,7 @@ module FFI
     def null?: () -> bool
     def initialize: (?Pointer) -> void
     def []: (Symbol) -> untyped
+    def []=: (Symbol, untyped) -> untyped
     def pointer: () -> Pointer
   end
 

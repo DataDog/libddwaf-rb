@@ -284,10 +284,7 @@ module Datadog
       end
 
       def self.version
-        version = LibDDWAF::Version.new
-        LibDDWAF.ddwaf_get_version(version.pointer)
-
-        [version[:major], version[:minor], version[:patch]]
+        LibDDWAF.ddwaf_get_version
       end
 
       def self.ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil, coerce: true)
@@ -537,8 +534,7 @@ module Datadog
         end
 
         def toggle_rules(map)
-          # { rule_id [String]: [boolean] }
-          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_toggle_rules(Datadog::AppSec::WAF.ruby_to_object(map, coerce: false))
+          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_toggle_rules(@handle_obj, Datadog::AppSec::WAF.ruby_to_object(map, coerce: false))
 
           RESULT_CODE[res]
         end

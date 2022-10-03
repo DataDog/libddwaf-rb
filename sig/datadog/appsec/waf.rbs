@@ -23,10 +23,7 @@ module Datadog
 
         # version
 
-        class Version < ::FFI::Struct
-        end
-
-        def self.ddwaf_get_version: (::FFI::Pointer) -> void
+        def self.ddwaf_get_version: () -> ::String
 
         # ddwaf::object data structure
 
@@ -57,6 +54,7 @@ module Datadog
         def self.ddwaf_object_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_unsigned_force: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_signed_force: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
+        def self.ddwaf_object_bool: (LibDDWAF::Object, bool) -> ::FFI::Pointer
 
         def self.ddwaf_object_array: (LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_object_array_add: (LibDDWAF::Object, LibDDWAF::Object) -> bool
@@ -67,6 +65,15 @@ module Datadog
         def self.ddwaf_object_map_addl_nc: (LibDDWAF::Object, ::String, ::Integer, LibDDWAF::Object) -> bool
 
         # getters
+
+        def self.ddwaf_object_type: (LibDDWAF::Object) -> ::FFI::Enum
+        def self.ddwaf_object_size: (LibDDWAF::Object) -> ::Integer
+        def self.ddwaf_object_length: (LibDDWAF::Object) -> ::Integer
+        def self.ddwaf_object_get_key: (LibDDWAF::Object, SizeTPtr) -> ::String
+        def self.ddwaf_object_get_string: (LibDDWAF::Object, SizeTPtr) -> ::String
+        def self.ddwaf_object_get_unsigned: (LibDDWAF::Object, SizeTPtr) -> ::Integer
+        def self.ddwaf_object_get_signed: (LibDDWAF::Object, SizeTPtr) -> ::Integer
+        def self.ddwaf_object_get_index: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
 
         # freeers
 
@@ -96,13 +103,22 @@ module Datadog
         def self.ddwaf_destroy: (::FFI::Pointer) -> void
 
         def self.ddwaf_required_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
+        def self.ddwaf_rule_data_ids: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
+
+        # updating
+
+        DDWAF_RET_CODE: ::FFI::Enum
+
+        def self.ddwaf_update_rule_data: (::FFI::Pointer, LibDDWAF::Object) -> ::Symbol
+        def self.ddwaf_toggle_rules: (::FFI::Pointer, LibDDWAF::Object) -> ::Symbol
 
         # running
 
-        def self.ddwaf_context_init: (::FFI::Pointer, ::FFI::Function | ::FFI::Pointer) -> ::FFI::Pointer
+        def self.ddwaf_context_init: (::FFI::Pointer) -> ::FFI::Pointer
         def self.ddwaf_context_destroy: (::FFI::Pointer) -> void
 
-        DDWAF_RET_CODE: ::FFI::Enum
+        class ResultActions < ::FFI::Struct
+        end
 
         class Result < ::FFI::Struct
         end
@@ -132,11 +148,11 @@ module Datadog
         DDWAF_RUN_TIMEOUT: ::Integer
       end
 
-      def self.version: () -> ::Array[::Integer]
+      def self.version: () -> ::String
 
       type data = String | Symbol | Integer | Float | TrueClass | FalseClass | Array[data] | Hash[String | Symbol, data] | nil
 
-      def self.ruby_to_object: (data val, ?max_container_size: ::Integer?, ?max_container_depth: ::Integer?, ?max_string_length: ::Integer?) -> ::Datadog::AppSec::WAF::LibDDWAF::Object
+      def self.ruby_to_object: (data val, ?max_container_size: ::Integer?, ?max_container_depth: ::Integer?, ?max_string_length: ::Integer?, ?coerce: bool?) -> ::Datadog::AppSec::WAF::LibDDWAF::Object
       def self.object_to_ruby: (::Datadog::AppSec::WAF::LibDDWAF::Object obj) -> data
 
       self.@logger: ::Logger
@@ -146,6 +162,8 @@ module Datadog
       def self.logger: () -> ::Logger
       def self.logger=: (::Logger logger) -> void
 
+      RESULT_CODE: ::Hash[::Symbol, ::Symbol]
+
       class Handle
         attr_reader handle_obj: ::FFI::Pointer
         attr_reader ruleset_info: Hash[Symbol, untyped]
@@ -153,6 +171,8 @@ module Datadog
         def initialize: (data rule, ?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
         def finalize: () -> untyped
         def required_addresses: () -> ::Array[::String]
+        def update_rule_data: (::Array[untyped]) -> ::Symbol
+        def toggle_rules: (::Hash[::String, bool]) -> ::Symbol
 
         private
 
@@ -173,12 +193,13 @@ module Datadog
       type result_data = Array[untyped] | nil
 
       class Result
-        attr_reader action: ::Symbol
+        attr_reader status: ::Symbol
         attr_reader data: untyped
         attr_reader total_runtime: ::Float
         attr_reader timeout: bool
+        attr_reader actions: ::Array[::String]
 
-        def initialize: (::Symbol, result_data, ::Float, bool) -> void
+        def initialize: (::Symbol, result_data, ::Float, bool, ::Array[::String]) -> void
       end
 
       class Context
@@ -186,8 +207,6 @@ module Datadog
 
         def initialize: (Handle handle) -> void
         def finalize: () -> void
-
-        ACTION_MAP_OUT: ::Hash[::Symbol, ::Symbol]
 
         def run: (data input, ?::Integer timeout) -> ::Array[top]
 
