@@ -19,7 +19,7 @@ gem 'rspec_junit_formatter', '>= 0.4.1'
 gem 'rspec_n', '~> 1.3' if RUBY_VERSION >= '2.4.0'
 
 if RUBY_VERSION >= '2.4.0'
-  gem 'rubocop', '~> 1.10', require: false
+  gem 'rubocop', '~> 1.36', require: false
   gem 'rubocop-performance', '~> 1.9', require: false
   gem 'rubocop-rspec', '~> 2.2', require: false
 end
