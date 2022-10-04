@@ -16,7 +16,7 @@ module Datadog
         def self.source_dir: () -> ::String
         def self.vendor_dir: () -> ::String
         def self.libddwaf_vendor_dir: () -> ::String
-        def self.shared_lib_triplet: () -> ::String
+        def self.shared_lib_triplet: (?version: ::String?) -> ::String
         def self.libddwaf_dir: () -> ::String
         def self.shared_lib_extname: () -> ::String
         def self.shared_lib_path: () -> ::String
