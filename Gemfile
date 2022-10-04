@@ -18,7 +18,7 @@ gem 'rspec-collection_matchers', '~> 1.1'
 gem 'rspec_junit_formatter', '>= 0.4.1'
 gem 'rspec_n', '~> 1.3' if RUBY_VERSION >= '2.4.0'
 
-if RUBY_VERSION >= '2.4.0'
+if RUBY_VERSION >= '2.6.0'
   gem 'rubocop', '~> 1.36', require: false
   gem 'rubocop-performance', '~> 1.9', require: false
   gem 'rubocop-rspec', '~> 2.2', require: false
@@ -37,5 +37,7 @@ end
 
 gem 'yard', '~> 0.9'
 
-gem 'steep'
-gem 'rbs'
+if RUBY_VERSION >= '2.5.0'
+  gem 'steep'
+  gem 'rbs'
+end
