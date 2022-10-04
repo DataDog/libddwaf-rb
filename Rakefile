@@ -430,18 +430,16 @@ task :binary, [:platform] => [] do |_, args|
       'aarch64-linux-musl',
     ],
     'java' => [
-      'x86_64-linux-gnu',
-      'x86_64-linux-musl',
-      'aarch64-linux-gnu',
-      'aarch64-linux-musl',
+      'x86_64-linux',
+      'aarch64-linux',
       'x86_64-darwin',
       'arm64-darwin',
     ],
   }
 
   # alias default portable build
-  subplatform_for['x86_64-linux']  = subplatform_for['x86_64-linux:gnu+musl']
-  subplatform_for['aarch64-linux'] = subplatform_for['aarch64-linux:gnu+musl']
+  subplatform_for['x86_64-linux']  = subplatform_for['x86_64-linux:llvm']
+  subplatform_for['aarch64-linux'] = subplatform_for['aarch64-linux:llvm']
 
   # preprocess argument
   platform_arg = args.to_h[:platform]

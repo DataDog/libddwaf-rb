@@ -69,12 +69,22 @@ module Datadog
           File.join(vendor_dir, 'libddwaf')
         end
 
-        def self.shared_lib_triplet
-          local_version ? "#{local_os}-#{local_version}-#{local_cpu}" : "#{local_os}-#{local_cpu}"
+        def self.shared_lib_triplet(version: local_version)
+          version ? "#{local_os}-#{version}-#{local_cpu}" : "#{local_os}-#{local_cpu}"
         end
 
         def self.libddwaf_dir
-          File.join(libddwaf_vendor_dir, "libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{shared_lib_triplet}")
+          candidates = [
+            File.join(libddwaf_vendor_dir,
+                      "libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{shared_lib_triplet}")
+          ]
+
+          if local_os == 'linux'
+            candidates << File.join(libddwaf_vendor_dir,
+                                    "libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{shared_lib_triplet(version: nil)}")
+          end
+
+          candidates.find { |d| Dir.exist?(d) } || candidates.first
         end
 
         def self.shared_lib_extname

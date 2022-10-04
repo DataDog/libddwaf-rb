@@ -10,127 +10,127 @@ jobs:
         include:
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:3.1
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-gnu
+            platform: aarch64-linux
             image: ruby:3.1
             qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:3.0
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-gnu
+            platform: aarch64-linux
             image: ruby:3.0
             qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:2.7
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-gnu
+            platform: aarch64-linux
             image: ruby:2.7
             qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:2.6
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-gnu
+            platform: aarch64-linux
             image: ruby:2.6
             qemu: arm64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:2.5
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:2.4
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:2.3
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:2.2
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-gnu
+            platform: x86_64-linux
             image: ruby:2.1
             qemu: amd64
             libc: gnu
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-musl
+            platform: x86_64-linux
             image: ruby:3.1-alpine
             qemu: amd64
             libc: musl
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-musl
+            platform: aarch64-linux
             image: ruby:3.1-alpine
             qemu: arm64
             libc: musl
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-musl
+            platform: x86_64-linux
             image: ruby:3.0-alpine
             qemu: amd64
             libc: musl
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-musl
+            platform: aarch64-linux
             image: ruby:3.0-alpine
             qemu: arm64
             libc: musl
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-musl
+            platform: x86_64-linux
             image: ruby:2.7-alpine
             qemu: amd64
             libc: musl
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-musl
+            platform: aarch64-linux
             image: ruby:2.7-alpine
             qemu: arm64
             libc: musl
           - os: ubuntu-20.04
             cpu: x86_64
-            platform: x86_64-linux-musl
+            platform: x86_64-linux
             image: ruby:2.6-alpine
             qemu: amd64
             libc: musl
           - os: ubuntu-20.04
             cpu: aarch64
-            platform: aarch64-linux-musl
+            platform: aarch64-linux
             image: ruby:2.6-alpine
             qemu: arm64
             libc: musl
