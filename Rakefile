@@ -480,7 +480,7 @@ task :binary, [:platform] => [] do |_, args|
 
   gemspec.files = []
   gemspec.files += Dir['lib/**/*.rb']
-  gemspec.files += ['NOTICE'] + Dir['LICENSE*']
+  gemspec.files += ['NOTICE', 'CHANGELOG.md'] + Dir['LICENSE*']
 
   gemspec.files += shared_lib_paths
 
