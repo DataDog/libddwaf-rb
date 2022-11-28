@@ -539,15 +539,21 @@ module Datadog
         end
 
         def update_rule_data(data)
-          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update_rule_data(@handle_obj, Datadog::AppSec::WAF.ruby_to_object(data, coerce: false))
+          data_obj = Datadog::AppSec::WAF.ruby_to_object(data, coerce: false)
+          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update_rule_data(@handle_obj, data_obj)
 
           RESULT_CODE[res]
+        ensure
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(data_obj) if data_obj
         end
 
         def toggle_rules(map)
-          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_toggle_rules(@handle_obj, Datadog::AppSec::WAF.ruby_to_object(map, coerce: false))
+          map_obj = Datadog::AppSec::WAF.ruby_to_object(map, coerce: false)
+          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_toggle_rules(@handle_obj, map_obj)
 
           RESULT_CODE[res]
+        ensure
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(map_obj) if map_obj
         end
 
         private
