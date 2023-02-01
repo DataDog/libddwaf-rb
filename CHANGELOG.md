@@ -1,3 +1,8 @@
+# 2023-02-01 v1.5.1.0.1
+
+- Fix incorrect size in input string limit
+- Fix object freeing on `update_rule_data` and `toggle_rules`
+
 # 2022-10-04 v1.5.1.0.0
 
 - Update to libddwaf 1.5.1
