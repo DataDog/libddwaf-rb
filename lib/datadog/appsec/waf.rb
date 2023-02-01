@@ -627,7 +627,7 @@ module Datadog
 
           max_container_size  = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
           max_container_depth = LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH
-          max_string_length   = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
+          max_string_length   = LibDDWAF::DDWAF_MAX_STRING_LENGTH
 
           input_obj = Datadog::AppSec::WAF.ruby_to_object(input,
                                                           max_container_size: max_container_size,
