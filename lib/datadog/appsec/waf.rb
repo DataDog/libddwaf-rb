@@ -203,8 +203,8 @@ module Datadog
           end
 
           class Obfuscator < ::FFI::Struct
-            layout :key_regex,   :pointer, # :charptr
-                   :value_regex, :pointer  # :charptr
+            layout :key_regex,   :pointer, # should be :charptr
+                   :value_regex, :pointer  # should be :charptr
           end
 
           layout :limits,     Limits,
