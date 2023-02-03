@@ -1644,12 +1644,12 @@ RSpec.describe Datadog::AppSec::WAF do
             { 1 => 1, 'server.request.headers.no_cookies' => { 2 => 2, 'user-agent' => { 4 => 'Nessus SOAP' } } }
           end
 
-          it 'matches input inside of limit' do
+          it 'passes input inside of limit' do
             code, result = context.run(matching_input, timeout)
             perf_store[:total_runtime] << result.total_runtime
-            expect(code).to eq :match
-            expect(result.status).to eq :match
-            expect(result.data).to be_a Array
+            expect(code).to eq :ok
+            expect(result.status).to eq :ok
+            expect(result.data).to be nil
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []

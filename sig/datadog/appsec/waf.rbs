@@ -74,6 +74,7 @@ module Datadog
         def self.ddwaf_object_get_unsigned: (LibDDWAF::Object, SizeTPtr) -> ::Integer
         def self.ddwaf_object_get_signed: (LibDDWAF::Object, SizeTPtr) -> ::Integer
         def self.ddwaf_object_get_index: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
+        def self.ddwaf_object_get_bool: (LibDDWAF::Object) -> bool
 
         # freeers
 
