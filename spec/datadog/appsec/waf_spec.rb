@@ -1664,21 +1664,42 @@ RSpec.describe Datadog::AppSec::WAF do
           Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_depth: 1 })
         end
 
-        let(:matching_input) do
-          { 'server.request.headers.no_cookies' => { 'user-agent' => ['Nessus SOAP'] } }
+        context 'when value is outside of limit' do
+          let(:matching_input) do
+            { 'server.request.headers.no_cookies' => { 'user-agent' => ['Nessus SOAP'] } }
+          end
+
+          it 'passes' do
+            code, result = context.run(matching_input, timeout)
+            perf_store[:total_runtime] << result.total_runtime
+            expect(code).to eq :ok
+            expect(result.status).to eq :ok
+            expect(result.data).to be nil
+            expect(result.total_runtime).to be > 0
+            expect(result.timeout).to eq false
+            expect(result.actions).to eq []
+            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+            expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+          end
         end
 
-        it 'passes on matching input outside of limit' do
-          code, result = context.run(matching_input, timeout)
-          perf_store[:total_runtime] << result.total_runtime
-          expect(code).to eq :ok
-          expect(result.status).to eq :ok
-          expect(result.data).to be nil
-          expect(result.total_runtime).to be > 0
-          expect(result.timeout).to eq false
-          expect(result.actions).to eq []
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
-          expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        context 'when value is inside of limit' do
+          let(:matching_input) do
+            { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } }
+          end
+
+          it 'matches' do
+            code, result = context.run(matching_input, timeout)
+            perf_store[:total_runtime] << result.total_runtime
+            expect(code).to eq :match
+            expect(result.status).to eq :match
+            expect(result.data).to be_a Array
+            expect(result.total_runtime).to be > 0
+            expect(result.timeout).to eq false
+            expect(result.actions).to eq []
+            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+            expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+          end
         end
       end
 
