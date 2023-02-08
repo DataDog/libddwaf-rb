@@ -2,6 +2,7 @@ require 'spec_helper'
 require 'datadog/appsec/waf'
 require 'json'
 
+# rubocop:disable Metrics/BlockLength
 RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   let(:libddwaf) { Datadog::AppSec::WAF::LibDDWAF }
 
@@ -231,6 +232,260 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(i.to_s)
       end
       libddwaf.ddwaf_object_free(object)
+    end
+
+    context 'getters' do
+      let(:object_for_getter_spec) { libddwaf::Object.new }
+
+      after do
+        libddwaf.ddwaf_object_free(object_for_getter_spec)
+      end
+
+      describe '.ddwaf_object_type' do
+        [
+          ['for array object', :ddwaf_object_array, nil, :ddwaf_obj_array],
+          ['for map object', :ddwaf_object_map, nil, :ddwaf_obj_map],
+          ['for signed object', :ddwaf_object_signed_force, -12, :ddwaf_obj_signed,],
+          ['for unsigened object', :ddwaf_object_unsigned_force, 12, :ddwaf_obj_unsigned],
+          ['for string object', :ddwaf_object_string, "Hello World", :ddwaf_obj_string],
+          ['for boolean object', :ddwaf_object_bool, true, :ddwaf_obj_bool]
+        ].each do |message, method, value, result|
+          context message do
+            it 'returns object type' do
+              if value
+                libddwaf.send(method, object_for_getter_spec, value)
+              else
+                libddwaf.send(method, object_for_getter_spec)
+              end
+              object_type = libddwaf.ddwaf_object_type(object_for_getter_spec)
+              expect(object_type).to eq(result)
+            end
+          end
+        end
+      end
+
+      describe '.ddwaf_object_size' do
+        context 'for array object' do
+          it 'returns size' do
+            libddwaf.ddwaf_object_array(object_for_getter_spec)
+            member_object = libddwaf::Object.new
+            libddwaf.ddwaf_object_string(member_object, 'Hello World')
+            libddwaf.ddwaf_object_array_add(object_for_getter_spec, member_object)
+
+            size = libddwaf.ddwaf_object_size(object_for_getter_spec)
+            expect(size).to eq(1)
+          end
+        end
+
+        context 'for map object' do
+          it 'returns size' do
+            key = 'foo'
+            libddwaf.ddwaf_object_map(object_for_getter_spec)
+            member_object = libddwaf::Object.new
+            libddwaf.ddwaf_object_string(member_object, 'bar')
+            libddwaf.ddwaf_object_map_addl(object_for_getter_spec, key, key.bytesize, member_object)
+
+            size = libddwaf.ddwaf_object_size(object_for_getter_spec)
+            expect(size).to eq(1)
+          end
+        end
+
+        context 'for non container objects' do
+          it 'returns 0' do
+            libddwaf.ddwaf_object_string(object_for_getter_spec, 'Hello World')
+            size = libddwaf.ddwaf_object_size(object_for_getter_spec)
+            expect(size).to eq(0)
+          end
+        end
+      end
+
+      describe '.ddwaf_object_get_string' do
+        context 'for string object' do
+          it 'returns string' do
+            libddwaf.ddwaf_object_string(object_for_getter_spec, 'Hello World')
+            string = libddwaf.ddwaf_object_get_string(object_for_getter_spec, libddwaf::SizeTPtr.new)
+            expect(string.get_string(0)).to eq('Hello World')
+          end
+        end
+
+        context 'non string object' do
+          it 'returns null' do
+            libddwaf.ddwaf_object_map(object_for_getter_spec)
+            string = libddwaf.ddwaf_object_get_string(object_for_getter_spec, libddwaf::SizeTPtr.new)
+            expect(string).to be_null
+          end
+        end
+      end
+
+      describe '.ddwaf_object_get_index' do
+        context 'for map object' do
+          before do
+            key = 'foo'
+            libddwaf.ddwaf_object_map(object_for_getter_spec)
+            member_object = libddwaf::Object.new
+            libddwaf.ddwaf_object_string(member_object, 'bar')
+            libddwaf.ddwaf_object_map_addl(object_for_getter_spec, key, key.bytesize, member_object)
+          end
+
+          context 'with index in range' do
+            it 'returns object' do
+              object = libddwaf.ddwaf_object_get_index(object_for_getter_spec, 0)
+              expect(object).to_not be_null
+            end
+          end
+
+          context 'with index out of range' do
+            it 'returns null' do
+              object = libddwaf.ddwaf_object_get_index(object_for_getter_spec, 1)
+              expect(object).to be_null
+            end
+          end
+        end
+
+        context 'for array object' do
+          before do
+            libddwaf.ddwaf_object_array(object_for_getter_spec)
+            member_object = libddwaf::Object.new
+            libddwaf.ddwaf_object_string(member_object, 'Hello World')
+            libddwaf.ddwaf_object_array_add(object_for_getter_spec, member_object)
+          end
+
+          context 'with index in range' do
+            it 'returns object' do
+              object = libddwaf.ddwaf_object_get_index(object_for_getter_spec, 0)
+              expect(object).to_not be_null
+            end
+          end
+
+          context 'with index out of range' do
+            it 'returns null' do
+              object = libddwaf.ddwaf_object_get_index(object_for_getter_spec, 1)
+              expect(object).to be_null
+            end
+          end
+        end
+
+        context 'non container object' do
+          it 'returns null' do
+            libddwaf.ddwaf_object_string(object_for_getter_spec, 'Hello World')
+            object = libddwaf.ddwaf_object_get_index(object_for_getter_spec, 0)
+            expect(object).to be_null
+          end
+        end
+      end
+
+      describe '.ddwaf_object_get_key' do
+        context 'for map object' do
+          it 'returns object key' do
+            key = 'foo'
+            libddwaf.ddwaf_object_map(object_for_getter_spec)
+            member_object = libddwaf::Object.new
+            libddwaf.ddwaf_object_string(member_object, 'bar')
+            libddwaf.ddwaf_object_map_addl(object_for_getter_spec, key, key.bytesize, member_object)
+
+            object = libddwaf.ddwaf_object_get_index(object_for_getter_spec, 0)
+            key_object = libddwaf.ddwaf_object_get_key(object, libddwaf::SizeTPtr.new)
+
+            expect(key_object.get_string(0)).to eq('foo')
+          end
+
+          it 'returns key length' do
+            key = 'foo'
+            libddwaf.ddwaf_object_map(object_for_getter_spec)
+            member_object = libddwaf::Object.new
+            libddwaf.ddwaf_object_string(member_object, 'bar')
+            libddwaf.ddwaf_object_map_addl(object_for_getter_spec, key, key.bytesize, member_object)
+
+            object = libddwaf.ddwaf_object_get_index(object_for_getter_spec, 0)
+            length = libddwaf::SizeTPtr.new
+
+            expect(length.pointer.get_int(0)).to eq(0)
+            libddwaf.ddwaf_object_get_key(object, length)
+            expect(length.pointer.get_int(0)).to eq(3)
+          end
+
+          context 'for non map object' do
+            it 'returns nulls' do
+              libddwaf.ddwaf_object_string(object_for_getter_spec, 'bar')
+              key_object = libddwaf.ddwaf_object_get_key(object_for_getter_spec, libddwaf::SizeTPtr.new)
+
+              expect(key_object).to be_null
+            end
+          end
+        end
+
+        context 'non map objects' do
+          it 'returns nulll' do
+            libddwaf.ddwaf_object_string(object_for_getter_spec, 'Hello World')
+            object = libddwaf.ddwaf_object_get_key(object_for_getter_spec, libddwaf::SizeTPtr.new)
+            expect(object).to be_null
+          end
+        end
+      end
+
+      describe '.ddwaf_object_get_signed' do
+        context 'for signed object' do
+          it 'returns value' do
+            libddwaf.ddwaf_object_signed_force(object_for_getter_spec, -12)
+            value = libddwaf.ddwaf_object_get_signed(object_for_getter_spec)
+            expect(value).to eq(-12)
+          end
+        end
+
+        context 'for non signed object' do
+          it 'returns 0' do
+            libddwaf.ddwaf_object_string(object_for_getter_spec, 'Hello World')
+            value = libddwaf.ddwaf_object_get_signed(object_for_getter_spec)
+            expect(value).to eq(0)
+          end
+        end
+      end
+
+      describe '.ddwaf_object_get_unsigned' do
+        context 'for unsigned object' do
+          it 'returns value' do
+            libddwaf.ddwaf_object_unsigned_force(object_for_getter_spec, 12)
+            value = libddwaf.ddwaf_object_get_unsigned(object_for_getter_spec)
+            expect(value).to eq(12)
+          end
+        end
+
+        context 'for non unsigned object' do
+          it 'returns 0' do
+            libddwaf.ddwaf_object_string(object_for_getter_spec, 'Hello World')
+            value = libddwaf.ddwaf_object_get_unsigned(object_for_getter_spec)
+            expect(value).to eq(0)
+          end
+        end
+      end
+
+      describe '.ddwaf_object_get_bool' do
+        context 'for boolean object' do
+          context 'true' do
+            it 'returns value' do
+              libddwaf.ddwaf_object_bool(object_for_getter_spec, true)
+              value = libddwaf.ddwaf_object_get_bool(object_for_getter_spec)
+              expect(value).to eq(true)
+            end
+          end
+
+          context 'false' do
+            it 'returns value' do
+              libddwaf.ddwaf_object_bool(object_for_getter_spec, false)
+              value = libddwaf.ddwaf_object_get_bool(object_for_getter_spec)
+              expect(value).to eq(false)
+            end
+          end
+        end
+
+        context 'for non boolean object' do
+          it 'returns false' do
+            libddwaf.ddwaf_object_string(object_for_getter_spec, 'Hello World')
+            value = libddwaf.ddwaf_object_get_bool(object_for_getter_spec)
+            expect(value).to eq(false)
+          end
+        end
+      end
     end
   end
 
@@ -2076,3 +2331,4 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 end
+# rubocop:enable Metrics/BlockLength

@@ -1,6 +1,7 @@
 # 2023-02-03 v1.6.2.0.0
 
 - Update to libddwaf 1.6.2
+- Add specs for the getter functions
 
 # 2023-02-01 v1.5.1.0.1
 
