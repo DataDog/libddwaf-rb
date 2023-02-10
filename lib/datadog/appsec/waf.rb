@@ -182,6 +182,7 @@ module Datadog
         attach_function :ddwaf_object_get_unsigned, [:ddwaf_object], :uint64
         attach_function :ddwaf_object_get_signed, [:ddwaf_object], :int64
         attach_function :ddwaf_object_get_index, [:ddwaf_object, :size_t], :ddwaf_object
+        attach_function :ddwaf_object_get_bool, [:ddwaf_object], :bool
 
         ## freeers
 
