@@ -2,7 +2,6 @@ require 'spec_helper'
 require 'datadog/appsec/waf'
 require 'json'
 
-# rubocop:disable Metrics/BlockLength
 RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   let(:libddwaf) { Datadog::AppSec::WAF::LibDDWAF }
 
@@ -2331,4 +2330,3 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 end
-# rubocop:enable Metrics/BlockLength
