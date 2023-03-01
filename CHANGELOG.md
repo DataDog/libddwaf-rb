@@ -1,3 +1,10 @@
+# 2023-03-03 v1.8.2.0.0
+
+- Update to libddwaf 1.8.2
+- Added Waf::Handle#merge method
+- Remove Waf::Handle#update_rule_data and Waf::Handle#toggle_rules methods
+- Remove WAF::LibDDWAF.ddwaf_required_rule_data_ids method
+
 # 2023-02-03 v1.7.0.0.0
 
 - Update to libddwaf 1.7.0
