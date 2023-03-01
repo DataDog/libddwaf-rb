@@ -1,3 +1,7 @@
+# 2023-02-03 v1.7.0.0.0
+
+- Update to libddwaf 1.7.0
+
 # 2023-02-03 v1.6.2.0.0
 
 - Update to libddwaf 1.6.2
