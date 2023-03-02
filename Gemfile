@@ -37,7 +37,7 @@ end
 
 gem 'yard', '~> 0.9'
 
-if RUBY_VERSION >= '2.5.0'
-  gem 'steep'
-  gem 'rbs'
+if RUBY_VERSION >= '2.6.0'
+  gem 'rbs', '~> 2.8.1', require: false
+  gem 'steep', '~> 1.3.0', require: false
 end
