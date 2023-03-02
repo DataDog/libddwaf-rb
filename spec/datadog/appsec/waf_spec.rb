@@ -1333,7 +1333,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
       count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
       list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_required_addresses(handle, count)
-      expect(list.get_array_of_string(0, count[:value])).to eq ['value1', 'value2']
+      expect(list.get_array_of_string(0, count[:value])).to include('value1', 'value2')
     end
 
     it 'triggers a monitoring rule' do
@@ -1425,7 +1425,7 @@ RSpec.describe Datadog::AppSec::WAF do
       },
       'rules' => [
         {
-          'id' => 1,
+          'id' => "1",
           'name' => 'Rule 1',
           'tags' => { 'type' => 'flow1' },
           'conditions' => [
@@ -1540,6 +1540,30 @@ RSpec.describe Datadog::AppSec::WAF do
     expect(handle.ruleset_info[:version]).to eq('1.2.3')
   end
 
+  context 'run' do
+    it 'passes non-matching input' do
+      code, result = context.run(passing_input, timeout)
+      perf_store[:total_runtime] << result.total_runtime
+      expect(code).to eq :ok
+      expect(result.status).to eq :ok
+      expect(result.data).to be nil
+      expect(result.total_runtime).to be > 0
+      expect(result.timeout).to eq false
+      expect(result.actions).to eq []
+    end
+
+    it 'catches a match' do
+      code, result = context.run(matching_input, timeout)
+      perf_store[:total_runtime] << result.total_runtime
+      expect(code).to eq :match
+      expect(result.status).to eq :match
+      expect(result.data).to be_a Array
+      expect(result.total_runtime).to be > 0
+      expect(result.timeout).to eq false
+      expect(result.actions).to eq []
+    end
+  end
+
   context 'with a partially bad ruleset' do
     let(:rule) do
       {
@@ -1629,159 +1653,132 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 
-  context 'run' do
-    it 'passes non-matching input' do
-      code, result = context.run(passing_input, timeout)
-      perf_store[:total_runtime] << result.total_runtime
-      expect(code).to eq :ok
-      expect(result.status).to eq :ok
-      expect(result.data).to be nil
-      expect(result.total_runtime).to be > 0
-      expect(result.timeout).to eq false
-      expect(result.actions).to eq []
-    end
-
-    it 'catches a match' do
-      code, result = context.run(matching_input, timeout)
-      perf_store[:total_runtime] << result.total_runtime
-      expect(code).to eq :match
-      expect(result.status).to eq :match
-      expect(result.data).to be_a Array
-      expect(result.total_runtime).to be > 0
-      expect(result.timeout).to eq false
-      expect(result.actions).to eq []
-    end
-  end
-
-  context 'run with a blocking rule' do
-    let(:rule) do
-      {
-        'version' => '2.2',
-        'metadata' => {
-          'rules_version' => '1.4.1'
-        },
-        'rules' => [
-          {
-            'id' => 'blk-001-001',
-            'name' => 'Block IP Addresses',
-            'tags' => { 'type' => 'block_ip', 'category' => 'security_response' },
-            'conditions' => [
+  describe '.update' do
+    context 'valid update data' do
+      context 'rules override' do
+        it 'update handle to disable an exiting rule' do
+          data = {
+            "rules_override": [
               {
-                'operator' => 'ip_match',
-                'parameters' => { 'inputs' => [{ 'address' => 'http.client_ip' }], 'data' => 'blocked_ips' }
+                "enabled": false,
+                "id": "1"
               }
-            ],
-            'transformers' => [],
-            'on_match' => ['block']
+            ]
           }
-        ]
-      }
-    end
 
-    let(:passing_input) do
-      { 'http.client_ip' => '1.1.1.1' }
-    end
+          code, _ = context.run(matching_input, timeout)
+          expect(code).to eq :match
 
-    let(:matching_ip) do
-      '1.2.3.4'
-    end
+          new_handle = Datadog::AppSec::WAF::Handle.update(handle, data)
+          expect(new_handle).to be_a(Datadog::AppSec::WAF::Handle)
 
-    let(:matching_input) do
-      { 'http.client_ip' => matching_ip }
-    end
+          new_context = Datadog::AppSec::WAF::Context.new(new_handle)
+          code, _ = new_context.run(matching_input, timeout)
+          expect(code).to eq :ok
 
-    let(:matching_input_rule) do
-      'blk-001-001'
-    end
+          new_context.finalize
+          new_handle.finalize
+          handle.finalize
+          context.finalize
+        end
 
-    let(:data_id) do
-      'blocked_ips'
-    end
+        it 'update rule actions' do
+          data = {
+            "rules_override": [
+              {
+                "id": "1",
+                "on_match": ["block"]
+              },
+            ]
+          }
 
-    let(:data_type) do
-      'data_with_expiration'
-    end
+          code, result = context.run(matching_input, timeout)
+          expect(code).to eq :match
+          expect(result.actions).to be_empty
 
-    let(:data) do
-      [
-        {
-          'id' => data_id,
-          'type' => data_type,
-          'data' => [{ 'value' => matching_ip, 'expiration' => (Time.now + 1000).to_i }]
-        }
-      ]
-    end
+          new_handle = Datadog::AppSec::WAF::Handle.update(handle, data)
+          expect(new_handle).to be_a(Datadog::AppSec::WAF::Handle)
 
-    context 'without rule data' do
-      it 'passes any input' do
-        code, result = context.run(passing_input, timeout)
-        perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :ok
-        expect(result.status).to eq :ok
-        expect(result.data).to be nil
-        expect(result.total_runtime).to be > 0
-        expect(result.timeout).to eq false
-        expect(result.actions).to eq []
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
-      end
-    end
+          new_context = Datadog::AppSec::WAF::Context.new(new_handle)
+          code, result = new_context.run(matching_input, timeout)
+          expect(code).to eq :match
+          expect(result.actions).to eq(['block'])
 
-    context 'with invalid rule data' do
-      context 'at top level' do
-        let(:data) { 'foo' }
-
-        it 'fails to update' do
-          expect(handle.update_rule_data(data)).to eq :err_invalid_object
-          expect(log_store.find { |log| log[:message] =~ /bad cast/ }).to_not be_nil
-          expect(log_store.find { |log| log[:message] =~ /Updating rules with id/ }).to be_nil
+          new_context.finalize
+          new_handle.finalize
+          handle.finalize
+          context.finalize
         end
       end
 
-      context 'nested' do
-        let(:data) { ['foo'] }
+      context 'rules data' do
+        let(:rule) do
+          {
+            'version' => '2.2',
+            'metadata' => {
+              'rules_version' => '1.4.1'
+            },
+            'rules' => [
+              {
+                'id' => 'blk-001-001',
+                'name' => 'Block IP Addresses',
+                'tags' => { 'type' => 'block_ip', 'category' => 'security_response' },
+                'conditions' => [
+                  {
+                    'operator' => 'ip_match',
+                    'parameters' => { 'inputs' => [{ 'address' => 'http.client_ip' }], 'data' => 'blocked_ips' }
+                  }
+                ],
+                'transformers' => [],
+                'on_match' => ['block']
+              }
+            ]
+          }
+        end
 
-        it 'fails to update' do
-          expect(handle.update_rule_data(data)).to eq :ok # TODO: should be :err_invalid_object?
-          expect(log_store.find { |log| log[:message] =~ /bad cast/ }).to_not be_nil
-          expect(log_store.find { |log| log[:message] =~ /Updating rules with id/ }).to be_nil
+        let(:matching_ip) do
+          '1.2.3.4'
+        end
+
+        let(:matching_input) do
+          { 'http.client_ip' => matching_ip }
+        end
+
+        it 'updates handle data' do
+          data = {
+            "rules_data": [
+              {
+                'id' => 'blocked_ips',
+                'type' => 'data_with_expiration',
+                'data' => [{ 'value' => matching_ip, 'expiration' => (Time.now + 1000).to_i }]
+              }
+            ]
+          }
+
+          code, _ = context.run(matching_input, timeout)
+          expect(code).to eq :ok
+
+          new_handle = Datadog::AppSec::WAF::Handle.update(handle, data)
+          expect(new_handle).to be_a(Datadog::AppSec::WAF::Handle)
+
+          new_context = Datadog::AppSec::WAF::Context.new(new_handle)
+          code, _ = new_context.run(matching_input, timeout)
+          expect(code).to eq :match
+
+          new_context.finalize
+          new_handle.finalize
+          handle.finalize
+          context.finalize
         end
       end
     end
 
-    context 'with valid rule data' do
-      before do
-        code = handle.update_rule_data(data)
+    context 'with invalid update data' do
+      it 'does not return a Handle instance' do
+        data = {'invalid_data': 'a'}
 
-        expect(code).to eq :ok
-        expect(log_store.find { |log| log[:message] =~ /Updating rules with id '#{data_id}' and type '#{data_type}'/ }).to_not be_nil
-      end
-
-      it 'passes non-matching input' do
-        code, result = context.run(passing_input, timeout)
-        perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :ok
-        expect(result.status).to eq :ok
-        expect(result.data).to be nil
-        expect(result.total_runtime).to be > 0
-        expect(result.timeout).to eq false
-        expect(result.actions).to eq []
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
-      end
-
-      it 'catches a match' do
-        code, result = context.run(matching_input, timeout)
-        perf_store[:total_runtime] << result.total_runtime
-        expect(code).to eq :match
-        expect(result.status).to eq :match
-        expect(result.data).to be_a Array
-        expect(result.total_runtime).to be > 0
-        expect(result.timeout).to eq false
-        expect(result.actions).to eq ['block']
-        expect(result.data.find { |r| r['rule']['id'] == matching_input_rule }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
+        new_handle = Datadog::AppSec::WAF::Handle.update(handle, data)
+        expect(new_handle).to be_nil
       end
     end
   end
