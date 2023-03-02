@@ -1072,7 +1072,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         'version' => '1.0',
         'events' => [
           {
-            'id' => 1,
+            'id' => '1',
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
@@ -1081,7 +1081,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'action' => 'record',
           },
           {
-            'id' => 2,
+            'id' => '2',
             'name' => 'Rule 2',
             'tags' => { 'type' => 'flow2' },
             'conditions' => [
@@ -1090,7 +1090,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'action' => 'record',
           },
           {
-            'id' => 3,
+            'id' => '3',
             'name' => 'Rule 3',
             'tags' => { 'type' => 'flow2' },
             'conditions' => [
@@ -1107,7 +1107,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         'version' => '1.0',
         'events' => [
           {
-            'id' => 1,
+            'id' => '1',
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
@@ -1132,7 +1132,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         },
         'rules' => [
           {
-            'id' => 1,
+            'id' => '1',
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
@@ -1152,7 +1152,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         },
         'rules' => [
           {
-            'id' => 1,
+            'id' => '1',
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
@@ -1169,7 +1169,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         'version' => '1.0',
         'events' => [
           {
-            'id' => 1,
+            'id' => '1',
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
@@ -1178,7 +1178,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'action' => 'record',
           },
           {
-            'id' => 2,
+            'id' => '2',
             'badname' => 'Rule 2',
             'tags' => { 'type' => 'flow2' },
             'conditions' => [
@@ -1187,7 +1187,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'action' => 'record',
           },
           {
-            'id' => 3,
+            'id' => '3',
             'name' => 'Rule 3',
             'tags' => { 'type' => 'flow2' },
             'conditions' => [
@@ -1425,7 +1425,7 @@ RSpec.describe Datadog::AppSec::WAF do
       },
       'rules' => [
         {
-          'id' => "1",
+          'id' => '1',
           'name' => 'Rule 1',
           'tags' => { 'type' => 'flow1' },
           'conditions' => [
@@ -1573,7 +1573,7 @@ RSpec.describe Datadog::AppSec::WAF do
         },
         'rules' => [
           {
-            'id' => 1,
+            'id' => '1',
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
@@ -1585,7 +1585,7 @@ RSpec.describe Datadog::AppSec::WAF do
             'action' => 'record',
           },
           {
-            'id' => 2,
+            'id' => '2',
             'name' => 'Rule 2',
             'tags' => { 'type' => 'flow2' },
             'conditions' => [
@@ -1619,7 +1619,7 @@ RSpec.describe Datadog::AppSec::WAF do
         },
         'rules' => [
           {
-            'id' => 1,
+            'id' => '1',
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
