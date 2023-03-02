@@ -228,10 +228,10 @@ module Datadog
         attach_function :ddwaf_ruleset_info_free, [:ddwaf_ruleset_info], :void
 
         attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_ruleset_info], :ddwaf_handle
+        attach_function :ddwaf_update, [:ddwaf_handle, :ddwaf_object, :ddwaf_ruleset_info], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
         attach_function :ddwaf_required_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr
-        attach_function :ddwaf_required_rule_data_ids, [:ddwaf_handle, UInt32Ptr], :charptrptr
 
         # updating
 
@@ -241,9 +241,6 @@ module Datadog
                               :ddwaf_ok,                    0,
                               :ddwaf_match,                 1
         typedef DDWAF_RET_CODE, :ddwaf_ret_code
-
-        attach_function :ddwaf_update_rule_data, [:ddwaf_handle, :ddwaf_object], :ddwaf_ret_code
-        attach_function :ddwaf_toggle_rules, [:ddwaf_handle, :ddwaf_object], :ddwaf_ret_code
 
         # running
 
@@ -482,6 +479,32 @@ module Datadog
 
         attr_reader :ruleset_info
 
+        def self.update(handle, data)
+          data_obj = Datadog::AppSec::WAF.ruby_to_object(data, coerce: false)
+          ruleset_info = LibDDWAF::RuleSetInfo.new
+          new_handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update(handle.handle_obj, data_obj, ruleset_info)
+
+          if !new_handle.null?
+            info = {
+              loaded: ruleset_info[:loaded],
+              failed: ruleset_info[:failed],
+              errors: WAF.object_to_ruby(ruleset_info[:errors]),
+              version: ruleset_info[:version],
+            }
+            return initialize_from_handle(new_handle, info)
+          end
+        ensure
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_ruleset_info_free(ruleset_info) if ruleset_info
+        end
+
+        def self.initialize_from_handle(handle_object, info)
+          obj = allocate
+          obj.instance_variable_set(:@handle_obj, handle_object)
+          obj.instance_variable_set(:@ruleset_info, info)
+          obj
+        end
+        private_class_method :initialize_from_handle
+
         def initialize(rule, limits: {}, obfuscator: {})
           rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
           if rule_obj.null? || rule_obj[:type] == :ddwaf_object_invalid
@@ -537,24 +560,6 @@ module Datadog
           return [] if count == 0 # list is null
 
           list.get_array_of_string(0, count[:value])
-        end
-
-        def update_rule_data(data)
-          data_obj = Datadog::AppSec::WAF.ruby_to_object(data, coerce: false)
-          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update_rule_data(@handle_obj, data_obj)
-
-          RESULT_CODE[res]
-        ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(data_obj) if data_obj
-        end
-
-        def toggle_rules(map)
-          map_obj = Datadog::AppSec::WAF.ruby_to_object(map, coerce: false)
-          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_toggle_rules(@handle_obj, map_obj)
-
-          RESULT_CODE[res]
-        ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(map_obj) if map_obj
         end
 
         private
