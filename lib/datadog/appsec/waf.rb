@@ -228,10 +228,10 @@ module Datadog
         attach_function :ddwaf_ruleset_info_free, [:ddwaf_ruleset_info], :void
 
         attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_ruleset_info], :ddwaf_handle
+        attach_function :ddwaf_update, [:ddwaf_handle, :ddwaf_object, :ddwaf_ruleset_info], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
         attach_function :ddwaf_required_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr
-        attach_function :ddwaf_required_rule_data_ids, [:ddwaf_handle, UInt32Ptr], :charptrptr
 
         # updating
 
@@ -241,9 +241,6 @@ module Datadog
                               :ddwaf_ok,                    0,
                               :ddwaf_match,                 1
         typedef DDWAF_RET_CODE, :ddwaf_ret_code
-
-        attach_function :ddwaf_update_rule_data, [:ddwaf_handle, :ddwaf_object], :ddwaf_ret_code
-        attach_function :ddwaf_toggle_rules, [:ddwaf_handle, :ddwaf_object], :ddwaf_ret_code
 
         # running
 
@@ -478,9 +475,7 @@ module Datadog
       }
 
       class Handle
-        attr_reader :handle_obj
-
-        attr_reader :ruleset_info
+        attr_reader :handle_obj, :ruleset_info, :config
 
         def initialize(rule, limits: {}, obfuscator: {})
           rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
@@ -492,7 +487,6 @@ module Datadog
           if config_obj.null?
             fail LibDDWAF::Error, 'Could not create config struct'
           end
-          retain(config_obj)
 
           config_obj[:limits][:max_container_size]  = limits[:max_container_size]  || LibDDWAF::DEFAULT_MAX_CONTAINER_SIZE
           config_obj[:limits][:max_container_depth] = limits[:max_container_depth] || LibDDWAF::DEFAULT_MAX_CONTAINER_DEPTH
@@ -500,6 +494,8 @@ module Datadog
           config_obj[:obfuscator][:key_regex]       = FFI::MemoryPointer.from_string(obfuscator[:key_regex])   if obfuscator[:key_regex]
           config_obj[:obfuscator][:value_regex]     = FFI::MemoryPointer.from_string(obfuscator[:value_regex]) if obfuscator[:value_regex]
           config_obj[:free_fn] = Datadog::AppSec::WAF::LibDDWAF::ObjectNoFree
+
+          @config = config_obj
 
           ruleset_info = LibDDWAF::RuleSetInfo.new
 
@@ -539,25 +535,34 @@ module Datadog
           list.get_array_of_string(0, count[:value])
         end
 
-        def update_rule_data(data)
+        def merge(data)
           data_obj = Datadog::AppSec::WAF.ruby_to_object(data, coerce: false)
-          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update_rule_data(@handle_obj, data_obj)
+          ruleset_info = LibDDWAF::RuleSetInfo.new
+          new_handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update(handle_obj, data_obj, ruleset_info)
 
-          RESULT_CODE[res]
+          return if new_handle.null?
+
+          info = {
+            loaded: ruleset_info[:loaded],
+            failed: ruleset_info[:failed],
+            errors: WAF.object_to_ruby(ruleset_info[:errors]),
+            version: ruleset_info[:version],
+          }
+          new_from_handle(new_handle, info, config)
         ensure
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(data_obj) if data_obj
-        end
-
-        def toggle_rules(map)
-          map_obj = Datadog::AppSec::WAF.ruby_to_object(map, coerce: false)
-          res = Datadog::AppSec::WAF::LibDDWAF.ddwaf_toggle_rules(@handle_obj, map_obj)
-
-          RESULT_CODE[res]
-        ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(map_obj) if map_obj
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_ruleset_info_free(ruleset_info) if ruleset_info
         end
 
         private
+
+        def new_from_handle(handle_object, info, config)
+          obj = self.class.allocate
+          obj.instance_variable_set(:@handle_obj, handle_object)
+          obj.instance_variable_set(:@ruleset_info, info)
+          obj.instance_variable_set(:@config, config)
+          obj
+        end
 
         def validate!
           @valid = true
@@ -575,18 +580,6 @@ module Datadog
           return if valid?
 
           fail LibDDWAF::Error, "Attempt to use an invalid instance: #{inspect}"
-        end
-
-        def retained
-          @retained ||= []
-        end
-
-        def retain(object)
-          retained << object
-        end
-
-        def release(object)
-          retained.delete(object)
         end
       end
 
