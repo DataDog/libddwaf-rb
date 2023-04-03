@@ -2,7 +2,6 @@ Gemfile.lock
 /.envrc
 /vendor/bundle
 /vendor/libddwaf
-/*.nix
 /pkg
 *.gem
 *.vim
