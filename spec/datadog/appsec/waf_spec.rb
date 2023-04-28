@@ -1653,6 +1653,54 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 
+  context 'with a custom rules' do
+    let(:rule) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '1.2.3'
+        },
+        'rules' => [
+          {
+            'id' => 1,
+            'name' => 'Rule 1',
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              {
+                'operator' => 'match_regex',
+                'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule1' }
+              },
+            ],
+            'action' => 'record',
+          }
+        ],
+        'custom_rules' => [
+          {
+            'id' => 3,
+            'name' => 'Custom Rule 1',
+            'tags' => { 'type' => 'custom_flow' },
+            'conditions' => [
+              {
+                'operator' => 'match_regex',
+                'parameters' => { 'inputs' => [{ 'address' => 'custom_address' }], 'regex' => 'custom_value' }
+              },
+            ],
+            'action' => 'record',
+          }
+        ]
+      }
+    end
+
+    let(:matching_input) do
+      { custom_address: ['custom_value'] }
+    end
+
+    it 'matches custom rule' do
+      code, = context.run(matching_input, timeout)
+      expect(code).to eq :match
+    end
+  end
+
   describe '#merge' do
     context 'valid merge data' do
       context 'rules override' do
