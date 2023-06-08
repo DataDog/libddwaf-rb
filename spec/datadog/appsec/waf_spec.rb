@@ -1562,6 +1562,48 @@ RSpec.describe Datadog::AppSec::WAF do
       expect(result.timeout).to eq false
       expect(result.actions).to eq []
     end
+
+    context 'encoding' do
+      context 'with a non UTF-8 string' do
+        let(:matching_input) do
+          { value1: [4242, 'randomString'], value2: ['rule1'.force_encoding('ASCII-8BIT')] }
+        end
+
+        it 'catches a match' do
+          code, result = context.run(matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :match
+          expect(result.status).to eq :match
+          expect(result.data).to be_a Array
+          expect(result.total_runtime).to be > 0
+          expect(result.timeout).to eq false
+          expect(result.actions).to eq []
+        end
+      end
+
+      context 'with badly encoded string' do
+        let(:matching_input) do
+          { value1: [4242, 'randomString'], value2: ["rule1\xE2".force_encoding('ASCII-8BIT')] }
+        end
+
+        it 'returns valid UTF-8' do
+          code, result = context.run(matching_input, timeout)
+          expect(result.data.first['rule_matches'].first['parameters'].first['value']).to be_valid_encoding
+          expect(result.data.first['rule_matches'].first['parameters'].first['highlight'].first).to be_valid_encoding
+        end
+
+        it 'catches a match' do
+          code, result = context.run(matching_input, timeout)
+          perf_store[:total_runtime] << result.total_runtime
+          expect(code).to eq :match
+          expect(result.status).to eq :match
+          expect(result.data).to be_a Array
+          expect(result.total_runtime).to be > 0
+          expect(result.timeout).to eq false
+          expect(result.actions).to eq []
+        end
+      end
+    end
   end
 
   context 'with a partially bad ruleset' do
