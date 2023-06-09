@@ -19,7 +19,7 @@ assignees: ''
   Code snippets, log messages, screenshots and sample apps are encouraged!
 -->
 
-**How does `ddtrace` help you?**
+**How does `libddwaf` help you?**
 <!-- Optionally, tell us why and how you're using ddtrace, and what your overall experience with it is! -->
 
 **Environment**
