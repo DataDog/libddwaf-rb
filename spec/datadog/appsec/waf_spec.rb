@@ -1587,7 +1587,7 @@ RSpec.describe Datadog::AppSec::WAF do
         end
 
         it 'returns valid UTF-8' do
-          code, result = context.run(matching_input, timeout)
+          _code, result = context.run(matching_input, timeout)
           expect(result.data.first['rule_matches'].first['parameters'].first['value']).to be_valid_encoding
           expect(result.data.first['rule_matches'].first['parameters'].first['highlight'].first).to be_valid_encoding
         end
