@@ -1,5 +1,8 @@
 inherit_from: .rubocop_todo.yml
 
+Metrics/AbcSize:
+  Enabled: false
+
 Metrics/BlockLength:
   Exclude:
     - 'spec/datadog/appsec/waf_spec.rb'
