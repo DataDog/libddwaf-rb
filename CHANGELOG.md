@@ -1,3 +1,12 @@
+# 2023-06-13 v.1.9.0.0.1
+
+- Handle invalid encoding. Make sure strings are UTF-8 when passing them to libddwaf
+
+# 2023-05-17 v1.9.0.0.0
+
+- Update to libddwaf 1.9.0
+- Support [`custom_rules`](https://github.com/DataDog/libddwaf/pull/154)
+
 # 2023-03-03 v1.8.2.0.0
 
 - Update to libddwaf 1.8.2
