@@ -4,6 +4,7 @@ require 'datadog/appsec/waf/version'
 
 module Datadog
   module AppSec
+    # rubocop:disable Metrics/ModuleLength
     module WAF
       module LibDDWAF
         class Error < StandardError
@@ -296,6 +297,7 @@ module Datadog
         LibDDWAF.ddwaf_get_version
       end
 
+      # rubocop:disable Metrics/MethodLength
       def self.ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil, coerce: true)
         case val
         when Array
@@ -406,6 +408,7 @@ module Datadog
           ruby_to_object(''.freeze)
         end
       end
+      # rubocop:enable Metrics/MethodLength
 
       def self.object_to_ruby(obj)
         case obj[:type]
@@ -700,5 +703,6 @@ module Datadog
         end
       end
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end
