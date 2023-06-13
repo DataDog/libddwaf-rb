@@ -281,9 +281,9 @@ module Datadog
 
         attach_function :ddwaf_set_log_cb, [:ddwaf_log_cb, :ddwaf_log_level], :bool
 
-        DEFAULT_MAX_CONTAINER_SIZE  = 0
-        DEFAULT_MAX_CONTAINER_DEPTH = 0
-        DEFAULT_MAX_STRING_LENGTH   = 0
+        DEFAULT_MAX_CONTAINER_SIZE  = 256
+        DEFAULT_MAX_CONTAINER_DEPTH = 20
+        DEFAULT_MAX_STRING_LENGTH   = 16_384 # in bytes, UTF-8 worst case being 4x size in terms of code point)
 
         DDWAF_MAX_CONTAINER_SIZE  = 256
         DDWAF_MAX_CONTAINER_DEPTH = 20
