@@ -4,6 +4,7 @@ require 'datadog/appsec/waf/version'
 
 module Datadog
   module AppSec
+    # rubocop:disable Metrics/ModuleLength
     module WAF
       module LibDDWAF
         class Error < StandardError
@@ -281,9 +282,9 @@ module Datadog
 
         attach_function :ddwaf_set_log_cb, [:ddwaf_log_cb, :ddwaf_log_level], :bool
 
-        DEFAULT_MAX_CONTAINER_SIZE  = 0
-        DEFAULT_MAX_CONTAINER_DEPTH = 0
-        DEFAULT_MAX_STRING_LENGTH   = 0
+        DEFAULT_MAX_CONTAINER_SIZE  = 256
+        DEFAULT_MAX_CONTAINER_DEPTH = 20
+        DEFAULT_MAX_STRING_LENGTH   = 16_384 # in bytes, UTF-8 worst case being 4x size in terms of code point)
 
         DDWAF_MAX_CONTAINER_SIZE  = 256
         DDWAF_MAX_CONTAINER_DEPTH = 20
@@ -296,6 +297,7 @@ module Datadog
         LibDDWAF.ddwaf_get_version
       end
 
+      # rubocop:disable Metrics/MethodLength
       def self.ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil, coerce: true)
         case val
         when Array
@@ -349,7 +351,8 @@ module Datadog
           obj
         when String
           obj = LibDDWAF::Object.new
-          val = val.to_s[0, max_string_length] if max_string_length
+          encoded_val = val.to_s.encode('utf-8', invalid: :replace, undef: :replace)
+          val = encoded_val[0, max_string_length] if max_string_length
           str = val.to_s
           res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
           if res.null?
@@ -405,6 +408,7 @@ module Datadog
           ruby_to_object(''.freeze)
         end
       end
+      # rubocop:enable Metrics/MethodLength
 
       def self.object_to_ruby(obj)
         case obj[:type]
@@ -699,5 +703,6 @@ module Datadog
         end
       end
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end
