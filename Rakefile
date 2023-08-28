@@ -350,6 +350,11 @@ task :fetch, [:platform] => [] do |_, args|
     'libddwaf-1.10.0-darwin-x86_64.tar.gz' => 'f2bc8ed671cfa0662ed45cf3895cb4dd7fa0c8e9cdf4d2fe2b59eda9e9589813',
     'libddwaf-1.10.0-linux-aarch64.tar.gz' => 'd74ebadd09a11cb342082d763439dd235be4583f52b8f597369640cc5daa60c6',
     'libddwaf-1.10.0-linux-x86_64.tar.gz'  => 'a51c63ea0d0223df5b7b0d7d9abc608cf63f65b5aebbbb1acba7bd667e4f1335',
+
+    'libddwaf-1.11.0-darwin-arm64.tar.gz'  => 'a50d087d5b8f6d3b4bc72d4ef85e8004c06b179f07e5974f7849ccb552b292c8',
+    'libddwaf-1.11.0-darwin-x86_64.tar.gz' => 'e1285b9a62393a4a37fad16b49812052b9eed95920ffe4cd591e06ac27ed1b32',
+    'libddwaf-1.11.0-linux-aarch64.tar.gz' => '92a0a64daa00376b127dfe7d7f02436f39a611325113e212cf2cdafddd50053a',
+    'libddwaf-1.11.0-linux-x86_64.tar.gz'  => '7a0682c2e65cec7540d04646621d6768bc8f42c5ff22da2a0d20801b51ad442a',
   }
 
   filename = Helpers.libddwaf_filename(platform: platform)

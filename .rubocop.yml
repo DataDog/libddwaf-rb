@@ -6,3 +6,6 @@ Metrics/AbcSize:
 Metrics/BlockLength:
   Exclude:
     - 'spec/datadog/appsec/waf_spec.rb'
+
+Style/HashSyntax:
+  EnforcedShorthandSyntax: never
