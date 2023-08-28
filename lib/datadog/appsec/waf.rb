@@ -216,20 +216,8 @@ module Datadog
 
         typedef Config.by_ref, :ddwaf_config
 
-        class RuleSetInfo < ::FFI::Struct
-          layout :loaded, :uint16,
-                 :failed, :uint16,
-                 :errors, Object,
-                 :version, :string
-        end
-
-        typedef RuleSetInfo.by_ref, :ddwaf_ruleset_info
-        RuleSetInfoNone = Datadog::AppSec::WAF::LibDDWAF::RuleSetInfo.new(::FFI::Pointer::NULL)
-
-        attach_function :ddwaf_ruleset_info_free, [:ddwaf_ruleset_info], :void
-
-        attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_ruleset_info], :ddwaf_handle
-        attach_function :ddwaf_update, [:ddwaf_handle, :ddwaf_object, :ddwaf_ruleset_info], :ddwaf_handle
+        attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_object], :ddwaf_handle
+        attach_function :ddwaf_update, [:ddwaf_handle, :ddwaf_object, :ddwaf_object], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
         attach_function :ddwaf_required_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr
@@ -250,15 +238,10 @@ module Datadog
         attach_function :ddwaf_context_init, [:ddwaf_handle], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
-        class ResultActions < ::FFI::Struct
-          layout :array, :charptrptr,
-                 :size,  :uint32
-        end
-
         class Result < ::FFI::Struct
-          layout :timeout,          :bool,
-                 :data,             :string,
-                 :actions,          ResultActions,
+          layout :timeout, :bool,
+                 :events, Object,
+                 :actions,          Object,
                  :total_runtime,    :uint64
         end
 
@@ -501,16 +484,11 @@ module Datadog
 
           @config = config_obj
 
-          ruleset_info = LibDDWAF::RuleSetInfo.new
+          ruleset_info_obj = Datadog::AppSec::WAF::LibDDWAF::Object.new
 
-          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, ruleset_info)
+          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, ruleset_info_obj)
 
-          @ruleset_info = {
-            loaded: ruleset_info[:loaded],
-            failed: ruleset_info[:failed],
-            errors: WAF.object_to_ruby(ruleset_info[:errors]),
-            version: ruleset_info[:version],
-          }
+          @ruleset_info = Datadog::AppSec::WAF.object_to_ruby(ruleset_info_obj)
 
           if @handle_obj.null?
             fail LibDDWAF::Error.new('Could not create handle', ruleset_info: @ruleset_info)
@@ -518,7 +496,7 @@ module Datadog
 
           validate!
         ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_ruleset_info_free(ruleset_info) if ruleset_info
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(ruleset_info_obj) if ruleset_info_obj
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
         end
 
@@ -541,29 +519,24 @@ module Datadog
 
         def merge(data)
           data_obj = Datadog::AppSec::WAF.ruby_to_object(data, coerce: false)
-          ruleset_info = LibDDWAF::RuleSetInfo.new
-          new_handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update(handle_obj, data_obj, ruleset_info)
+          ruleset_info_obj = LibDDWAF::Object.new
+          new_handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update(handle_obj, data_obj, ruleset_info_obj)
 
           return if new_handle.null?
 
-          info = {
-            loaded: ruleset_info[:loaded],
-            failed: ruleset_info[:failed],
-            errors: WAF.object_to_ruby(ruleset_info[:errors]),
-            version: ruleset_info[:version],
-          }
-          new_from_handle(new_handle, info, config)
+          ruleset_info = Datadog::AppSec::WAF.object_to_ruby(ruleset_info_obj)
+          new_from_handle(new_handle, ruleset_info, config)
         ensure
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(data_obj) if data_obj
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_ruleset_info_free(ruleset_info) if ruleset_info
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(ruleset_info_obj) if ruleset_info_obj
         end
 
         private
 
-        def new_from_handle(handle_object, info, config)
+        def new_from_handle(handle_object, ruleset_info, config)
           obj = self.class.allocate
           obj.instance_variable_set(:@handle_obj, handle_object)
-          obj.instance_variable_set(:@ruleset_info, info)
+          obj.instance_variable_set(:@ruleset_info, ruleset_info)
           obj.instance_variable_set(:@config, config)
           obj
         end
@@ -588,11 +561,11 @@ module Datadog
       end
 
       class Result
-        attr_reader :status, :data, :total_runtime, :timeout, :actions
+        attr_reader :status, :events, :total_runtime, :timeout, :actions
 
-        def initialize(status, data, total_runtime, timeout, actions)
+        def initialize(status, events, total_runtime, timeout, actions)
           @status = status
-          @data = data
+          @events = events
           @total_runtime = total_runtime
           @timeout = timeout
           @actions = actions
@@ -651,18 +624,12 @@ module Datadog
 
           code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
 
-          actions = if result_obj[:actions][:size] > 0
-                      result_obj[:actions][:array].get_array_of_string(0, result_obj[:actions][:size])
-                    else
-                      []
-                    end
-
           result = Result.new(
             RESULT_CODE[code],
-            (JSON.parse(result_obj[:data]) if result_obj[:data] != nil),
+            Datadog::AppSec::WAF.object_to_ruby(result_obj[:events]),
             result_obj[:total_runtime],
             result_obj[:timeout],
-            actions,
+            Datadog::AppSec::WAF.object_to_ruby(result_obj[:actions]),
           )
 
           [RESULT_CODE[code], result]

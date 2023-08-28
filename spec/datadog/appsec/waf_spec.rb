@@ -1254,7 +1254,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     let(:ruleset_info) do
-      Datadog::AppSec::WAF::LibDDWAF::RuleSetInfo.new
+      Datadog::AppSec::WAF::LibDDWAF::Object.new
     end
 
     before(:each) do
@@ -1278,52 +1278,40 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
     end
 
-    context 'with no ruleset information' do
-      let(:ruleset_info) do
-        Datadog::AppSec::WAF::LibDDWAF::RuleSetInfoNone
-      end
-
-      it 'creates a handle' do
-        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
-        expect(handle.null?).to be false
-      end
-    end
-
     context 'with ruleset information' do
       it 'records successful old ruleset information' do
         handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
         expect(handle.null?).to be false
 
-        expect(ruleset_info[:loaded]).to eq(3)
-        expect(ruleset_info[:failed]).to eq(0)
-        expect(ruleset_info[:errors]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
-        expect(ruleset_info[:errors][:type]).to eq(:ddwaf_obj_map)
-        expect(ruleset_info[:errors][:nbEntries]).to eq(0)
-        expect(ruleset_info[:version]).to be_nil
+        rulset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+
+        expect(rulset_info_ruby_object["rules"]["loaded"].size).to eq(3)
+        expect(rulset_info_ruby_object["rules"]["failed"].size).to eq(0)
+        expect(rulset_info_ruby_object["rules"]["errors"]).to be_empty
       end
 
       it 'records successful new ruleset information' do
         handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule4, config, ruleset_info)
         expect(handle.null?).to be false
 
-        expect(ruleset_info[:loaded]).to eq(1)
-        expect(ruleset_info[:failed]).to eq(0)
-        expect(ruleset_info[:errors]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
-        expect(ruleset_info[:errors][:type]).to eq(:ddwaf_obj_map)
-        expect(ruleset_info[:errors][:nbEntries]).to eq(0)
-        expect(ruleset_info[:version]).to eq('0.1.2')
+        rulset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+
+        expect(rulset_info_ruby_object["rules"]["loaded"].size).to eq(1)
+        expect(rulset_info_ruby_object["rules"]["failed"].size).to eq(0)
+        expect(rulset_info_ruby_object["rules"]["errors"]).to be_empty
+        expect(rulset_info_ruby_object["ruleset_version"]).to eq('0.1.2')
       end
 
       it 'records failing ruleset information' do
         handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(bad_rule, config, ruleset_info)
         expect(handle.null?).to be false
 
-        expect(ruleset_info[:loaded]).to eq(2)
-        expect(ruleset_info[:failed]).to eq(1)
-        expect(ruleset_info[:errors]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
-        expect(ruleset_info[:errors][:type]).to eq(:ddwaf_obj_map)
-        expect(ruleset_info[:errors][:nbEntries]).to eq(1)
-        expect(ruleset_info[:version]).to be_nil
+        rulset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+
+        expect(rulset_info_ruby_object["rules"]["loaded"].size).to eq(2)
+        expect(rulset_info_ruby_object["rules"]["failed"].size).to eq(1)
+        expect(rulset_info_ruby_object["rules"]["errors"]).to_not be_empty
+        expect(rulset_info_ruby_object["ruleset_version"]).to be_nil
       end
     end
 
@@ -1348,9 +1336,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
       expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
-      expect(result[:data]).to_not be nil
-      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
-      expect(result[:actions][:size]).to eq 0
+      expect(result[:events]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_size(result[:actions])).to eq 0
     end
 
     it 'does not trigger' do
@@ -1362,9 +1350,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, input, result, timeout)
       expect(code).to eq :ddwaf_ok
       expect(result[:timeout]).to eq false
-      expect(result[:data]).to be nil
-      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
-      expect(result[:actions][:size]).to eq 0
+      expect(result[:events]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_size(result[:actions])).to eq 0
     end
 
     it 'does not trigger a monitoring rule due to timeout' do
@@ -1379,9 +1367,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
       expect(code).to eq :ddwaf_ok
       expect(result[:timeout]).to eq true
-      expect(result[:data]).to be nil
-      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
-      expect(result[:actions][:size]).to eq 0
+      expect(result[:events]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_size(result[:actions])).to eq 0
     end
 
     it 'triggers a known attack' do
@@ -1393,9 +1381,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, attack, result, timeout)
       expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
-      expect(result[:data]).to_not be nil
-      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
-      expect(result[:actions][:size]).to eq 0
+      expect(result[:events]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_size(result[:actions])).to eq 0
     end
 
     it 'triggers a known actionable attack' do
@@ -1407,11 +1395,11 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(context, block, result, timeout)
       expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
-      expect(result[:data]).to_not be nil
-      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::ResultActions
-      expect(result[:actions][:size]).to eq 4
+      expect(result[:events]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(result[:actions]).to be_a Datadog::AppSec::WAF::LibDDWAF::Object
+      expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_size(result[:actions])).to eq 4
       # TODO: not sure why libddwaf reverses actions
-      expect(result[:actions][:array].get_array_of_string(0, 4)).to eq ['action1', 'action2', 'action3', 'action4'].reverse
+      expect(Datadog::AppSec::WAF.object_to_ruby(result[:actions])).to eq ['action1', 'action2', 'action3', 'action4'].reverse
     end
   end
 end
@@ -1445,7 +1433,7 @@ RSpec.describe Datadog::AppSec::WAF do
   end
 
   let(:ruleset_info) do
-    Datadog::AppSec::WAF::LibDDWAF::RuleSetInfoNone
+    Datadog::AppSec::WAF::LibDDWAF::Object.new
   end
 
   let(:handle) do
@@ -1533,11 +1521,10 @@ RSpec.describe Datadog::AppSec::WAF do
 
   it 'records good ruleset info' do
     expect(handle.ruleset_info).to be_a Hash
-    expect(handle.ruleset_info[:loaded]).to eq(1)
-    expect(handle.ruleset_info[:failed]).to eq(0)
-    expect(handle.ruleset_info[:errors]).to be_a(Hash)
-    expect(handle.ruleset_info[:errors]).to be_empty
-    expect(handle.ruleset_info[:version]).to eq('1.2.3')
+    expect(handle.ruleset_info["rules"]["loaded"].size).to eq(1)
+    expect(handle.ruleset_info["rules"]["failed"].size).to eq(0)
+    expect(handle.ruleset_info["rules"]["errors"]).to be_empty
+    expect(handle.ruleset_info["ruleset_version"]).to eq('1.2.3')
   end
 
   context 'run' do
@@ -1546,7 +1533,7 @@ RSpec.describe Datadog::AppSec::WAF do
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :ok
       expect(result.status).to eq :ok
-      expect(result.data).to be nil
+      expect(result.events).to eq []
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
       expect(result.actions).to eq []
@@ -1557,7 +1544,7 @@ RSpec.describe Datadog::AppSec::WAF do
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :match
       expect(result.status).to eq :match
-      expect(result.data).to be_a Array
+      expect(result.events).to be_a Array
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
       expect(result.actions).to eq []
@@ -1574,7 +1561,7 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
-          expect(result.data).to be_a Array
+          expect(result.events).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
@@ -1588,8 +1575,8 @@ RSpec.describe Datadog::AppSec::WAF do
 
         it 'returns valid UTF-8' do
           _code, result = context.run(matching_input, timeout)
-          expect(result.data.first['rule_matches'].first['parameters'].first['value']).to be_valid_encoding
-          expect(result.data.first['rule_matches'].first['parameters'].first['highlight'].first).to be_valid_encoding
+          expect(result.events.first['rule_matches'].first['parameters'].first['value']).to be_valid_encoding
+          expect(result.events.first['rule_matches'].first['parameters'].first['highlight'].first).to be_valid_encoding
         end
 
         it 'catches a match' do
@@ -1597,7 +1584,7 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
-          expect(result.data).to be_a Array
+          expect(result.events).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
@@ -1644,11 +1631,10 @@ RSpec.describe Datadog::AppSec::WAF do
 
     it 'records bad ruleset info' do
       expect(handle.ruleset_info).to be_a Hash
-      expect(handle.ruleset_info[:loaded]).to eq(1)
-      expect(handle.ruleset_info[:failed]).to eq(1)
-      expect(handle.ruleset_info[:errors]).to be_a(Hash)
-      expect(handle.ruleset_info[:errors]).to_not be_empty
-      expect(handle.ruleset_info[:version]).to eq('1.2.3')
+      expect(handle.ruleset_info["rules"]["loaded"].size).to eq(1)
+      expect(handle.ruleset_info["rules"]["failed"].size).to eq(1)
+      expect(handle.ruleset_info["rules"]["errors"]).to_not be_empty
+      expect(handle.ruleset_info["ruleset_version"]).to eq('1.2.3')
     end
   end
 
@@ -1687,11 +1673,10 @@ RSpec.describe Datadog::AppSec::WAF do
     it 'records bad ruleset info in the exception' do
       expect(handle_exception).to be_a(Datadog::AppSec::WAF::LibDDWAF::Error)
       expect(handle_exception.ruleset_info).to be_a Hash
-      expect(handle_exception.ruleset_info[:loaded]).to eq(0)
-      expect(handle_exception.ruleset_info[:failed]).to eq(1)
-      expect(handle_exception.ruleset_info[:errors]).to be_a(Hash)
-      expect(handle_exception.ruleset_info[:errors]).to_not be_empty
-      expect(handle_exception.ruleset_info[:version]).to eq('1.2.3')
+      expect(handle_exception.ruleset_info["rules"]["loaded"].size).to eq(0)
+      expect(handle_exception.ruleset_info["rules"]["failed"].size).to eq(1)
+      expect(handle_exception.ruleset_info["rules"]["errors"]).to_not be_empty
+      expect(handle_exception.ruleset_info["ruleset_version"]).to eq('1.2.3')
     end
   end
 
@@ -1930,8 +1915,8 @@ RSpec.describe Datadog::AppSec::WAF do
         new_code, new_result = new_context.run(matching_input, timeout)
         expect(new_code).to eq :match
 
-        expect(new_result.data.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
-        expect(new_result.data.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
+        expect(new_result.events.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
+        expect(new_result.events.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
       end
     end
   end
@@ -1958,7 +1943,7 @@ RSpec.describe Datadog::AppSec::WAF do
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :ok
       expect(result.status).to eq :ok
-      expect(result.data).to be nil
+      expect(result.events).to eq []
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
       expect(result.actions).to eq []
@@ -1971,11 +1956,11 @@ RSpec.describe Datadog::AppSec::WAF do
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :match
       expect(result.status).to eq :match
-      expect(result.data).to be_a Array
+      expect(result.events).to be_a Array
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
       expect(result.actions).to eq []
-      expect(result.data.find { |r| r['rule']['id'] == matching_input_rule }).to_not be_nil
+      expect(result.events.find { |r| r['rule']['id'] == matching_input_rule }).to_not be_nil
       expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
       expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
     end
@@ -1996,7 +1981,7 @@ RSpec.describe Datadog::AppSec::WAF do
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :match
             expect(result.status).to eq :match
-            expect(result.data).to be_a Array
+            expect(result.events).to be_a Array
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
@@ -2015,7 +2000,7 @@ RSpec.describe Datadog::AppSec::WAF do
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :match
             expect(result.status).to eq :match
-            expect(result.data).to be_a Array
+            expect(result.events).to be_a Array
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
@@ -2034,7 +2019,7 @@ RSpec.describe Datadog::AppSec::WAF do
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :ok
             expect(result.status).to eq :ok
-            expect(result.data).to be nil
+            expect(result.events).to eq []
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
@@ -2053,7 +2038,7 @@ RSpec.describe Datadog::AppSec::WAF do
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :ok
             expect(result.status).to eq :ok
-            expect(result.data).to be nil
+            expect(result.events).to eq []
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
@@ -2078,7 +2063,7 @@ RSpec.describe Datadog::AppSec::WAF do
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :ok
             expect(result.status).to eq :ok
-            expect(result.data).to be nil
+            expect(result.events).to eq []
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
@@ -2097,7 +2082,7 @@ RSpec.describe Datadog::AppSec::WAF do
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :match
             expect(result.status).to eq :match
-            expect(result.data).to be_a Array
+            expect(result.events).to be_a Array
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
@@ -2122,7 +2107,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
           expect(code).to eq :ok
           expect(result.status).to eq :ok
-          expect(result.data).to be nil
+          expect(result.events).to eq []
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
@@ -2147,9 +2132,9 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
-          expect(result.data).to be_a Array
-          expect(result.data.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
-          expect(result.data.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
+          expect(result.events).to be_a Array
+          expect(result.events.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
+          expect(result.events.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
@@ -2172,9 +2157,9 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
-          expect(result.data).to be_a Array
-          expect(result.data.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
-          expect(result.data.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
+          expect(result.events).to be_a Array
+          expect(result.events.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
+          expect(result.events.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
@@ -2222,7 +2207,7 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
-        expect(result.data).to be nil
+        expect(result.events).to eq []
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
@@ -2234,7 +2219,7 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
-        expect(result.data).to be nil
+        expect(result.events).to eq []
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
@@ -2248,7 +2233,7 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
-        expect(result.data).to be_a Array
+        expect(result.events).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
@@ -2257,7 +2242,7 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
-        expect(result.data).to be nil
+        expect(result.events).to eq []
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
@@ -2277,12 +2262,12 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
-          expect(result.data).to be_a Array
+          expect(result.events).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
 
-          expect(result.data.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
+          expect(result.events.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Running .* #{long_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
@@ -2295,11 +2280,11 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
-          expect(result.data).to be_a Array
+          expect(result.events).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
 
-          expect(result.data.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
+          expect(result.events.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Running .* #{long_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
@@ -2314,7 +2299,7 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(code).to eq :match
           expect(result.status).to eq :match
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
-          expect(result.data).to be_a Array
+          expect(result.events).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
@@ -2326,7 +2311,7 @@ RSpec.describe Datadog::AppSec::WAF do
             expect(code).to eq :ok
             expect(result.status).to eq :ok
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
-            expect(result.data).to be nil
+            expect(result.events).to eq []
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
@@ -2348,7 +2333,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
           expect(code).to eq :ok
           expect(result.status).to eq :ok
-          expect(result.data).to be_nil
+          expect(result.events).to eq []
           expect(result.total_runtime).to be > 0
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to_not be_nil
 
@@ -2362,7 +2347,7 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
-        expect(result.data).to be nil
+        expect(result.events).to eq []
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
@@ -2374,12 +2359,12 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
-        expect(result.data).to be_a Array
+        expect(result.events).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(result.data.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
+        expect(result.events.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
       end
@@ -2389,12 +2374,12 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
-        expect(result.data).to be_a Array
+        expect(result.events).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(result.data.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
+        expect(result.events.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
@@ -2402,13 +2387,13 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
-        expect(result.data).to be_a Array
+        expect(result.events).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(result.data.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to be_nil
-        expect(result.data.find { |r| r['rule']['id'] == matching_input_sqli_rule }).to_not be_nil
+        expect(result.events.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to be_nil
+        expect(result.events.find { |r| r['rule']['id'] == matching_input_sqli_rule }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_sqli_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
       end
@@ -2418,7 +2403,7 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
-        expect(result.data).to be nil
+        expect(result.events).to eq []
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
@@ -2430,12 +2415,12 @@ RSpec.describe Datadog::AppSec::WAF do
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
-        expect(result.data).to be_a Array
+        expect(result.events).to be_a Array
         expect(result.total_runtime).to be > 0
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(result.data.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
+        expect(result.events.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
       end
@@ -2449,7 +2434,7 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :ok
           expect(result.status).to eq :ok
-          expect(result.data).to be nil
+          expect(result.events).to eq []
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
@@ -2467,12 +2452,12 @@ RSpec.describe Datadog::AppSec::WAF do
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
-          expect(result.data).to be_a Array
+          expect(result.events).to be_a Array
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
 
-          expect(result.data.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
+          expect(result.events.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end.call
