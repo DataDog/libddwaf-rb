@@ -1283,35 +1283,35 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
         expect(handle.null?).to be false
 
-        rulset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+        ruleset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
 
-        expect(rulset_info_ruby_object["rules"]["loaded"].size).to eq(3)
-        expect(rulset_info_ruby_object["rules"]["failed"].size).to eq(0)
-        expect(rulset_info_ruby_object["rules"]["errors"]).to be_empty
+        expect(ruleset_info_ruby_object["rules"]["loaded"].size).to eq(3)
+        expect(ruleset_info_ruby_object["rules"]["failed"].size).to eq(0)
+        expect(ruleset_info_ruby_object["rules"]["errors"]).to be_empty
       end
 
       it 'records successful new ruleset information' do
         handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule4, config, ruleset_info)
         expect(handle.null?).to be false
 
-        rulset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+        ruleset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
 
-        expect(rulset_info_ruby_object["rules"]["loaded"].size).to eq(1)
-        expect(rulset_info_ruby_object["rules"]["failed"].size).to eq(0)
-        expect(rulset_info_ruby_object["rules"]["errors"]).to be_empty
-        expect(rulset_info_ruby_object["ruleset_version"]).to eq('0.1.2')
+        expect(ruleset_info_ruby_object["rules"]["loaded"].size).to eq(1)
+        expect(ruleset_info_ruby_object["rules"]["failed"].size).to eq(0)
+        expect(ruleset_info_ruby_object["rules"]["errors"]).to be_empty
+        expect(ruleset_info_ruby_object["ruleset_version"]).to eq('0.1.2')
       end
 
       it 'records failing ruleset information' do
         handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(bad_rule, config, ruleset_info)
         expect(handle.null?).to be false
 
-        rulset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+        ruleset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
 
-        expect(rulset_info_ruby_object["rules"]["loaded"].size).to eq(2)
-        expect(rulset_info_ruby_object["rules"]["failed"].size).to eq(1)
-        expect(rulset_info_ruby_object["rules"]["errors"]).to_not be_empty
-        expect(rulset_info_ruby_object["ruleset_version"]).to be_nil
+        expect(ruleset_info_ruby_object["rules"]["loaded"].size).to eq(2)
+        expect(ruleset_info_ruby_object["rules"]["failed"].size).to eq(1)
+        expect(ruleset_info_ruby_object["rules"]["errors"]).to_not be_empty
+        expect(ruleset_info_ruby_object["ruleset_version"]).to be_nil
       end
     end
 
