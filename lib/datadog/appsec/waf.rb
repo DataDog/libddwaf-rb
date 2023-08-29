@@ -8,10 +8,10 @@ module Datadog
     module WAF
       module LibDDWAF
         class Error < StandardError
-          attr_reader :ruleset_info
+          attr_reader :diagnostics
 
-          def initialize(msg, ruleset_info: nil)
-            @ruleset_info = ruleset_info
+          def initialize(msg, diagnostics: nil)
+            @diagnostics = diagnostics
           end
         end
 
@@ -462,7 +462,7 @@ module Datadog
       }
 
       class Handle
-        attr_reader :handle_obj, :ruleset_info, :config
+        attr_reader :handle_obj, :diagnostics, :config
 
         def initialize(rule, limits: {}, obfuscator: {})
           rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
@@ -484,19 +484,19 @@ module Datadog
 
           @config = config_obj
 
-          ruleset_info_obj = Datadog::AppSec::WAF::LibDDWAF::Object.new
+          diagnostics_obj = Datadog::AppSec::WAF::LibDDWAF::Object.new
 
-          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, ruleset_info_obj)
+          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, diagnostics_obj)
 
-          @ruleset_info = Datadog::AppSec::WAF.object_to_ruby(ruleset_info_obj)
+          @diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
 
           if @handle_obj.null?
-            fail LibDDWAF::Error.new('Could not create handle', ruleset_info: @ruleset_info)
+            fail LibDDWAF::Error.new('Could not create handle', diagnostics: @diagnostics)
           end
 
           validate!
         ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(ruleset_info_obj) if ruleset_info_obj
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(diagnostics_obj) if diagnostics_obj
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
         end
 
@@ -519,24 +519,24 @@ module Datadog
 
         def merge(data)
           data_obj = Datadog::AppSec::WAF.ruby_to_object(data, coerce: false)
-          ruleset_info_obj = LibDDWAF::Object.new
-          new_handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update(handle_obj, data_obj, ruleset_info_obj)
+          diagnostics_obj = LibDDWAF::Object.new
+          new_handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update(handle_obj, data_obj, diagnostics_obj)
 
           return if new_handle.null?
 
-          ruleset_info = Datadog::AppSec::WAF.object_to_ruby(ruleset_info_obj)
-          new_from_handle(new_handle, ruleset_info, config)
+          diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
+          new_from_handle(new_handle, diagnostics, config)
         ensure
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(data_obj) if data_obj
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(ruleset_info_obj) if ruleset_info_obj
+          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(diagnostics_obj) if diagnostics_obj
         end
 
         private
 
-        def new_from_handle(handle_object, ruleset_info, config)
+        def new_from_handle(handle_object, diagnostics, config)
           obj = self.class.allocate
           obj.instance_variable_set(:@handle_obj, handle_object)
-          obj.instance_variable_set(:@ruleset_info, ruleset_info)
+          obj.instance_variable_set(:@diagnostics, diagnostics)
           obj.instance_variable_set(:@config, config)
           obj
         end

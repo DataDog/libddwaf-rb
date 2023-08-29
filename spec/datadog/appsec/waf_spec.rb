@@ -1253,7 +1253,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       10_000_000 # in us
     end
 
-    let(:ruleset_info) do
+    let(:diagnostics_obj) do
       Datadog::AppSec::WAF::LibDDWAF::Object.new
     end
 
@@ -1278,45 +1278,45 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
     end
 
-    context 'with ruleset information' do
-      it 'records successful old ruleset information' do
-        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
+    context 'with diagnostics' do
+      it 'records successful old diagnostics' do
+        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, diagnostics_obj)
         expect(handle.null?).to be false
 
-        ruleset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+        diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
 
-        expect(ruleset_info_ruby_object["rules"]["loaded"].size).to eq(3)
-        expect(ruleset_info_ruby_object["rules"]["failed"].size).to eq(0)
-        expect(ruleset_info_ruby_object["rules"]["errors"]).to be_empty
+        expect(diagnostics["rules"]["loaded"].size).to eq(3)
+        expect(diagnostics["rules"]["failed"].size).to eq(0)
+        expect(diagnostics["rules"]["errors"]).to be_empty
       end
 
-      it 'records successful new ruleset information' do
-        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule4, config, ruleset_info)
+      it 'records successful new diagnostics' do
+        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule4, config, diagnostics_obj)
         expect(handle.null?).to be false
 
-        ruleset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+        diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
 
-        expect(ruleset_info_ruby_object["rules"]["loaded"].size).to eq(1)
-        expect(ruleset_info_ruby_object["rules"]["failed"].size).to eq(0)
-        expect(ruleset_info_ruby_object["rules"]["errors"]).to be_empty
-        expect(ruleset_info_ruby_object["ruleset_version"]).to eq('0.1.2')
+        expect(diagnostics["rules"]["loaded"].size).to eq(1)
+        expect(diagnostics["rules"]["failed"].size).to eq(0)
+        expect(diagnostics["rules"]["errors"]).to be_empty
+        expect(diagnostics["ruleset_version"]).to eq('0.1.2')
       end
 
-      it 'records failing ruleset information' do
-        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(bad_rule, config, ruleset_info)
+      it 'records failing diagnostics' do
+        handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(bad_rule, config, diagnostics_obj)
         expect(handle.null?).to be false
 
-        ruleset_info_ruby_object = Datadog::AppSec::WAF.object_to_ruby(ruleset_info)
+        diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
 
-        expect(ruleset_info_ruby_object["rules"]["loaded"].size).to eq(2)
-        expect(ruleset_info_ruby_object["rules"]["failed"].size).to eq(1)
-        expect(ruleset_info_ruby_object["rules"]["errors"]).to_not be_empty
-        expect(ruleset_info_ruby_object["ruleset_version"]).to be_nil
+        expect(diagnostics["rules"]["loaded"].size).to eq(2)
+        expect(diagnostics["rules"]["failed"].size).to eq(1)
+        expect(diagnostics["rules"]["errors"]).to_not be_empty
+        expect(diagnostics["ruleset_version"]).to be_nil
       end
     end
 
     it 'lists required addresses' do
-      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, diagnostics_obj)
       expect(handle.null?).to be false
 
       count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
@@ -1325,7 +1325,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'triggers a monitoring rule' do
-      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, diagnostics_obj)
       expect(handle.null?).to be false
 
       context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
@@ -1342,7 +1342,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'does not trigger' do
-      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule2, config, ruleset_info)
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule2, config, diagnostics_obj)
       expect(handle.null?).to be false
 
       context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
@@ -1356,7 +1356,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'does not trigger a monitoring rule due to timeout' do
-      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, ruleset_info)
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule1, config, diagnostics_obj)
       expect(handle.null?).to be false
 
       context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
@@ -1373,7 +1373,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'triggers a known attack' do
-      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule3, config, ruleset_info)
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule3, config, diagnostics_obj)
       expect(handle.null?).to be false
 
       context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
@@ -1387,7 +1387,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'triggers a known actionable attack' do
-      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule5, config, ruleset_info)
+      handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule5, config, diagnostics_obj)
       expect(handle.null?).to be false
 
       context = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle)
@@ -1432,7 +1432,7 @@ RSpec.describe Datadog::AppSec::WAF do
     10_000_000 # in us
   end
 
-  let(:ruleset_info) do
+  let(:diagnostics_obj) do
     Datadog::AppSec::WAF::LibDDWAF::Object.new
   end
 
@@ -1509,7 +1509,7 @@ RSpec.describe Datadog::AppSec::WAF do
     invalid_rule = {}
     invalid_rule_obj = Datadog::AppSec::WAF.ruby_to_object(invalid_rule)
     config_obj = Datadog::AppSec::WAF::LibDDWAF::Config.new
-    invalid_handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, ruleset_info)
+    invalid_handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, diagnostics_obj)
     expect(invalid_handle_obj.null?).to be true
     invalid_handle = Datadog::AppSec::WAF::Handle.new(rule)
     invalid_handle.instance_eval do
@@ -1519,12 +1519,12 @@ RSpec.describe Datadog::AppSec::WAF do
     expect { Datadog::AppSec::WAF::Context.new(invalid_handle) }.to raise_error Datadog::AppSec::WAF::LibDDWAF::Error
   end
 
-  it 'records good ruleset info' do
-    expect(handle.ruleset_info).to be_a Hash
-    expect(handle.ruleset_info["rules"]["loaded"].size).to eq(1)
-    expect(handle.ruleset_info["rules"]["failed"].size).to eq(0)
-    expect(handle.ruleset_info["rules"]["errors"]).to be_empty
-    expect(handle.ruleset_info["ruleset_version"]).to eq('1.2.3')
+  it 'records good diagnostics' do
+    expect(handle.diagnostics).to be_a Hash
+    expect(handle.diagnostics["rules"]["loaded"].size).to eq(1)
+    expect(handle.diagnostics["rules"]["failed"].size).to eq(0)
+    expect(handle.diagnostics["rules"]["errors"]).to be_empty
+    expect(handle.diagnostics["ruleset_version"]).to eq('1.2.3')
   end
 
   context 'run' do
@@ -1629,12 +1629,12 @@ RSpec.describe Datadog::AppSec::WAF do
       }
     end
 
-    it 'records bad ruleset info' do
-      expect(handle.ruleset_info).to be_a Hash
-      expect(handle.ruleset_info["rules"]["loaded"].size).to eq(1)
-      expect(handle.ruleset_info["rules"]["failed"].size).to eq(1)
-      expect(handle.ruleset_info["rules"]["errors"]).to_not be_empty
-      expect(handle.ruleset_info["ruleset_version"]).to eq('1.2.3')
+    it 'records bad diagnostics' do
+      expect(handle.diagnostics).to be_a Hash
+      expect(handle.diagnostics["rules"]["loaded"].size).to eq(1)
+      expect(handle.diagnostics["rules"]["failed"].size).to eq(1)
+      expect(handle.diagnostics["rules"]["errors"]).to_not be_empty
+      expect(handle.diagnostics["ruleset_version"]).to eq('1.2.3')
     end
   end
 
@@ -1670,13 +1670,13 @@ RSpec.describe Datadog::AppSec::WAF do
       end
     end
 
-    it 'records bad ruleset info in the exception' do
+    it 'records bad diagnostics in the exception' do
       expect(handle_exception).to be_a(Datadog::AppSec::WAF::LibDDWAF::Error)
-      expect(handle_exception.ruleset_info).to be_a Hash
-      expect(handle_exception.ruleset_info["rules"]["loaded"].size).to eq(0)
-      expect(handle_exception.ruleset_info["rules"]["failed"].size).to eq(1)
-      expect(handle_exception.ruleset_info["rules"]["errors"]).to_not be_empty
-      expect(handle_exception.ruleset_info["ruleset_version"]).to eq('1.2.3')
+      expect(handle_exception.diagnostics).to be_a Hash
+      expect(handle_exception.diagnostics["rules"]["loaded"].size).to eq(0)
+      expect(handle_exception.diagnostics["rules"]["failed"].size).to eq(1)
+      expect(handle_exception.diagnostics["rules"]["errors"]).to_not be_empty
+      expect(handle_exception.diagnostics["ruleset_version"]).to eq('1.2.3')
     end
   end
 

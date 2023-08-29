@@ -3,9 +3,9 @@ module Datadog
     module WAF
       module LibDDWAF
         class Error < StandardError
-          attr_reader ruleset_info: ::Datadog::AppSec::WAF::data
+          attr_reader diagnostics: ::Datadog::AppSec::WAF::data
 
-          def initialize: (::String msg, ?ruleset_info: ::Datadog::AppSec::WAF::data?) -> void
+          def initialize: (::String msg, ?diagnostics: ::Datadog::AppSec::WAF::data?) -> void
         end
 
         extend ::FFI::Library
@@ -155,7 +155,7 @@ module Datadog
 
       class Handle
         attr_reader handle_obj: ::FFI::Pointer
-        attr_reader ruleset_info: data
+        attr_reader diagnostics: data
         attr_reader config: WAF::LibDDWAF::Config
 
         def initialize: (data rule, ?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
@@ -167,7 +167,7 @@ module Datadog
 
         @valid: bool
 
-        def new_from_handle: (::FFI::Pointer handle_object, data ruleset_info, WAF::LibDDWAF::Config config) -> untyped
+        def new_from_handle: (::FFI::Pointer handle_object, data diagnostics, WAF::LibDDWAF::Config config) -> untyped
         def validate!: () -> void
         def invalidate!: () -> void
         def valid?: () -> (nil | bool)
