@@ -3,9 +3,9 @@ module Datadog
     module WAF
       module LibDDWAF
         class Error < StandardError
-          attr_reader ruleset_info: Hash[Symbol, untyped] | nil
+          attr_reader diagnostics: ::Datadog::AppSec::WAF::data
 
-          def initialize: (::String msg, ?ruleset_info: Hash[Symbol, untyped]?) -> void
+          def initialize: (::String msg, ?diagnostics: ::Datadog::AppSec::WAF::data?) -> void
         end
 
         extend ::FFI::Library
@@ -93,15 +93,8 @@ module Datadog
           end
         end
 
-        class RuleSetInfo < ::FFI::Struct
-        end
-
-        RuleSetInfoNone: ::Datadog::AppSec::WAF::LibDDWAF::RuleSetInfo
-
-        def self.ddwaf_ruleset_info_free: (RuleSetInfo) -> void
-
-        def self.ddwaf_init: (top, Config, RuleSetInfo) -> ::FFI::Pointer
-        def self.ddwaf_update: (::FFI::Pointer, LibDDWAF::Object, RuleSetInfo) -> ::FFI::Pointer
+        def self.ddwaf_init: (top, Config, Object) -> ::FFI::Pointer
+        def self.ddwaf_update: (::FFI::Pointer, LibDDWAF::Object, LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_destroy: (::FFI::Pointer) -> void
 
         def self.ddwaf_required_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
@@ -115,9 +108,6 @@ module Datadog
 
         def self.ddwaf_context_init: (::FFI::Pointer) -> ::FFI::Pointer
         def self.ddwaf_context_destroy: (::FFI::Pointer) -> void
-
-        class ResultActions < ::FFI::Struct
-        end
 
         class Result < ::FFI::Struct
         end
@@ -165,35 +155,33 @@ module Datadog
 
       class Handle
         attr_reader handle_obj: ::FFI::Pointer
-        attr_reader ruleset_info: Hash[Symbol, untyped]
+        attr_reader diagnostics: data
         attr_reader config: WAF::LibDDWAF::Config
 
         def initialize: (data rule, ?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
         def finalize: () -> untyped
         def required_addresses: () -> ::Array[::String]
-        def update: (untyped data) -> Handle
+        def merge: (untyped data) -> Handle?
 
         private
 
         @valid: bool
 
-        def new_from_handle: (::FFI::Pointer handle_object, Hash[Symbol, untyped] info, WAF::LibDDWAF::Config config) -> untyped
+        def new_from_handle: (::FFI::Pointer handle_object, data diagnostics, WAF::LibDDWAF::Config config) -> untyped
         def validate!: () -> void
         def invalidate!: () -> void
         def valid?: () -> (nil | bool)
         def valid!: () -> void
       end
 
-      type result_data = Array[untyped] | nil
-
       class Result
         attr_reader status: ::Symbol
-        attr_reader data: untyped
+        attr_reader events: data
         attr_reader total_runtime: ::Float
         attr_reader timeout: bool
-        attr_reader actions: ::Array[::String]
+        attr_reader actions: data
 
-        def initialize: (::Symbol, result_data, ::Float, bool, ::Array[::String]) -> void
+        def initialize: (::Symbol, data, ::Float, bool, data) -> void
       end
 
       class Context
