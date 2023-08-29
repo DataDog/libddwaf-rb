@@ -7,5 +7,6 @@ Metrics/BlockLength:
   Exclude:
     - 'spec/datadog/appsec/waf_spec.rb'
 
+# Requires Ruby 3.1
 Style/HashSyntax:
   EnforcedShorthandSyntax: never
