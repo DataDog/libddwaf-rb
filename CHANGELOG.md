@@ -1,8 +1,10 @@
 # 2023-08-29 v.1.11.0.0.0
 
 - Update to libddwaf 1.11.0
-- Rename Handle#ruleset_info to Handle#diagnostics. (Breaking change)
-  The schema of the new diagnostics variable can be [here](https://github.com/DataDog/libddwaf/blob/master/schema/diagnostics.json)
+- Changed `Datadog::AppSec::WAF::Handle#ruleset_info` to `Datadog::AppSec::WAF::Handle#diagnostics``. (Breaking change)
+  The schema of the diagnostics variable can be found [here](https://github.com/DataDog/libddwaf/blob/master/schema/diagnostics.json)
+- Changed `Datadog::AppSec::WAF::Result#data` to `Datadog::AppSec::WAF::Result#events`. (Breaking change)
+  The schema of the events variable can be found [here](https://github.com/DataDog/libddwaf/blob/master/schema/events.json)
 
 
 # 2023-08-28 v.1.10.0.0.0
