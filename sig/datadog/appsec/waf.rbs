@@ -182,8 +182,9 @@ module Datadog
         attr_reader total_runtime: ::Float
         attr_reader timeout: bool
         attr_reader actions: data
+        attr_reader derivatives: data
 
-        def initialize: (::Symbol, data, ::Float, bool, data) -> void
+        def initialize: (::Symbol, data, ::Float, bool, data, data) -> void
       end
 
       class Context

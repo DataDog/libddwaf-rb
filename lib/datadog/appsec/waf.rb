@@ -575,14 +575,15 @@ module Datadog
       end
 
       class Result
-        attr_reader :status, :events, :total_runtime, :timeout, :actions
+        attr_reader :status, :events, :total_runtime, :timeout, :actions, :derivatives
 
-        def initialize(status, events, total_runtime, timeout, actions)
+        def initialize(status, events, total_runtime, timeout, actions, derivatives)
           @status = status
           @events = events
           @total_runtime = total_runtime
           @timeout = timeout
           @actions = actions
+          @derivatives = derivatives
         end
       end
 
@@ -623,7 +624,8 @@ module Datadog
           input_obj = Datadog::AppSec::WAF.ruby_to_object(input,
                                                           max_container_size: max_container_size,
                                                           max_container_depth: max_container_depth,
-                                                          max_string_length: max_string_length)
+                                                          max_string_length: max_string_length,
+                                                          coerce: false)
           if input_obj.null?
             fail LibDDWAF::Error, "Could not convert input: #{input.inspect}"
           end
@@ -644,6 +646,7 @@ module Datadog
             result_obj[:total_runtime],
             result_obj[:timeout],
             Datadog::AppSec::WAF.object_to_ruby(result_obj[:actions]),
+            Datadog::AppSec::WAF.object_to_ruby(result_obj[:derivatives]),
           )
 
           [RESULT_CODE[code], result]

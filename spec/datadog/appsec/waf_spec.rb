@@ -2215,7 +2215,7 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       let(:matching_input_status) do
-        { 'server.response.status' => 404 }
+        { 'server.response.status' => '404' }
       end
 
       let(:matching_input_sqli) do
@@ -2485,6 +2485,169 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_path_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end.call
+      end
+    end
+  end
+
+  context 'with processors' do
+    let(:rule) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '1.2.3'
+        },
+        'rules' => [
+          {
+            "id": "crs-913-120",
+            "name": "Known security scanner filename/argument",
+            "tags": {
+              "type": "security_scanner",
+              "crs_id": "913120",
+              "category": "attack_attempt"
+            },
+            "conditions": [
+              {
+                "parameters": {
+                  "inputs": [
+                    {
+                      "address": "server.request.query"
+                    },
+                  ],
+                  "regex": "<EMBED[\\s/+].*?(?:src|type).*?=",
+                  "options": {
+                    "min_length": 11
+                  }
+                },
+                "operator": "match_regex"
+              }
+            ],
+            "transformers": [
+              "removeNulls"
+            ]
+          }
+        ],
+        # Extracted the processor configuration from
+        # https://gist.github.com/Anilm3/db97e3f24869ee4f4d0eb96655df6983
+        "processors": [
+          {
+            "id": "processor-001",
+            "generator": "extract_schema",
+            "conditions": [
+              {
+                "operator": "equals",
+                "parameters": {
+                  "inputs": [
+                    {
+                      "address": "waf.context.processor",
+                      "key_path": [
+                        "extract-schema"
+                      ]
+                    }
+                  ],
+                  "type": "boolean",
+                  "value": true
+                }
+              }
+            ],
+            "parameters": {
+              "mappings": [
+                {
+                  "inputs": [
+                    {
+                      "address": "server.request.body"
+                    }
+                  ],
+                  "output": "_dd.appsec.s.req.body"
+                },
+                {
+                  "inputs": [
+                    {
+                      "address": "server.request.headers.no_cookies"
+                    }
+                  ],
+                  "output": "_dd.appsec.s.req.headers"
+                },
+                {
+                  "inputs": [
+                    {
+                      "address": "server.request.query"
+                    }
+                  ],
+                  "output": "_dd.appsec.s.req.query"
+                },
+                {
+                  "inputs": [
+                    {
+                      "address": "server.request.path_params"
+                    }
+                  ],
+                  "output": "_dd.appsec.s.req.params"
+                },
+                {
+                  "inputs": [
+                    {
+                      "address": "server.request.cookies"
+                    }
+                  ],
+                  "output": "_dd.appsec.s.req.cookies"
+                },
+                {
+                  "inputs": [
+                    {
+                      "address": "server.response.headers.no_cookies"
+                    }
+                  ],
+                  "output": "_dd.appsec.s.res.headers"
+                },
+                {
+                  "inputs": [
+                    {
+                      "address": "server.response.body"
+                    }
+                  ],
+                  "output": "_dd.appsec.s.res.body"
+                }
+              ]
+            },
+            "evaluate": false,
+            "output": true
+          }
+        ]
+      }
+    end
+
+    context 'with schema extraction' do
+      it 'populates derivatives' do
+        waf_args = {
+          'server.request.query' => {
+            'hello' => 'EMBED',
+          },
+          'waf.context.processor' => {
+            "extract-schema" => true
+          }
+        }
+
+        code, result = context.run(waf_args, timeout)
+        expect(code).to eq :ok
+        expect(result.derivatives).to_not be_empty
+        expect(result.derivatives).to eq({"_dd.appsec.s.req.query" => [{"hello" => [8]}]})
+      end
+    end
+
+    context 'with schema extraction' do
+      it 'populates derivatives' do
+        waf_args = {
+          'server.request.query' => {
+            'hello' => 'EMBED',
+          },
+          'waf.context.processor' => {
+            "extract-schema" => false
+          }
+        }
+
+        code, result = context.run(waf_args, timeout)
+        expect(code).to eq :ok
+        expect(result.derivatives).to be_empty
       end
     end
   end
