@@ -52,9 +52,10 @@ module Datadog
         def self.ddwaf_object_stringl_nc: (LibDDWAF::Object, ::String, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_unsigned: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_unsigned_force: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_signed_force: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
+        def self.ddwaf_object_string_from_unsigned: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
+        def self.ddwaf_object_string_from_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_bool: (LibDDWAF::Object, bool) -> ::FFI::Pointer
+        def self.ddwaf_object_float: (LibDDWAF::Object, ::Float) -> ::FFI::Pointer
 
         def self.ddwaf_object_array: (LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_object_array_add: (LibDDWAF::Object, LibDDWAF::Object) -> bool
@@ -75,6 +76,7 @@ module Datadog
         def self.ddwaf_object_get_signed: (LibDDWAF::Object, SizeTPtr) -> ::Integer
         def self.ddwaf_object_get_index: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
         def self.ddwaf_object_get_bool: (LibDDWAF::Object) -> bool
+        def self.ddwaf_object_get_float: (LibDDWAF::Object) -> ::Float
 
         # freeers
 

@@ -82,7 +82,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_string from unsigned' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_unsigned(object, 42)
+      r = libddwaf.ddwaf_object_string_from_unsigned(object, 42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_string
@@ -94,7 +94,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_string from signed' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_signed(object, -42)
+      r = libddwaf.ddwaf_object_string_from_signed(object, -42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_string
@@ -106,7 +106,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_unsigned' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_unsigned_force(object, 42)
+      r = libddwaf.ddwaf_object_unsigned(object, 42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_unsigned
@@ -116,7 +116,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_signed' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_signed_force(object, -42)
+      r = libddwaf.ddwaf_object_signed(object, -42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_signed
@@ -159,7 +159,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(object[:valueUnion][:array].null?).to be(true)
       ('a'..'f').each.with_index do |c, i|
         o = libddwaf::Object.new
-        o = libddwaf.ddwaf_object_unsigned(o, i)
+        o = libddwaf.ddwaf_object_string_from_unsigned(o, i)
         r = libddwaf.ddwaf_object_map_add(object, c, o)
       end
       expect(object[:nbEntries]).to eq 6
@@ -186,7 +186,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(object[:valueUnion][:array].null?).to be(true)
       ('a'..'f').each.with_index do |c, i|
         o = libddwaf::Object.new
-        o = libddwaf.ddwaf_object_unsigned(o, i)
+        o = libddwaf.ddwaf_object_string_from_unsigned(o, i)
         r = libddwaf.ddwaf_object_map_addl(object, c << "\x00foo", 5, o)
       end
       expect(object[:nbEntries]).to eq 6
@@ -216,7 +216,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         buf = FFI::MemoryPointer.from_string(s)
         buf.autorelease = false
         o = libddwaf::Object.new
-        o = libddwaf.ddwaf_object_unsigned(o, i)
+        o = libddwaf.ddwaf_object_string_from_unsigned(o, i)
         r = libddwaf.ddwaf_object_map_addl_nc(object, buf, s.size, o)
       end
       expect(object[:nbEntries]).to eq 6
@@ -244,8 +244,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         [
           ['for array object', :ddwaf_object_array, nil, :ddwaf_obj_array],
           ['for map object', :ddwaf_object_map, nil, :ddwaf_obj_map],
-          ['for signed object', :ddwaf_object_signed_force, -12, :ddwaf_obj_signed,],
-          ['for unsigened object', :ddwaf_object_unsigned_force, 12, :ddwaf_obj_unsigned],
+          ['for signed object', :ddwaf_object_signed, -12, :ddwaf_obj_signed,],
+          ['for unsigened object', :ddwaf_object_unsigned, 12, :ddwaf_obj_unsigned],
           ['for string object', :ddwaf_object_string, "Hello World", :ddwaf_obj_string],
           ['for boolean object', :ddwaf_object_bool, true, :ddwaf_obj_bool]
         ].each do |message, method, value, expected_object_type|
@@ -425,7 +425,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       describe '.ddwaf_object_get_signed' do
         context 'for signed object' do
           it 'returns value' do
-            libddwaf.ddwaf_object_signed_force(ddwaf_object, -12)
+            libddwaf.ddwaf_object_signed(ddwaf_object, -12)
             value = libddwaf.ddwaf_object_get_signed(ddwaf_object)
             expect(value).to eq(-12)
           end
@@ -443,7 +443,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       describe '.ddwaf_object_get_unsigned' do
         context 'for unsigned object' do
           it 'returns value' do
-            libddwaf.ddwaf_object_unsigned_force(ddwaf_object, 12)
+            libddwaf.ddwaf_object_unsigned(ddwaf_object, 12)
             value = libddwaf.ddwaf_object_get_unsigned(ddwaf_object)
             expect(value).to eq(12)
           end
@@ -482,6 +482,24 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             libddwaf.ddwaf_object_string(ddwaf_object, 'Hello World')
             value = libddwaf.ddwaf_object_get_bool(ddwaf_object)
             expect(value).to eq(false)
+          end
+        end
+      end
+
+      describe '.ddwaf_object_get_float' do
+        context 'for float object' do
+          it 'returns value' do
+            libddwaf.ddwaf_object_float(ddwaf_object, 12.5)
+            value = libddwaf.ddwaf_object_get_float(ddwaf_object)
+            expect(value).to eq(12.5)
+          end
+        end
+
+        context 'for non float object' do
+          it 'returns value' do
+            libddwaf.ddwaf_object_string(ddwaf_object, "Hello World")
+            value = libddwaf.ddwaf_object_get_float(ddwaf_object)
+            expect(value).to eq(0.0)
           end
         end
       end
@@ -827,12 +845,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
 
       it 'converts a float' do
-        # TODO: no coercion because no ddwaf type
-
         obj = Datadog::AppSec::WAF.ruby_to_object(Math::PI, coerce: false)
-        expect(obj[:type]).to eq :ddwaf_obj_string
-        expect(obj[:nbEntries]).to eq 17
-        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '3.141592653589793'
+        expect(obj[:type]).to eq :ddwaf_obj_float
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:f64]).to eq Math::PI
       end
 
       it 'converts an empty array' do
@@ -1062,7 +1078,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'converts objects in a map recursively' do
       obj = Datadog::AppSec::WAF.ruby_to_object({ foo: [{ bar: [42] }], 21 => 10.5 }, coerce: false)
-      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => [42] }], '21' => '10.5' })
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => [42] }], '21' => 10.5 })
     end
   end
 
