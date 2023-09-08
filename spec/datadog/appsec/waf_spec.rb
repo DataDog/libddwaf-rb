@@ -2498,119 +2498,119 @@ RSpec.describe Datadog::AppSec::WAF do
         },
         'rules' => [
           {
-            "id": "crs-913-120",
-            "name": "Known security scanner filename/argument",
-            "tags": {
-              "type": "security_scanner",
-              "crs_id": "913120",
-              "category": "attack_attempt"
+            "id" => "crs-913-120",
+            "name" => "Known security scanner filename/argument",
+            "tags" => {
+              "type" => "security_scanner",
+              "crs_id" => "913120",
+              "category" => "attack_attempt"
             },
-            "conditions": [
+            "conditions" => [
               {
-                "parameters": {
-                  "inputs": [
+                "parameters" => {
+                  "inputs" => [
                     {
-                      "address": "server.request.query"
+                      "address" => "server.request.query"
                     },
                   ],
-                  "regex": "<EMBED[\\s/+].*?(?:src|type).*?=",
-                  "options": {
-                    "min_length": 11
+                  "regex" => "<EMBED[\\s/+].*?(?:src|type).*?=",
+                  "options" => {
+                    "min_length" => 11
                   }
                 },
-                "operator": "match_regex"
+                "operator" => "match_regex"
               }
             ],
-            "transformers": [
+            "transformers" => [
               "removeNulls"
             ]
           }
         ],
         # Extracted the processor configuration from
         # https://gist.github.com/Anilm3/db97e3f24869ee4f4d0eb96655df6983
-        "processors": [
+        "processors" => [
           {
-            "id": "processor-001",
-            "generator": "extract_schema",
-            "conditions": [
+            "id" => "processor-001",
+            "generator" => "extract_schema",
+            "conditions" => [
               {
-                "operator": "equals",
-                "parameters": {
-                  "inputs": [
+                "operator" => "equals",
+                "parameters" => {
+                  "inputs" => [
                     {
-                      "address": "waf.context.processor",
-                      "key_path": [
+                      "address" => "waf.context.processor",
+                      "key_path" => [
                         "extract-schema"
                       ]
                     }
                   ],
-                  "type": "boolean",
-                  "value": true
+                  "type" => "boolean",
+                  "value" => true
                 }
               }
             ],
-            "parameters": {
-              "mappings": [
+            "parameters" => {
+              "mappings" => [
                 {
-                  "inputs": [
+                  "inputs" => [
                     {
-                      "address": "server.request.body"
+                      "address" => "server.request.body"
                     }
                   ],
-                  "output": "_dd.appsec.s.req.body"
+                  "output" => "_dd.appsec.s.req.body"
                 },
                 {
-                  "inputs": [
+                  "inputs" => [
                     {
-                      "address": "server.request.headers.no_cookies"
+                      "address" => "server.request.headers.no_cookies"
                     }
                   ],
-                  "output": "_dd.appsec.s.req.headers"
+                  "output" => "_dd.appsec.s.req.headers"
                 },
                 {
-                  "inputs": [
+                  "inputs" => [
                     {
-                      "address": "server.request.query"
+                      "address" => "server.request.query"
                     }
                   ],
-                  "output": "_dd.appsec.s.req.query"
+                  "output" => "_dd.appsec.s.req.query"
                 },
                 {
-                  "inputs": [
+                  "inputs" => [
                     {
-                      "address": "server.request.path_params"
+                      "address" => "server.request.path_params"
                     }
                   ],
-                  "output": "_dd.appsec.s.req.params"
+                  "output" => "_dd.appsec.s.req.params"
                 },
                 {
-                  "inputs": [
+                  "inputs" => [
                     {
-                      "address": "server.request.cookies"
+                      "address" => "server.request.cookies"
                     }
                   ],
-                  "output": "_dd.appsec.s.req.cookies"
+                  "output" => "_dd.appsec.s.req.cookies"
                 },
                 {
-                  "inputs": [
+                  "inputs" => [
                     {
-                      "address": "server.response.headers.no_cookies"
+                      "address" => "server.response.headers.no_cookies"
                     }
                   ],
-                  "output": "_dd.appsec.s.res.headers"
+                  "output" => "_dd.appsec.s.res.headers"
                 },
                 {
-                  "inputs": [
+                  "inputs" => [
                     {
-                      "address": "server.response.body"
+                      "address" => "server.response.body"
                     }
                   ],
-                  "output": "_dd.appsec.s.res.body"
+                  "output" => "_dd.appsec.s.res.body"
                 }
               ]
             },
-            "evaluate": false,
-            "output": true
+            "evaluate" => false,
+            "output" => true
           }
         ]
       }
