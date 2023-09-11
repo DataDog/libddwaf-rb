@@ -56,6 +56,7 @@ module Datadog
         def self.ddwaf_object_string_from_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_bool: (LibDDWAF::Object, bool) -> ::FFI::Pointer
         def self.ddwaf_object_float: (LibDDWAF::Object, ::Float) -> ::FFI::Pointer
+        def self.ddwaf_object_null: (LibDDWAF::Object) -> ::FFI::Pointer
 
         def self.ddwaf_object_array: (LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_object_array_add: (LibDDWAF::Object, LibDDWAF::Object) -> bool
