@@ -399,6 +399,18 @@ module Datadog
           end
 
           obj
+        when NilClass
+          obj = LibDDWAF::Object.new
+          res = if coerce
+                  LibDDWAF.ddwaf_object_string(obj, '')
+                else
+                  LibDDWAF.ddwaf_object_null(obj)
+                end
+          if res.null?
+            fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
+          end
+
+          obj
         else
           ruby_to_object(''.freeze)
         end
@@ -407,7 +419,7 @@ module Datadog
 
       def self.object_to_ruby(obj)
         case obj[:type]
-        when :ddwaf_obj_invalid
+        when :ddwaf_obj_invalid, :ddwaf_obj_null
           nil
         when :ddwaf_obj_bool
           obj[:valueUnion][:boolean]

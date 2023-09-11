@@ -507,7 +507,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   end
 
   context 'ruby_to_object' do
-    context 'with coerction to string' do
+    context 'with coercion to string' do
       it 'converts nil' do
         obj = Datadog::AppSec::WAF.ruby_to_object(nil)
         expect(obj[:type]).to eq :ddwaf_obj_string
@@ -785,12 +785,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     context 'without coercion to string' do
       it 'converts nil' do
-        # TODO: coerced because of arrays and maps
-
         obj = Datadog::AppSec::WAF.ruby_to_object(nil, coerce: false)
-        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:type]).to eq :ddwaf_obj_null
         expect(obj[:nbEntries]).to eq 0
-        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
       end
 
       it 'converts an unhandled object' do
@@ -1064,6 +1061,11 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     it 'converts a string' do
       obj = Datadog::AppSec::WAF.ruby_to_object('foo')
       expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq('foo')
+    end
+
+    it 'converts a nil' do
+      obj = Datadog::AppSec::WAF.ruby_to_object(nil, coerce: false)
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to be_nil
     end
 
     it 'converts an array' do
