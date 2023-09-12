@@ -30,4 +30,4 @@ jobs:
           bundle install
       - name: Run Steep
         run: |
-          bundle exec steep check --severity-level=error
+          bundle exec steep check
