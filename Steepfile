@@ -4,7 +4,6 @@ target :lib do
   signature "sig"
 
   check "lib"
-  library "rubygems"
   library "logger"
   library "monitor" # needed by logger
   library "json"

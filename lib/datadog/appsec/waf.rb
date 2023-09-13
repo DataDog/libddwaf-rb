@@ -111,7 +111,10 @@ module Datadog
                               :ddwaf_obj_string,   1 << 2,
                               :ddwaf_obj_array,    1 << 3,
                               :ddwaf_obj_map,      1 << 4,
-                              :ddwaf_obj_bool,     1 << 5
+                              :ddwaf_obj_bool,     1 << 5,
+                              :ddwaf_obj_float,    1 << 6,
+                              :ddwaf_obj_null,     1 << 7
+
         typedef DDWAF_OBJ_TYPE, :ddwaf_obj_type
 
         typedef :pointer, :charptr
@@ -140,7 +143,8 @@ module Datadog
                  :uintValue,   :uint64,
                  :intValue,    :int64,
                  :array,       :pointer,
-                 :boolean,     :bool
+                 :boolean,     :bool,
+                 :f64,         :double
         end
 
         class Object < ::FFI::Struct
@@ -159,11 +163,13 @@ module Datadog
         attach_function :ddwaf_object_string, [:ddwaf_object, :string], :ddwaf_object
         attach_function :ddwaf_object_stringl, [:ddwaf_object, :charptr, :size_t], :ddwaf_object
         attach_function :ddwaf_object_stringl_nc, [:ddwaf_object, :charptr, :size_t], :ddwaf_object
+        attach_function :ddwaf_object_string_from_unsigned, [:ddwaf_object, :uint64], :ddwaf_object
+        attach_function :ddwaf_object_string_from_signed, [:ddwaf_object, :int64], :ddwaf_object
         attach_function :ddwaf_object_unsigned, [:ddwaf_object, :uint64], :ddwaf_object
         attach_function :ddwaf_object_signed, [:ddwaf_object, :int64], :ddwaf_object
-        attach_function :ddwaf_object_unsigned_force, [:ddwaf_object, :uint64], :ddwaf_object
-        attach_function :ddwaf_object_signed_force, [:ddwaf_object, :int64], :ddwaf_object
         attach_function :ddwaf_object_bool, [:ddwaf_object, :bool], :ddwaf_object
+        attach_function :ddwaf_object_null, [:ddwaf_object], :ddwaf_object
+        attach_function :ddwaf_object_float, [:ddwaf_object, :double], :ddwaf_object
 
         attach_function :ddwaf_object_array, [:ddwaf_object], :ddwaf_object
         attach_function :ddwaf_object_array_add, [:ddwaf_object, :ddwaf_object], :bool
@@ -184,6 +190,7 @@ module Datadog
         attach_function :ddwaf_object_get_signed, [:ddwaf_object], :int64
         attach_function :ddwaf_object_get_index, [:ddwaf_object, :size_t], :ddwaf_object
         attach_function :ddwaf_object_get_bool, [:ddwaf_object], :bool
+        attach_function :ddwaf_object_get_float, [:ddwaf_object], :double
 
         ## freeers
 
@@ -239,10 +246,11 @@ module Datadog
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
         class Result < ::FFI::Struct
-          layout :timeout, :bool,
-                 :events, Object,
-                 :actions,          Object,
-                 :total_runtime,    :uint64
+          layout :timeout,       :bool,
+                 :events,        Object,
+                 :actions,       Object,
+                 :derivatives,   Object,
+                 :total_runtime, :uint64
         end
 
         typedef Result.by_ref, :ddwaf_result
@@ -280,7 +288,7 @@ module Datadog
         LibDDWAF.ddwaf_get_version
       end
 
-      # rubocop:disable Metrics/MethodLength
+      # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       def self.ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil, coerce: true)
         case val
         when Array
@@ -358,9 +366,9 @@ module Datadog
           res = if coerce
                   LibDDWAF.ddwaf_object_string(obj, val.to_s)
                 elsif val < 0
-                  LibDDWAF.ddwaf_object_signed_force(obj, val)
+                  LibDDWAF.ddwaf_object_signed(obj, val)
                 else
-                  LibDDWAF.ddwaf_object_unsigned_force(obj, val)
+                  LibDDWAF.ddwaf_object_unsigned(obj, val)
                 end
           if res.null?
             fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
@@ -369,7 +377,11 @@ module Datadog
           obj
         when Float
           obj = LibDDWAF::Object.new
-          res = LibDDWAF.ddwaf_object_string(obj, val.to_s)
+          res = if coerce
+                  LibDDWAF.ddwaf_object_string(obj, val.to_s)
+                else
+                  LibDDWAF.ddwaf_object_float(obj, val)
+                end
           if res.null?
             fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
           end
@@ -387,15 +399,27 @@ module Datadog
           end
 
           obj
+        when NilClass
+          obj = LibDDWAF::Object.new
+          res = if coerce
+                  LibDDWAF.ddwaf_object_string(obj, '')
+                else
+                  LibDDWAF.ddwaf_object_null(obj)
+                end
+          if res.null?
+            fail LibDDWAF::Error, "Could not convert into object: #{val.inspect}"
+          end
+
+          obj
         else
           ruby_to_object(''.freeze)
         end
       end
-      # rubocop:enable Metrics/MethodLength
+      # rubocop:enable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
 
       def self.object_to_ruby(obj)
         case obj[:type]
-        when :ddwaf_obj_invalid
+        when :ddwaf_obj_invalid, :ddwaf_obj_null
           nil
         when :ddwaf_obj_bool
           obj[:valueUnion][:boolean]
@@ -405,6 +429,8 @@ module Datadog
           obj[:valueUnion][:intValue]
         when :ddwaf_obj_unsigned
           obj[:valueUnion][:uintValue]
+        when :ddwaf_obj_float
+          obj[:valueUnion][:f64]
         when :ddwaf_obj_array
           (0...obj[:nbEntries]).each.with_object([]) do |i, a|
             ptr = obj[:valueUnion][:array] + i * LibDDWAF::Object.size
@@ -561,14 +587,15 @@ module Datadog
       end
 
       class Result
-        attr_reader :status, :events, :total_runtime, :timeout, :actions
+        attr_reader :status, :events, :total_runtime, :timeout, :actions, :derivatives
 
-        def initialize(status, events, total_runtime, timeout, actions)
+        def initialize(status, events, total_runtime, timeout, actions, derivatives)
           @status = status
           @events = events
           @total_runtime = total_runtime
           @timeout = timeout
           @actions = actions
+          @derivatives = derivatives
         end
       end
 
@@ -609,7 +636,8 @@ module Datadog
           input_obj = Datadog::AppSec::WAF.ruby_to_object(input,
                                                           max_container_size: max_container_size,
                                                           max_container_depth: max_container_depth,
-                                                          max_string_length: max_string_length)
+                                                          max_string_length: max_string_length,
+                                                          coerce: false)
           if input_obj.null?
             fail LibDDWAF::Error, "Could not convert input: #{input.inspect}"
           end
@@ -630,6 +658,7 @@ module Datadog
             result_obj[:total_runtime],
             result_obj[:timeout],
             Datadog::AppSec::WAF.object_to_ruby(result_obj[:actions]),
+            Datadog::AppSec::WAF.object_to_ruby(result_obj[:derivatives]),
           )
 
           [RESULT_CODE[code], result]

@@ -52,9 +52,11 @@ module Datadog
         def self.ddwaf_object_stringl_nc: (LibDDWAF::Object, ::String, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_unsigned: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_unsigned_force: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_signed_force: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
+        def self.ddwaf_object_string_from_unsigned: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
+        def self.ddwaf_object_string_from_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
         def self.ddwaf_object_bool: (LibDDWAF::Object, bool) -> ::FFI::Pointer
+        def self.ddwaf_object_float: (LibDDWAF::Object, ::Float) -> ::FFI::Pointer
+        def self.ddwaf_object_null: (LibDDWAF::Object) -> ::FFI::Pointer
 
         def self.ddwaf_object_array: (LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_object_array_add: (LibDDWAF::Object, LibDDWAF::Object) -> bool
@@ -75,6 +77,7 @@ module Datadog
         def self.ddwaf_object_get_signed: (LibDDWAF::Object, SizeTPtr) -> ::Integer
         def self.ddwaf_object_get_index: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
         def self.ddwaf_object_get_bool: (LibDDWAF::Object) -> bool
+        def self.ddwaf_object_get_float: (LibDDWAF::Object) -> ::Float
 
         # freeers
 
@@ -139,9 +142,9 @@ module Datadog
 
       def self.version: () -> ::String
 
-      type data = String | Symbol | Integer | Float | TrueClass | FalseClass | Array[data] | Hash[String | Symbol, data] | nil
+      type data = String | Symbol | Integer | Float | TrueClass | FalseClass | Array[data] | Hash[(String | Symbol | nil), data] | nil
 
-      def self.ruby_to_object: (data val, ?max_container_size: ::Integer?, ?max_container_depth: ::Integer?, ?max_string_length: ::Integer?, ?coerce: bool?) -> ::Datadog::AppSec::WAF::LibDDWAF::Object
+      def self.ruby_to_object: (top val, ?max_container_size: ::Integer?, ?max_container_depth: ::Integer?, ?max_string_length: ::Integer?, ?coerce: bool?) -> ::Datadog::AppSec::WAF::LibDDWAF::Object
       def self.object_to_ruby: (::Datadog::AppSec::WAF::LibDDWAF::Object obj) -> data
 
       self.@logger: ::Logger
@@ -180,8 +183,9 @@ module Datadog
         attr_reader total_runtime: ::Float
         attr_reader timeout: bool
         attr_reader actions: data
+        attr_reader derivatives: data
 
-        def initialize: (::Symbol, data, ::Float, bool, data) -> void
+        def initialize: (::Symbol, data, ::Float, bool, data, data) -> void
       end
 
       class Context

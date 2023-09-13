@@ -82,7 +82,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_string from unsigned' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_unsigned(object, 42)
+      r = libddwaf.ddwaf_object_string_from_unsigned(object, 42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_string
@@ -94,7 +94,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_string from signed' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_signed(object, -42)
+      r = libddwaf.ddwaf_object_string_from_signed(object, -42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_string
@@ -106,7 +106,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_unsigned' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_unsigned_force(object, 42)
+      r = libddwaf.ddwaf_object_unsigned(object, 42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_unsigned
@@ -116,7 +116,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'creates ddwaf_object_signed' do
       object = libddwaf::Object.new
-      r = libddwaf.ddwaf_object_signed_force(object, -42)
+      r = libddwaf.ddwaf_object_signed(object, -42)
       expect(r.null?).to be false
       expect(r.pointer).to eq object.pointer
       expect(object[:type]).to eq :ddwaf_obj_signed
@@ -159,7 +159,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(object[:valueUnion][:array].null?).to be(true)
       ('a'..'f').each.with_index do |c, i|
         o = libddwaf::Object.new
-        o = libddwaf.ddwaf_object_unsigned(o, i)
+        o = libddwaf.ddwaf_object_string_from_unsigned(o, i)
         r = libddwaf.ddwaf_object_map_add(object, c, o)
       end
       expect(object[:nbEntries]).to eq 6
@@ -186,7 +186,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(object[:valueUnion][:array].null?).to be(true)
       ('a'..'f').each.with_index do |c, i|
         o = libddwaf::Object.new
-        o = libddwaf.ddwaf_object_unsigned(o, i)
+        o = libddwaf.ddwaf_object_string_from_unsigned(o, i)
         r = libddwaf.ddwaf_object_map_addl(object, c << "\x00foo", 5, o)
       end
       expect(object[:nbEntries]).to eq 6
@@ -216,7 +216,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         buf = FFI::MemoryPointer.from_string(s)
         buf.autorelease = false
         o = libddwaf::Object.new
-        o = libddwaf.ddwaf_object_unsigned(o, i)
+        o = libddwaf.ddwaf_object_string_from_unsigned(o, i)
         r = libddwaf.ddwaf_object_map_addl_nc(object, buf, s.size, o)
       end
       expect(object[:nbEntries]).to eq 6
@@ -244,8 +244,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         [
           ['for array object', :ddwaf_object_array, nil, :ddwaf_obj_array],
           ['for map object', :ddwaf_object_map, nil, :ddwaf_obj_map],
-          ['for signed object', :ddwaf_object_signed_force, -12, :ddwaf_obj_signed,],
-          ['for unsigened object', :ddwaf_object_unsigned_force, 12, :ddwaf_obj_unsigned],
+          ['for signed object', :ddwaf_object_signed, -12, :ddwaf_obj_signed,],
+          ['for unsigened object', :ddwaf_object_unsigned, 12, :ddwaf_obj_unsigned],
           ['for string object', :ddwaf_object_string, "Hello World", :ddwaf_obj_string],
           ['for boolean object', :ddwaf_object_bool, true, :ddwaf_obj_bool]
         ].each do |message, method, value, expected_object_type|
@@ -425,7 +425,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       describe '.ddwaf_object_get_signed' do
         context 'for signed object' do
           it 'returns value' do
-            libddwaf.ddwaf_object_signed_force(ddwaf_object, -12)
+            libddwaf.ddwaf_object_signed(ddwaf_object, -12)
             value = libddwaf.ddwaf_object_get_signed(ddwaf_object)
             expect(value).to eq(-12)
           end
@@ -443,7 +443,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       describe '.ddwaf_object_get_unsigned' do
         context 'for unsigned object' do
           it 'returns value' do
-            libddwaf.ddwaf_object_unsigned_force(ddwaf_object, 12)
+            libddwaf.ddwaf_object_unsigned(ddwaf_object, 12)
             value = libddwaf.ddwaf_object_get_unsigned(ddwaf_object)
             expect(value).to eq(12)
           end
@@ -485,11 +485,29 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
           end
         end
       end
+
+      describe '.ddwaf_object_get_float' do
+        context 'for float object' do
+          it 'returns value' do
+            libddwaf.ddwaf_object_float(ddwaf_object, 12.5)
+            value = libddwaf.ddwaf_object_get_float(ddwaf_object)
+            expect(value).to eq(12.5)
+          end
+        end
+
+        context 'for non float object' do
+          it 'returns value' do
+            libddwaf.ddwaf_object_string(ddwaf_object, "Hello World")
+            value = libddwaf.ddwaf_object_get_float(ddwaf_object)
+            expect(value).to eq(0.0)
+          end
+        end
+      end
     end
   end
 
   context 'ruby_to_object' do
-    context 'with coerction to string' do
+    context 'with coercion to string' do
       it 'converts nil' do
         obj = Datadog::AppSec::WAF.ruby_to_object(nil)
         expect(obj[:type]).to eq :ddwaf_obj_string
@@ -767,12 +785,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     context 'without coercion to string' do
       it 'converts nil' do
-        # TODO: coerced because of arrays and maps
-
         obj = Datadog::AppSec::WAF.ruby_to_object(nil, coerce: false)
-        expect(obj[:type]).to eq :ddwaf_obj_string
+        expect(obj[:type]).to eq :ddwaf_obj_null
         expect(obj[:nbEntries]).to eq 0
-        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ''
       end
 
       it 'converts an unhandled object' do
@@ -827,12 +842,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
 
       it 'converts a float' do
-        # TODO: no coercion because no ddwaf type
-
         obj = Datadog::AppSec::WAF.ruby_to_object(Math::PI, coerce: false)
-        expect(obj[:type]).to eq :ddwaf_obj_string
-        expect(obj[:nbEntries]).to eq 17
-        expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq '3.141592653589793'
+        expect(obj[:type]).to eq :ddwaf_obj_float
+        expect(obj[:nbEntries]).to eq 0
+        expect(obj[:valueUnion][:f64]).to eq Math::PI
       end
 
       it 'converts an empty array' do
@@ -1050,6 +1063,11 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq('foo')
     end
 
+    it 'converts a nil' do
+      obj = Datadog::AppSec::WAF.ruby_to_object(nil, coerce: false)
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to be_nil
+    end
+
     it 'converts an array' do
       obj = Datadog::AppSec::WAF.ruby_to_object(('a'..'f').to_a)
       expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq(('a'..'f').to_a)
@@ -1062,7 +1080,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it 'converts objects in a map recursively' do
       obj = Datadog::AppSec::WAF.ruby_to_object({ foo: [{ bar: [42] }], 21 => 10.5 }, coerce: false)
-      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => [42] }], '21' => '10.5' })
+      expect(Datadog::AppSec::WAF.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => [42] }], '21' => 10.5 })
     end
   end
 
@@ -1947,7 +1965,7 @@ RSpec.describe Datadog::AppSec::WAF do
       expect(result.total_runtime).to be > 0
       expect(result.timeout).to eq false
       expect(result.actions).to eq []
-      expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+      expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
       expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
     end
 
@@ -1961,7 +1979,7 @@ RSpec.describe Datadog::AppSec::WAF do
       expect(result.timeout).to eq false
       expect(result.actions).to eq []
       expect(result.events.find { |r| r['rule']['id'] == matching_input_rule }).to_not be_nil
-      expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+      expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
       expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
     end
 
@@ -1985,7 +2003,8 @@ RSpec.describe Datadog::AppSec::WAF do
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
-            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+            expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
           end
         end
@@ -2004,7 +2023,8 @@ RSpec.describe Datadog::AppSec::WAF do
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
-            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+            expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
           end
         end
@@ -2023,7 +2043,8 @@ RSpec.describe Datadog::AppSec::WAF do
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
-            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+            expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
           end
         end
@@ -2042,7 +2063,8 @@ RSpec.describe Datadog::AppSec::WAF do
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
-            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+            expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
           end
         end
@@ -2067,7 +2089,7 @@ RSpec.describe Datadog::AppSec::WAF do
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
-            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+            expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
           end
         end
@@ -2086,7 +2108,8 @@ RSpec.describe Datadog::AppSec::WAF do
             expect(result.total_runtime).to be > 0
             expect(result.timeout).to eq false
             expect(result.actions).to eq []
-            expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+            expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
             expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
           end
         end
@@ -2111,7 +2134,8 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+          expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
       end
@@ -2138,7 +2162,8 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+          expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
       end
@@ -2163,13 +2188,14 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.total_runtime).to be > 0
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_rule}/ }).to_not be_nil
+
+          expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
       end
     end
 
-    context 'running multiple times' do
+    context 'Evaluating multiple times' do
       let(:passing_input_user_agent) do
         passing_input
       end
@@ -2191,7 +2217,7 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       let(:matching_input_status) do
-        { 'server.response.status' => 404 }
+        { 'server.response.status' => '404' }
       end
 
       let(:matching_input_sqli) do
@@ -2212,7 +2238,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(passing_input_user_agent, timeout)
@@ -2224,7 +2250,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
       end
 
@@ -2268,7 +2294,7 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.actions).to eq []
 
           expect(result.events.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{long_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{long_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
 
@@ -2285,7 +2311,7 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.timeout).to eq false
 
           expect(result.events.find { |r| r['rule']['id'] == long_rule }).to_not be_nil
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{long_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{long_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end
       end
@@ -2352,7 +2378,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_user_agent, timeout)
@@ -2365,7 +2391,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.actions).to eq []
 
         expect(result.events.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
       end
 
@@ -2380,7 +2406,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.actions).to eq []
 
         expect(result.events.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_user_agent_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_sqli, timeout)
@@ -2394,7 +2420,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
         expect(result.events.find { |r| r['rule']['id'] == matching_input_user_agent_rule }).to be_nil
         expect(result.events.find { |r| r['rule']['id'] == matching_input_sqli_rule }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_sqli_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_sqli_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
       end
 
@@ -2408,7 +2434,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_path_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
         code, result = context.run(matching_input_status, timeout)
@@ -2421,7 +2447,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.actions).to eq []
 
         expect(result.events.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
-        expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
+        expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_path_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
       end
 
@@ -2439,7 +2465,7 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.timeout).to eq false
           expect(result.actions).to eq []
 
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_path_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end.call
 
@@ -2458,9 +2484,172 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.actions).to eq []
 
           expect(result.events.find { |r| r['rule']['id'] == matching_input_path_rule }).to_not be_nil
-          expect(log_store.find { |log| log[:message] =~ /Running .* #{matching_input_path_rule}/ }).to_not be_nil
+          expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_path_rule}'/ }).to_not be_nil
           expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
         end.call
+      end
+    end
+  end
+
+  context 'with processors' do
+    let(:rule) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '1.2.3'
+        },
+        'rules' => [
+          {
+            "id" => "crs-913-120",
+            "name" => "Known security scanner filename/argument",
+            "tags" => {
+              "type" => "security_scanner",
+              "crs_id" => "913120",
+              "category" => "attack_attempt"
+            },
+            "conditions" => [
+              {
+                "parameters" => {
+                  "inputs" => [
+                    {
+                      "address" => "server.request.query"
+                    },
+                  ],
+                  "regex" => "<EMBED[\\s/+].*?(?:src|type).*?=",
+                  "options" => {
+                    "min_length" => 11
+                  }
+                },
+                "operator" => "match_regex"
+              }
+            ],
+            "transformers" => [
+              "removeNulls"
+            ]
+          }
+        ],
+        # Extracted the processor configuration from
+        # https://gist.github.com/Anilm3/db97e3f24869ee4f4d0eb96655df6983
+        "processors" => [
+          {
+            "id" => "processor-001",
+            "generator" => "extract_schema",
+            "conditions" => [
+              {
+                "operator" => "equals",
+                "parameters" => {
+                  "inputs" => [
+                    {
+                      "address" => "waf.context.processor",
+                      "key_path" => [
+                        "extract-schema"
+                      ]
+                    }
+                  ],
+                  "type" => "boolean",
+                  "value" => true
+                }
+              }
+            ],
+            "parameters" => {
+              "mappings" => [
+                {
+                  "inputs" => [
+                    {
+                      "address" => "server.request.body"
+                    }
+                  ],
+                  "output" => "_dd.appsec.s.req.body"
+                },
+                {
+                  "inputs" => [
+                    {
+                      "address" => "server.request.headers.no_cookies"
+                    }
+                  ],
+                  "output" => "_dd.appsec.s.req.headers"
+                },
+                {
+                  "inputs" => [
+                    {
+                      "address" => "server.request.query"
+                    }
+                  ],
+                  "output" => "_dd.appsec.s.req.query"
+                },
+                {
+                  "inputs" => [
+                    {
+                      "address" => "server.request.path_params"
+                    }
+                  ],
+                  "output" => "_dd.appsec.s.req.params"
+                },
+                {
+                  "inputs" => [
+                    {
+                      "address" => "server.request.cookies"
+                    }
+                  ],
+                  "output" => "_dd.appsec.s.req.cookies"
+                },
+                {
+                  "inputs" => [
+                    {
+                      "address" => "server.response.headers.no_cookies"
+                    }
+                  ],
+                  "output" => "_dd.appsec.s.res.headers"
+                },
+                {
+                  "inputs" => [
+                    {
+                      "address" => "server.response.body"
+                    }
+                  ],
+                  "output" => "_dd.appsec.s.res.body"
+                }
+              ]
+            },
+            "evaluate" => false,
+            "output" => true
+          }
+        ]
+      }
+    end
+
+    context 'with schema extraction' do
+      it 'populates derivatives' do
+        waf_args = {
+          'server.request.query' => {
+            'hello' => 'EMBED',
+          },
+          'waf.context.processor' => {
+            "extract-schema" => true
+          }
+        }
+
+        code, result = context.run(waf_args, timeout)
+        expect(code).to eq :ok
+        expect(result.derivatives).to_not be_empty
+        expect(result.derivatives).to eq({"_dd.appsec.s.req.query" => [{"hello" => [8]}]})
+      end
+    end
+
+    context 'with schema extraction' do
+      it 'populates derivatives' do
+        waf_args = {
+          'server.request.query' => {
+            'hello' => 'EMBED',
+          },
+          'waf.context.processor' => {
+            "extract-schema" => false
+          }
+        }
+
+        code, result = context.run(waf_args, timeout)
+        expect(code).to eq :ok
+        expect(result.derivatives).to be_empty
       end
     end
   end
