@@ -142,7 +142,7 @@ module Datadog
 
       def self.version: () -> ::String
 
-      type data = String | Symbol | Integer | Float | TrueClass | FalseClass | Array[data] | Hash[String | Symbol, data] | nil
+      type data = String | Symbol | Integer | Float | TrueClass | FalseClass | Array[data] | Hash[(String | Symbol | nil), data] | nil
 
       def self.ruby_to_object: (top val, ?max_container_size: ::Integer?, ?max_container_depth: ::Integer?, ?max_string_length: ::Integer?, ?coerce: bool?) -> ::Datadog::AppSec::WAF::LibDDWAF::Object
       def self.object_to_ruby: (::Datadog::AppSec::WAF::LibDDWAF::Object obj) -> data

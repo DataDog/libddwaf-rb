@@ -1,6 +1,6 @@
-# 2023-09-11 v.1.14.0.0.0\
+# 2023-09-11 v.1.14.0.0.0
 - Update to libddwaf 1.14.0
-- Add support for `Float`` and `Nil`` scalar values when converting from ruby to WAF Object and vice versa.
+- Add support for `Float` and `Nil` scalar values when converting from ruby to WAF Object and vice versa.
 
 
 # 2023-08-29 v.1.11.0.0.0
