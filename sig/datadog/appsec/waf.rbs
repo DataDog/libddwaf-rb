@@ -194,7 +194,7 @@ module Datadog
         def initialize: (Handle handle) -> void
         def finalize: () -> void
 
-        def run: (data input, ?::Integer timeout) -> ::Array[top]
+        def run: (data input, ?::Integer timeout) -> [::Symbol, Result]
 
         private
 
