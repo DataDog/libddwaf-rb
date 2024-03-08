@@ -161,14 +161,14 @@ jobs:
         if: ${{ matrix.cpu != 'amd64' }}
         run: |
           docker run --privileged --rm tonistiigi/binfmt:latest --install ${{ matrix.qemu }} | tee platforms.json
-          echo "::set-output name=platforms::$(cat platforms.json)"
+          echo "platforms=$(cat platforms.json)" >> "$GITHUB_OUTPUT"
       - name: Start container
         id: container
         run: |
           echo ${{ matrix.image }} > container_image
           docker run --rm -d -v "${PWD}":"${PWD}" -w "${PWD}" --platform linux/${{ matrix.qemu }} ${{ matrix.image }} /bin/sleep 64d | tee container_id
           docker exec -w "${PWD}" $(cat container_id) uname -a
-          echo "::set-output name=id::$(cat container_id)"
+          echo "id=$(cat container_id)" >> "$GITHUB_OUTPUT"
       - name: Install Alpine system dependencies
         if: ${{ matrix.libc == 'musl' }}
         run: docker exec -w "${PWD}" ${{ steps.container.outputs.id }} apk add --no-cache build-base git
