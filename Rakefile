@@ -250,6 +250,123 @@ module Helpers
   end
 end
 
+namespace :libddwaf do
+  desc 'Download last 100 `libddwaf` releases checksums into a single checksum file'
+  task :download_checksums do
+    require 'uri'
+    require 'json'
+    require 'net/http'
+    require 'pathname'
+    require 'fileutils'
+
+    token_path = File.expand_path('.github-token', __dir__)
+    unless File.exist?(token_path)
+      fail <<~TEXT
+
+        \033[0;31mERROR:\033[0m Github token file #{token_path} not found!
+               Please generate new token here https://github.com/settings/tokens/new
+        \033[0;33mNOTE:\033[0m  Token requires only \033[0;32mrepo:public_repo\033[0m access with authorised SSO and should expire.
+               See more https://docs.github.com/en/enterprise-cloud@latest/authentication/authenticating-with-saml-single-sign-on/authorizing-a-personal-access-token-for-use-with-saml-single-sign-:console
+
+      TEXT
+    end
+
+    token = File.read(token_path)
+    releases_path = Pathname.new(File.expand_path('tmp/releases', __dir__))
+    FileUtils.mkdir_p(releases_path) unless File.directory?(releases_path)
+
+    uri = URI.parse('https://api.github.com/graphql')
+    headers = { 'Authorization' => "bearer #{token}", 'Content-Type' => 'application/json' }
+    response = Net::HTTP.post(uri, { query: <<~GQL, variables: '{}' }.to_json, headers)
+      query {
+        repository(name: "libddwaf", owner: "DataDog") {
+          releases(last: 100) {
+            nodes {
+              releaseAssets(last: 100) {
+                nodes {
+                  url
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    GQL
+
+    unless response.is_a?(Net::HTTPOK)
+      fail <<~TEXT
+
+        \033[0;31mERROR:\033[0m Github API call was unsuccessful!
+        \033[0;32mRESPONSE:\033[0m #{response.body}
+
+      TEXT
+    end
+
+    response = JSON.parse(response.body)
+    if response.key?('errors')
+      errors = response['errors'].map.with_index do |error, index|
+        next error['message'] if index.zero?
+
+        error['message'].rjust(10 + error['message'].length, ' ')
+      end
+
+      fail <<~TEXT
+
+        \033[0;31mERROR:\033[0m    Github API call was unsuccessful!
+        \033[0;32mRESPONSE:\033[0m #{errors.join("\n")}
+
+      TEXT
+    end
+
+    response.dig('data', 'repository', 'releases', 'nodes').each do |release|
+      release.dig('releaseAssets', 'nodes').each do |asset|
+        next unless asset['name'].match?(/\Alibddwaf-[\d.]+-(?:linux|darwin)-(?:arm64|x86_64|aarch64)\.tar\.gz\.sha256\z/)
+
+        sha256_path = releases_path.join(asset['name'])
+        next puts "\033[0;33mSKIP\033[0m     #{asset['name']} (exist)" if sha256_path.size?
+
+        puts "\033[0;34mDOWNLOAD\033[0m #{asset['name']}"
+
+        uri = URI.parse(asset['url'])
+        headers = { 'Authorization' => "bearer #{token}" }
+        response = Net::HTTP.get_response(uri)
+
+        unless response.is_a?(Net::HTTPOK)
+          fail <<~TEXT
+
+            \033[0;31mERROR:\033[0m    fail to download asset #{uri}
+            \033[0;32mRESPONSE:\033[0m #{response.body}
+
+          TEXT
+        end
+
+        File.open(sha256_path, 'wb') { |file| file.write(response.body) }
+      end
+    end
+
+    libddwaf_sha256_path = File.expand_path('libddwaf-releases.sha256', __dir__)
+    File.open(libddwaf_sha256_path, 'wb') do |file|
+      # NOTE: To sort releases descending in the checksum file we will need to
+      #       sort them in a consistent way. We turn version into the number,
+      #       group files by the version and additionally sort files within same
+      #       version.
+      versions = Dir[releases_path.join('*.sha256')].each_with_object({}) do |file, memo|
+        version = file.match(/libddwaf-([\d.]+)-/)[1].tr('.', '').to_i
+
+        memo[version] ||= []
+        memo[version].push(file)
+      end
+
+      versions.each_value(&:sort!).sort.reverse.flat_map { |_, values| values }.each do |sha256_path|
+        file.write(File.read(sha256_path))
+      end
+    end
+
+    puts "\033[0;32mCOMPLETE\033[0m #{File.basename(libddwaf_sha256_path)}"
+  end
+end
+
 task :fetch, [:platform] => [] do |_, args|
   platform = Helpers.parse_platform(args.to_h[:platform])
 
