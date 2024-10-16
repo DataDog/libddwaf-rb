@@ -444,9 +444,9 @@ end
 task :binary, [:platform] => [] do |_, args|
   subplatform_for = {
     # lean gems
-    'x86_64-linux-gnu'       => ['x86_64-linux-gnu'],
+    'x86_64-linux-gnu'       => ['x86_64-linux'],
     'x86_64-linux-musl'      => ['x86_64-linux-musl'],
-    'aarch64-linux-gnu'      => ['aarch64-linux-gnu'],
+    'aarch64-linux-gnu'      => ['aarch64-linux'],
     'aarch64-linux-musl'     => ['aarch64-linux-musl'],
     'x86_64-darwin'          => ['x86_64-darwin'],
     'arm64-darwin'           => ['arm64-darwin'],
@@ -457,11 +457,11 @@ task :binary, [:platform] => [] do |_, args|
 
     # fat gems
     'x86_64-linux:gnu+musl' => [
-      'x86_64-linux-gnu',
+      'x86_64-linux',
       'x86_64-linux-musl',
     ],
     'aarch64-linux:gnu+musl' => [
-      'aarch64-linux-gnu',
+      'aarch64-linux',
       'aarch64-linux-musl',
     ],
     'java' => [
@@ -492,6 +492,7 @@ task :binary, [:platform] => [] do |_, args|
                      RUBY_PLATFORM
                    end
   end
+
   platform_string, _opts = platform_arg.split(':')
   platform = Helpers.parse_platform(platform_string)
 
