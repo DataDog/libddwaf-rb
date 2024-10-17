@@ -84,7 +84,7 @@ DEFAULT_RUBY_VERSION = RUBY_VERSIONS['2.7']
 
 namespace :docker do
   task :build do
-    RUBY_VERSIONS.each do |_name, ruby|
+    RUBY_VERSIONS.each_value do |ruby|
       command = 'docker build'
       command += " -t #{ruby[:image]}"
       command += ' -t delner/ruby:latest' if ruby == DEFAULT_RUBY_VERSION
@@ -96,7 +96,7 @@ namespace :docker do
   end
 
   task :push do
-    RUBY_VERSIONS.each do |_name, ruby|
+    RUBY_VERSIONS.each_value do |ruby|
       command = 'docker push'
       command += " #{ruby[:image]}"
 
