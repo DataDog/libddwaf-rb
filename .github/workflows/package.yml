@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: ruby
     name: Build package (${{ matrix.platform }})
@@ -19,6 +19,8 @@ jobs:
       - name: Install Linux build tools
         if: ${{ startsWith(matrix.os, 'ubuntu-') }}
         run: sudo apt-get install -y ruby ruby-bundler
+      - name: Update rubygems
+        run: gem update --system 3.3.27 
       - name: Bundle
         run: |
           bundle install
@@ -35,15 +37,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux:llvm
             artifact: x86_64-linux-llvm
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: aarch64
             platform: aarch64-linux:llvm
             artifact: aarch64-linux-llvm
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: universal
             platform: java
             artifact: java
@@ -63,6 +65,8 @@ jobs:
       - name: Install Linux build tools
         if: ${{ startsWith(matrix.os, 'ubuntu-') }}
         run: sudo apt-get install -y ruby ruby-bundler
+      - name: Update rubygems
+        run: gem update --system 3.3.27 
       - name: Bundle
         run: |
           bundle install
@@ -80,7 +84,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: ruby
             image: ruby:2.6
@@ -120,35 +124,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux
             artifact: x86_64-linux-llvm
             image: ruby:2.6
             qemu: amd64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: aarch64
             platform: aarch64-linux
             artifact: aarch64-linux-llvm
             image: ruby:2.6
             qemu: aarch64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux
             artifact: x86_64-linux-llvm
             image: ruby:2.6-alpine
             qemu: amd64
             libc: musl
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: aarch64
             platform: aarch64-linux
             artifact: aarch64-linux-llvm
             image: ruby:2.6-alpine
             qemu: aarch64
             libc: musl
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: java
             artifact: java
