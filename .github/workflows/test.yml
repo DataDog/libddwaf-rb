@@ -8,151 +8,156 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.3
+            qemu: amd64
+            libc: gnu
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:3.3
+            qemu: arm64
+            libc: gnu
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.3-alpine
+            qemu: amd64
+            libc: musl
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:3.3-alpine
+            qemu: arm64
+            libc: musl
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.2
+            qemu: amd64
+            libc: gnu
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:3.2
+            qemu: arm64
+            libc: gnu
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.2-alpine
+            qemu: amd64
+            libc: musl
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:3.2-alpine
+            qemu: arm64
+            libc: musl
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux
             image: ruby:3.1
             qemu: amd64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:3.1
             qemu: arm64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.1-alpine
+            qemu: amd64
+            libc: musl
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:3.1-alpine
+            qemu: arm64
+            libc: musl
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux
             image: ruby:3.0
             qemu: amd64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:3.0
             qemu: arm64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:3.0-alpine
+            qemu: amd64
+            libc: musl
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:3.0-alpine
+            qemu: arm64
+            libc: musl
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux
             image: ruby:2.7
             qemu: amd64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:2.7
             qemu: arm64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:2.7-alpine
+            qemu: amd64
+            libc: musl
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:2.7-alpine
+            qemu: arm64
+            libc: musl
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux
             image: ruby:2.6
             qemu: amd64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cpu: aarch64
             platform: aarch64-linux
             image: ruby:2.6
             qemu: arm64
             libc: gnu
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
+            cpu: x86_64
+            platform: x86_64-linux
+            image: ruby:2.6-alpine
+            qemu: amd64
+            libc: musl
+          - os: ubuntu-22.04
+            cpu: aarch64
+            platform: aarch64-linux
+            image: ruby:2.6-alpine
+            qemu: arm64
+            libc: musl
+          - os: ubuntu-22.04
             cpu: x86_64
             platform: x86_64-linux
             image: ruby:2.5
             qemu: amd64
             libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.4
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.3
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.2
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.1
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:3.1-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:3.1-alpine
-            qemu: arm64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:3.0-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:3.0-alpine
-            qemu: arm64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.7-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:2.7-alpine
-            qemu: arm64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.6-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:2.6-alpine
-            qemu: arm64
-            libc: musl
-        # TODO: jruby images have no sudo so apt-get can't get a lock
-        # - os: ubuntu-20.04
-        #   cpu: x86_64
-        #   platform: x86_64-linux-gnu
-        #   image: jruby:9.3.0.0
-        #   qemu: amd64
-        #   libc: gnu
-        # - os: ubuntu-20.04
-        #   cpu: x86_64
-        #   platform: x86_64-linux-gnu
-        #   image: jruby:9.2.8.0
-        #   qemu: amd64
-        #   libc: gnu
-        # - os: ubuntu-20.04
-        #   cpu: x86_64
-        #   platform: aarch64-linux-gnu
-        #   image: jruby:9.3.4.0
-        #   qemu: arm64
-        #   libc: gnu
     name: Test (${{ matrix.image }}, ${{ matrix.cpu }})
     runs-on: ${{ matrix.os }}
     steps:
