@@ -4,6 +4,7 @@ gemspec
 
 gem 'climate_control', '~> 0.2.0'
 gem 'pry'
+
 if RUBY_PLATFORM != 'java'
   # There's a few incompatibilities between pry/pry-byebug on older Rubies
   gem 'pry-byebug' if RUBY_VERSION >= '2.6.0' && RUBY_VERSION < '3.0' && RUBY_ENGINE != 'truffleruby'
