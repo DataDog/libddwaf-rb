@@ -5,29 +5,30 @@ on:
 jobs:
   style-check:
     name: Style check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container:
-      image: ruby:3.1
+      image: ruby:3.3
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Bundle
-        run: |
-          bundle install
+        run: bundle install
+
       - name: Run Rubocop
-        run: |
-          bundle exec rubocop -D
+        run: bundle exec rubocop -D
+
   type-check:
     name: Type check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container:
-      image: ruby:3.1
+      image: ruby:3.3
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Bundle
-        run: |
-          bundle install
+        run: bundle install
+
       - name: Run Steep
-        run: |
-          bundle exec steep check
+        run: bundle exec steep check
