@@ -26,7 +26,7 @@ jobs:
         run: |
           bundle exec rake build
       - name: Upload gem
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: libddwaf-${{ matrix.platform }}-${{ github.run_id }}-${{ github.sha }}
           path: pkg
@@ -70,7 +70,7 @@ jobs:
         run: |
           bundle exec rake binary[${{ matrix.platform }}]
       - name: Upload gem
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: libddwaf-${{ matrix.artifact }}-${{ github.run_id }}-${{ github.sha }}
           path: pkg
@@ -102,7 +102,7 @@ jobs:
           docker run --rm -d -v "${PWD}":"${PWD}" -w "${PWD}" --platform linux/${{ matrix.qemu }} ${{ matrix.image }} /bin/sleep 64d | tee container_id
           docker exec -w "${PWD}" $(cat container_id) uname -a
           echo "::set-output name=id::$(cat container_id)"
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: libddwaf-${{ matrix.platform }}-${{ github.run_id }}-${{ github.sha }}
           path: pkg
@@ -171,7 +171,7 @@ jobs:
           docker run --rm -d -v "${PWD}":"${PWD}" -w "${PWD}" --platform linux/${{ matrix.qemu }} ${{ matrix.image }} /bin/sleep 64d | tee container_id
           docker exec -w "${PWD}" $(cat container_id) uname -a
           echo "::set-output name=id::$(cat container_id)"
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: libddwaf-${{ matrix.artifact }}-${{ github.run_id }}-${{ github.sha }}
           path: pkg
@@ -201,7 +201,7 @@ jobs:
     name: Test package (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: libddwaf-${{ matrix.platform }}-${{ github.run_id }}-${{ github.sha }}
           path: pkg
