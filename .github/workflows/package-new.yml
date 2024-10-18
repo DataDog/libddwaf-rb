@@ -1,0 +1,49 @@
+name: Package New
+on:
+  - push
+
+jobs:
+  test-rake-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        ruby: ["2.5", "2.6", "2.7", "3.0", "3.1", "3.2", "3.3"]
+        arch: [amd64, arm64]
+        libc: [gnu, musl]
+        include:
+          - arch: amd64
+            platform: x86_64-linux
+          - arch: arm64
+            platform: aarch64-linux
+
+    name: Test (Ruby ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build docker image
+        id: build-image
+        uses: ./.github/actions/docker-build-ruby
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          arch: ${{ matrix.arch }}
+          libc: ${{ matrix.libc }}
+
+      - name: Bundle install
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle install
+
+      - name: Build gem
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake build
+
+      - name: List artifact files
+        run: find .
+        working-directory: pkg
+
+      - name: Install gem
+        run: ${{ steps.build-image.outputs.run-cmd }} gem install --verbose pkg/*.gem
+
+      - name: Run smoke test
+        run: ${{ steps.build-image.outputs.run-cmd }} ruby -e 'begin require "libddwaf"; rescue LoadError => e; puts e.message; else fail "loaded when it should not"; end'
