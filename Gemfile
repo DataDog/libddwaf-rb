@@ -37,11 +37,13 @@ end
 
 gem 'yard', '~> 0.9'
 
-if RUBY_VERSION >= '2.6.0'
-  gem 'rbs', '~> 2.8.1', require: false
-  gem 'steep', '~> 1.3.0', require: false
+platforms :mri do
+  if RUBY_VERSION >= '3.1.0'
+    gem 'rbs', '~> 3.6.1', require: false
+    gem 'steep', '~> 1.8.1', require: false
 
-  # parallel 1.23 seems to annoy steep:
-  # cannot load such file -- parallel/processor_count (LoadError)
-  gem 'parallel', '< 1.23'
+    # parallel 1.23 seems to annoy steep:
+    # cannot load such file -- parallel/processor_count (LoadError)
+    gem 'parallel', '< 1.23'
+  end
 end
