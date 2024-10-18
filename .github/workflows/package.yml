@@ -53,7 +53,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        ruby: ["3.3"]
+        ruby: ["3.3", "9.4"]
         arch: [amd64, arm64]
         libc: [gnu, musl]
         include:
@@ -61,8 +61,15 @@ jobs:
             platform: x86_64-linux:llvm
           - arch: arm64
             platform: aarch64-linux:llvm
+          - ruby: 3.3
+            jruby: false
+          - ruby: 9.4
+            jruby: true
+        exclude:
+          - ruby: 9.4
+            libc: musl
 
-    name: Test rake binary (Ruby ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
+    name: Test rake binary (${{ matrix.jruby == true && 'Jruby' || 'Ruby'}} ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -76,6 +83,7 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
+          jruby: ${{ matrix.jruby }}
 
       - name: Bundle install
         run: ${{ steps.build-image.outputs.run-cmd }} bundle install
