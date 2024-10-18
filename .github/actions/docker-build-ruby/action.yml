@@ -1,5 +1,7 @@
 name: Build docker image
-description: Build docker image for a given Ruby version, architecture and libc
+description: Github Actions does not support setting the platform for the container yet.
+             This action builds the image for the specified architecture and libc.
+
 inputs:
   ruby-version:
     description: Ruby version
@@ -12,6 +14,11 @@ inputs:
   libc:
     description: Which libc is used
     required: true
+
+outputs:
+  run-cmd:
+    description: Command to run the container
+    value: ${{ steps.set-run-cmd.outputs.run-cmd }}
 
 runs:
   using: "composite"
@@ -36,3 +43,9 @@ runs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         platforms: linux/${{ inputs.arch }}
+
+    - name: Set run-cmd output
+      id: set-run-cmd
+      shell: bash
+      run: |
+        echo "run-cmd=docker run --platform linux/${{ inputs.arch }} -v gems:/usr/local/bundle -v ${{ github.workspace }}:/libddwaf-rb -w /libddwaf-rb libddwaf-rb-test:latest" >> "$GITHUB_OUTPUT"
