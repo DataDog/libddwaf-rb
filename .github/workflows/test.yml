@@ -49,7 +49,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        jruby: ["9.2", "9.3", "9.4"]
+        jruby: ["9.3", "9.4"]
         arch: [amd64, arm64]
         include:
           - arch: amd64
