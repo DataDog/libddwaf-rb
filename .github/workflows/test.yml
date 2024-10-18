@@ -3,7 +3,7 @@ on:
   - push
 
 jobs:
-  test-linux:
+  test-cruby-linux:
     strategy:
       fail-fast: false
       matrix:
@@ -31,6 +31,47 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
+
+      - name: Bundle install
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle install
+
+      - name: Fetch binary library
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake fetch[${{ matrix.platform }}]
+
+      - name: Extract binary library
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake extract[${{ matrix.platform }}]
+
+      - name: Run specs
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
+
+  test-jruby-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        jruby: ["9.2", "9.3", "9.4"]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            platform: x86_64-linux
+          - arch: arm64
+            platform: aarch64-linux
+
+    name: Test (Jruby ${{ matrix.jruby }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build docker image
+        id: build-image
+        uses: ./.github/actions/docker-build-ruby
+        with:
+          ruby-version: ${{ matrix.jruby }}
+          jruby: true
+          arch: ${{ matrix.arch }}
+          libc: gnu
 
       - name: Bundle install
         run: ${{ steps.build-image.outputs.run-cmd }} bundle install

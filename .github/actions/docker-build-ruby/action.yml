@@ -15,6 +15,11 @@ inputs:
     description: Which libc is used
     required: true
 
+  jruby:
+    description: Whether to use JRuby
+    required: false
+    default: 'false'
+
 outputs:
   run-cmd:
     description: Command to run the container
@@ -34,7 +39,7 @@ runs:
     - name: Build image
       uses: docker/build-push-action@v6
       with:
-        file: .github/actions/docker-build-ruby/Dockerfile${{ inputs.libc == 'musl' && '.alpine' || '' }}
+        file: .github/actions/docker-build-ruby/Dockerfile${{ inputs.libc == 'musl' && '.alpine' || '' }}${{ inputs.jruby == 'true' && '.jruby' || '' }}
         build-args: |
           "RUBY_VERSION=${{ inputs.ruby-version }}"
         push: false
