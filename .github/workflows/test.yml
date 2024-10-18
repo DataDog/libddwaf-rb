@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     env:
-      DOCKER_BUILD_CMD: docker build --platform linux/${{ matrix.arch }} -t libddwaf-rb-test
+      # DOCKER_BUILD_CMD: docker build --platform linux/${{ matrix.arch }} -t libddwaf-rb-test
       DOCKER_CMD: docker run
                   --platform linux/${{ matrix.arch }}
                   -v gems:/usr/local/bundle
@@ -29,33 +29,40 @@ jobs:
                   -w /libddwaf-rb libddwaf-rb-test
 
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: ${{ matrix.arch }}
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
+      #   with:
+      #     platforms: ${{ matrix.arch }}
 
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build docker image
-        if: ${{ matrix.libc == 'gnu' }}
-        run: |
-          ${{ env.DOCKER_BUILD_CMD }} - <<'EOT'
-            FROM ruby:${{ matrix.ruby }}
+        uses: ./.github/actions/docker-build-ruby
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          arch: ${{ matrix.arch }}
+          libc: ${{ matrix.libc }}
 
-            RUN gem update --system 3.3.27
-          EOT
+      # - name: Build docker image
+      #   if: ${{ matrix.libc == 'gnu' }}
+      #   run: |
+      #     ${{ env.DOCKER_BUILD_CMD }} - <<'EOT'
+      #       FROM ruby:${{ matrix.ruby }}
 
-      - name: Build alpine docker image
-        if: ${{ matrix.libc == 'musl' }}
-        run: |
-          ${{ env.DOCKER_BUILD_CMD }} - <<'EOT'
-            FROM ruby:${{ matrix.ruby }}-alpine
+      #       RUN gem update --system 3.3.27
+      #     EOT
 
-            RUN apk add --no-cache build-base git
+      # - name: Build alpine docker image
+      #   if: ${{ matrix.libc == 'musl' }}
+      #   run: |
+      #     ${{ env.DOCKER_BUILD_CMD }} - <<'EOT'
+      #       FROM ruby:${{ matrix.ruby }}-alpine
 
-            RUN gem update --system 3.3.27
-          EOT
+      #       RUN apk add --no-cache build-base git
+
+      #       RUN gem update --system 3.3.27
+      #     EOT
 
       - name: Bundle install
         run: ${{ env.DOCKER_CMD }} bundle install
