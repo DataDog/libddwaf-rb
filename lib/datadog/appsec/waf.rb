@@ -435,7 +435,7 @@ module Datadog
           (0...obj[:nbEntries]).each.with_object([]) do |i, a|
             ptr = obj[:valueUnion][:array] + i * LibDDWAF::Object.size
             e = object_to_ruby(LibDDWAF::Object.new(ptr))
-            a << e
+            a << e # steep:ignore
           end
         when :ddwaf_obj_map
           (0...obj[:nbEntries]).each.with_object({}) do |i, h|
@@ -444,7 +444,7 @@ module Datadog
             l = o[:parameterNameLength]
             k = o[:parameterName].read_bytes(l)
             v = object_to_ruby(LibDDWAF::Object.new(ptr))
-            h[k] = v
+            h[k] = v # steep:ignore
           end
         end
       end
