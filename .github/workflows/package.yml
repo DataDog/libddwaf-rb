@@ -17,7 +17,7 @@ jobs:
           - arch: arm64
             platform: aarch64-linux
 
-    name: Test rake build (Ruby ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
+    name: Test build without fetching libddwaf (Ruby ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -69,7 +69,7 @@ jobs:
           - ruby: 9.4
             libc: musl
 
-    name: Test rake binary (${{ matrix.jruby == true && 'Jruby' || 'Ruby'}} ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
+    name: Test gem build (${{ matrix.jruby == true && 'Jruby' || 'Ruby'}} ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -112,7 +112,7 @@ jobs:
           - os: macos-latest-large
             platform: x86_64-darwin
 
-    name: Test rake binary (${{ matrix.os }})
+    name: Test gem build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
     steps:
