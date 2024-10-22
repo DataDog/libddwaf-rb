@@ -10,7 +10,7 @@ module Datadog
 
         extend ::FFI::Library
 
-        def self.typedef: [T < ::FFI::Type] (T old, Symbol | ::FFI::DataConverter[untyped, untyped, untyped] add, ?untyped) -> T
+        def self.typedef: [T < ::FFI::Type, N, R, C] (T old, Symbol | ::FFI::DataConverter[N, R, C] add, ?untyped) -> T
            | (Symbol old, Symbol add, ?untyped) -> (::FFI::Type | ::FFI::Enum)
            | [X < ::FFI::DataConverter[N, R, C], N, R, C] (X old, Symbol add, ?untyped) -> ::FFI::Type::Mapped[X, N, R, C]
            | (:enum old, Array[Symbol | Integer] add, ?untyped) -> ::FFI::Enum

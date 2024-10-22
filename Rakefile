@@ -3,6 +3,7 @@ require 'datadog/appsec/waf/version'
 require 'rubocop/rake_task' if Gem.loaded_specs.key? 'rubocop'
 require 'rspec/core/rake_task'
 require 'yard'
+require 'open3'
 
 def system!(*args)
   puts "Run: #{args.join(' ')}"
@@ -534,5 +535,42 @@ task :binary, [:platform] => [] do |_, args|
 end
 
 task test: :spec
+
+namespace :steep do
+  task :check do
+    stdout, status = Open3.capture2('bundle exec steep check')
+    puts stdout
+
+    ignore_rules = File.read('.steepignore').split("\n").map(&:strip)
+    error_lines = stdout.lines.select { |line| line.include?('[error]') }
+
+    unexpected_errors = []
+    error_lines.each do |line|
+      location, error = line.split(': [error]').map(&:strip)
+
+      should_ignore = ignore_rules.any? do |ignore_rule|
+        ignored_loc, ignored_error = ignore_rule.scan(/(.+)\s+"(.+)"/).first
+
+        location.end_with?(ignored_loc) && error.include?(ignored_error)
+      end
+
+      unexpected_errors << [location, error] unless should_ignore
+    end
+
+    if unexpected_errors.any?
+      puts 'Unexpected problems found:'
+      puts(unexpected_errors.map { |location, error| "#{location}: #{error}" })
+      exit status.exitstatus
+    else
+      puts
+      puts "Ignored #{error_lines.size} problems according to .steepignore."
+      puts <<~MSG
+        Gem ffi v1.17.0 was shipped with incorrect RBS types and is causing Steep to fail.
+        https://github.com/ffi/ffi/issues/1107
+      MSG
+      exit 0
+    end
+  end
+end
 
 task default: 'spec'

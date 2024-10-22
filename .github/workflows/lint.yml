@@ -31,4 +31,4 @@ jobs:
         run: bundle install
 
       - name: Run Steep
-        run: bundle exec steep check
+        run: bundle exec rake steep:check
