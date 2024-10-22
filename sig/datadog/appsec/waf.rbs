@@ -175,7 +175,7 @@ module Datadog
 
         def initialize: (data rule, ?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
         def finalize: () -> untyped
-        def required_addresses: () -> ::Array[(::String | nil)]
+        def required_addresses: () -> ::Array[::String?]
         def merge: (untyped data) -> Handle?
 
         private

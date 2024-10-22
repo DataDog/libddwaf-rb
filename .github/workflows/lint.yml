@@ -5,7 +5,7 @@ on:
 jobs:
   style-check:
     name: Style check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: ruby:3.3
     steps:
@@ -20,7 +20,7 @@ jobs:
 
   type-check:
     name: Type check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: ruby:3.3
     steps:
