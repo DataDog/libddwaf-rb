@@ -3,220 +3,114 @@ on:
   - push
 
 jobs:
-  test-linux:
+  test-cruby-linux:
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-24.04]
+        ruby: ["2.5", "2.6", "2.7", "3.0", "3.1", "3.2", "3.3"]
+        arch: [amd64, arm64]
+        libc: [gnu, musl]
         include:
-          - os: ubuntu-20.04
-            cpu: x86_64
+          - arch: amd64
             platform: x86_64-linux
-            image: ruby:3.1
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: aarch64
+          - arch: arm64
             platform: aarch64-linux
-            image: ruby:3.1
-            qemu: arm64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:3.0
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:3.0
-            qemu: arm64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.7
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:2.7
-            qemu: arm64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.6
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:2.6
-            qemu: arm64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.5
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.4
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.3
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.2
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.1
-            qemu: amd64
-            libc: gnu
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:3.1-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:3.1-alpine
-            qemu: arm64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:3.0-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:3.0-alpine
-            qemu: arm64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.7-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:2.7-alpine
-            qemu: arm64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: x86_64
-            platform: x86_64-linux
-            image: ruby:2.6-alpine
-            qemu: amd64
-            libc: musl
-          - os: ubuntu-20.04
-            cpu: aarch64
-            platform: aarch64-linux
-            image: ruby:2.6-alpine
-            qemu: arm64
-            libc: musl
-        # TODO: jruby images have no sudo so apt-get can't get a lock
-        # - os: ubuntu-20.04
-        #   cpu: x86_64
-        #   platform: x86_64-linux-gnu
-        #   image: jruby:9.3.0.0
-        #   qemu: amd64
-        #   libc: gnu
-        # - os: ubuntu-20.04
-        #   cpu: x86_64
-        #   platform: x86_64-linux-gnu
-        #   image: jruby:9.2.8.0
-        #   qemu: amd64
-        #   libc: gnu
-        # - os: ubuntu-20.04
-        #   cpu: x86_64
-        #   platform: aarch64-linux-gnu
-        #   image: jruby:9.3.4.0
-        #   qemu: arm64
-        #   libc: gnu
-    name: Test (${{ matrix.image }}, ${{ matrix.cpu }})
+
+    name: Test (Ruby ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
     runs-on: ${{ matrix.os }}
+
     steps:
-      - name: Enable ${{ matrix.qemu }} platform
-        id: qemu
-        if: ${{ matrix.cpu != 'amd64' }}
-        run: |
-          docker run --privileged --rm tonistiigi/binfmt:latest --install ${{ matrix.qemu }} | tee platforms.json
-          echo "::set-output name=platforms::$(cat platforms.json)"
-      - name: Start container
-        id: container
-        run: |
-          echo ${{ matrix.image }} > container_image
-          docker run --rm -d -v "${PWD}":"${PWD}" -w "${PWD}" --platform linux/${{ matrix.qemu }} ${{ matrix.image }} /bin/sleep 64d | tee container_id
-          docker exec -w "${PWD}" $(cat container_id) uname -a
-          echo "::set-output name=id::$(cat container_id)"
-      - name: Install Alpine system dependencies
-        if: ${{ matrix.libc == 'musl' }}
-        run: docker exec -w "${PWD}" ${{ steps.container.outputs.id }} apk add --no-cache build-base git
-      - name: Install JRuby system dependencies
-        if: ${{ startsWith(matrix.image, 'jruby') }}
-        run: |
-          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} sudo apt-get update
-          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} sudo apt-get install -y build-essential git
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Bundle
-        run: |
-          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} bundle install
+        uses: actions/checkout@v4
+
+      - name: Build docker image
+        id: build-image
+        uses: ./.github/actions/docker-build-ruby
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          arch: ${{ matrix.arch }}
+          libc: ${{ matrix.libc }}
+
+      - name: Bundle install
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle install
+
       - name: Fetch binary library
-        run: |
-          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} bundle exec rake fetch[${{ matrix.platform }}]
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake fetch[${{ matrix.platform }}]
+
       - name: Extract binary library
-        run: |
-          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} bundle exec rake extract[${{ matrix.platform }}]
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake extract[${{ matrix.platform }}]
+
       - name: Run specs
-        run: |
-          docker exec -w "${PWD}" ${{ steps.container.outputs.id }} bundle exec rake spec
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
+
+  test-jruby-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04]
+        jruby: ["9.3", "9.4"]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            platform: x86_64-linux
+          - arch: arm64
+            platform: aarch64-linux
+
+    name: Test (Jruby ${{ matrix.jruby }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build docker image
+        id: build-image
+        uses: ./.github/actions/docker-build-ruby
+        with:
+          ruby-version: ${{ matrix.jruby }}
+          jruby: true
+          arch: ${{ matrix.arch }}
+          libc: gnu
+
+      - name: Bundle install
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle install
+
+      - name: Fetch binary library
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake fetch[${{ matrix.platform }}]
+
+      - name: Extract binary library
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake extract[${{ matrix.platform }}]
+
+      - name: Run specs
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
+
   test-darwin:
     strategy:
       fail-fast: false
       matrix:
+        os: [macos-15, macos-15-large]
         include:
-          - os: macos-12
-            cpu: x86_64
+          - os: macos-15
+            platform: arm64-darwin
+          - os: macos-15-large
             platform: x86_64-darwin
-        # - os: macos-12
-        #   cpu: arm64
-        #   platform: arm64-darwin
-    name: Test (${{ matrix.os }} ${{ matrix.cpu }})
+
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Bundle
-        run: |
-          bundle install
-      - name: Fetch binary library
-        run: |
-          bundle exec rake fetch[${{ matrix.platform }}]
-      - name: Extract binary library
-        run: |
-          bundle exec rake extract[${{ matrix.platform }}]
-      - name: Run specs
-        run: |
-          bundle exec rake spec
+        uses: actions/checkout@v4
 
+      - name: Bundle
+        run: bundle install
+
+      - name: Fetch binary library
+        run: bundle exec rake fetch[${{ matrix.platform }}]
+
+      - name: Extract binary library
+        run: bundle exec rake extract[${{ matrix.platform }}]
+
+      - name: Run specs
+        run: bundle exec rake spec

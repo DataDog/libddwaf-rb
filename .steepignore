@@ -1,0 +1,4 @@
+ffi/library.rbs:36:45 "Type `::FFI::DataConverter` is generic but used as a non generic type"
+ffi/struct.rbs:5:15 "Type application of `::FFI::Type::Mapped` doesn't satisfy the constraints"
+ffi/struct.rbs:23:29 "Type application of `::FFI::Type::Mapped` doesn't satisfy the constraints"
+ffi/auto_pointer.rbs:15:65 "Type application of `::FFI::AutoPointer::Releaser::_Proc` doesn't satisfy the constraints"

@@ -3,6 +3,7 @@ require 'datadog/appsec/waf/version'
 require 'rubocop/rake_task' if Gem.loaded_specs.key? 'rubocop'
 require 'rspec/core/rake_task'
 require 'yard'
+require 'open3'
 
 def system!(*args)
   puts "Run: #{args.join(' ')}"
@@ -84,7 +85,7 @@ DEFAULT_RUBY_VERSION = RUBY_VERSIONS['2.7']
 
 namespace :docker do
   task :build do
-    RUBY_VERSIONS.each do |_name, ruby|
+    RUBY_VERSIONS.each_value do |ruby|
       command = 'docker build'
       command += " -t #{ruby[:image]}"
       command += ' -t delner/ruby:latest' if ruby == DEFAULT_RUBY_VERSION
@@ -96,7 +97,7 @@ namespace :docker do
   end
 
   task :push do
-    RUBY_VERSIONS.each do |_name, ruby|
+    RUBY_VERSIONS.each_value do |ruby|
       command = 'docker push'
       command += " #{ruby[:image]}"
 
@@ -444,9 +445,9 @@ end
 task :binary, [:platform] => [] do |_, args|
   subplatform_for = {
     # lean gems
-    'x86_64-linux-gnu'       => ['x86_64-linux-gnu'],
+    'x86_64-linux-gnu'       => ['x86_64-linux'],
     'x86_64-linux-musl'      => ['x86_64-linux-musl'],
-    'aarch64-linux-gnu'      => ['aarch64-linux-gnu'],
+    'aarch64-linux-gnu'      => ['aarch64-linux'],
     'aarch64-linux-musl'     => ['aarch64-linux-musl'],
     'x86_64-darwin'          => ['x86_64-darwin'],
     'arm64-darwin'           => ['arm64-darwin'],
@@ -457,11 +458,11 @@ task :binary, [:platform] => [] do |_, args|
 
     # fat gems
     'x86_64-linux:gnu+musl' => [
-      'x86_64-linux-gnu',
+      'x86_64-linux',
       'x86_64-linux-musl',
     ],
     'aarch64-linux:gnu+musl' => [
-      'aarch64-linux-gnu',
+      'aarch64-linux',
       'aarch64-linux-musl',
     ],
     'java' => [
@@ -492,6 +493,7 @@ task :binary, [:platform] => [] do |_, args|
                      RUBY_PLATFORM
                    end
   end
+
   platform_string, _opts = platform_arg.split(':')
   platform = Helpers.parse_platform(platform_string)
 
@@ -533,5 +535,40 @@ task :binary, [:platform] => [] do |_, args|
 end
 
 task test: :spec
+
+namespace :steep do
+  task :check do
+    stdout, status = Open3.capture2('bundle exec steep check')
+    puts stdout
+
+    ignore_rules = File.readlines('.steepignore', chomp: true)
+    unexpected_errors = []
+    error_lines = stdout.lines.select { |line| line.include?('[error]') }
+    error_lines.each do |line|
+      location, error = line.split(': [error]').map(&:strip)
+
+      should_ignore = ignore_rules.any? do |ignore_rule|
+        ignored_loc, ignored_error = ignore_rule.scan(/(.+)\s+"(.+)"/).first
+        location.end_with?(ignored_loc) && error.include?(ignored_error)
+      end
+
+      unexpected_errors << [location, error] unless should_ignore
+    end
+
+    if unexpected_errors.any?
+      puts 'Unexpected problems found:'
+      puts(unexpected_errors.map { |location, error| "#{location}: #{error}" })
+      exit status.exitstatus
+    else
+      puts
+      puts "Ignored #{error_lines.size} problems according to .steepignore."
+      puts <<~MSG
+        Gem ffi v1.17.0 was shipped with incorrect RBS types and is causing Steep to fail.
+        https://github.com/ffi/ffi/issues/1107
+      MSG
+      exit 0
+    end
+  end
+end
 
 task default: 'spec'

@@ -10,6 +10,18 @@ module Datadog
 
         extend ::FFI::Library
 
+        def self.typedef: [T < ::FFI::Type, N, R, C] (T old, Symbol | ::FFI::DataConverter[N, R, C] add, ?untyped) -> T
+           | (Symbol old, Symbol add, ?untyped) -> (::FFI::Type | ::FFI::Enum)
+           | [X < ::FFI::DataConverter[N, R, C], N, R, C] (X old, Symbol add, ?untyped) -> ::FFI::Type::Mapped[X, N, R, C]
+           | (:enum old, Array[Symbol | Integer] add, ?untyped) -> ::FFI::Enum
+           | (:enum old, Symbol | ::FFI::Type add, Array[Symbol | Integer] info) -> ::FFI::Enum
+           | (untyped, ::Symbol) -> void
+
+        def self.callback: (::Symbol name, Array[::FFI::Library::ffi_lib_type] params, ::FFI::Library::ffi_lib_type ret) -> ::FFI::CallbackInfo
+
+        def self.enum: (*(Symbol | Integer) args) -> ::FFI::Enum
+                     | (Array[Symbol | Integer] values) -> ::FFI::Enum
+ 
         def self.local_os: () -> ::String
         def self.local_cpu: () -> ::String
         def self.local_version: () -> (::String | nil)
@@ -29,19 +41,19 @@ module Datadog
 
         DDWAF_OBJ_TYPE: ::FFI::Enum
 
-        class UInt32Ptr < ::FFI::Struct
+        class UInt32Ptr < ::FFI::Struct[::FFI::AbstractMemory, ::Integer]
         end
 
-        class UInt64Ptr < ::FFI::Struct
+        class UInt64Ptr < ::FFI::Struct[::FFI::AbstractMemory, ::Integer]
         end
 
-        class SizeTPtr < ::FFI::Struct
+        class SizeTPtr < ::FFI::Struct[::FFI::AbstractMemory, ::Integer]
         end
 
-        class ObjectValueUnion < ::FFI::Union
+        class ObjectValueUnion < ::FFI::Union[::FFI::AbstractMemory, untyped]
         end
 
-        class Object < ::FFI::Struct
+        class Object < ::FFI::Struct[::FFI::AbstractMemory, untyped]
         end
 
         # setters
@@ -88,11 +100,11 @@ module Datadog
 
         # main handle
 
-        class Config < ::FFI::Struct
-          class Limits < ::FFI::Struct
+        class Config < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+          class Limits < ::FFI::Struct[::FFI::AbstractMemory, ::Integer]
           end
 
-          class Obfuscator < ::FFI::Struct
+          class Obfuscator < ::FFI::Struct[::FFI::AbstractMemory, ::FFI::Pointer]
           end
         end
 
@@ -112,7 +124,7 @@ module Datadog
         def self.ddwaf_context_init: (::FFI::Pointer) -> ::FFI::Pointer
         def self.ddwaf_context_destroy: (::FFI::Pointer) -> void
 
-        class Result < ::FFI::Struct
+        class Result < ::FFI::Struct[::FFI::AbstractMemory, untyped]
         end
 
         def self.ddwaf_run: (::FFI::Pointer, Object, Result, ::Integer) -> ::Symbol
@@ -163,7 +175,7 @@ module Datadog
 
         def initialize: (data rule, ?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
         def finalize: () -> untyped
-        def required_addresses: () -> ::Array[::String]
+        def required_addresses: () -> ::Array[::String?]
         def merge: (untyped data) -> Handle?
 
         private
