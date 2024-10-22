@@ -541,16 +541,14 @@ namespace :steep do
     stdout, status = Open3.capture2('bundle exec steep check')
     puts stdout
 
-    ignore_rules = File.read('.steepignore').split("\n").map(&:strip)
-    error_lines = stdout.lines.select { |line| line.include?('[error]') }
-
+    ignore_rules = File.readlines('.steepignore', chomp: true)
     unexpected_errors = []
+    error_lines = stdout.lines.select { |line| line.include?('[error]') }
     error_lines.each do |line|
       location, error = line.split(': [error]').map(&:strip)
 
       should_ignore = ignore_rules.any? do |ignore_rule|
         ignored_loc, ignored_error = ignore_rule.scan(/(.+)\s+"(.+)"/).first
-
         location.end_with?(ignored_loc) && error.include?(ignored_error)
       end
 
