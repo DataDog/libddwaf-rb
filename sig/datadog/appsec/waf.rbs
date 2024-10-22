@@ -112,7 +112,7 @@ module Datadog
         def self.ddwaf_update: (::FFI::Pointer, LibDDWAF::Object, LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_destroy: (::FFI::Pointer) -> void
 
-        def self.ddwaf_required_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
+        def self.ddwaf_known_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
         def self.ddwaf_rule_data_ids: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
 
         # updating
