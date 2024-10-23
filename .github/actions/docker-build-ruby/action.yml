@@ -1,8 +1,13 @@
 name: Build docker image
-description: Github Actions does not support setting the platform for the container yet.
-             This action builds the image for the specified architecture and libc.
+description:
+  Github Actions does not support setting the platform for the container yet.
+  This action builds the image for the specified architecture and libc.
 
 inputs:
+  github-token:
+    description: Github API token
+    required: true
+
   ruby-version:
     description: Ruby version
     required: true
@@ -18,7 +23,7 @@ inputs:
   jruby:
     description: Whether to use JRuby
     required: false
-    default: 'false'
+    default: "false"
 
 outputs:
   run-cmd:
@@ -53,4 +58,4 @@ runs:
       id: set-run-cmd
       shell: bash
       run: |
-        echo "run-cmd=docker run --platform linux/${{ inputs.arch }} -v gems:/usr/local/bundle -v ${{ github.workspace }}:/libddwaf-rb -w /libddwaf-rb libddwaf-rb-test:latest" >> "$GITHUB_OUTPUT"
+        echo "run-cmd=docker run -e "GITHUB_TOKEN=${{ inputs.github-token }}" --platform linux/${{ inputs.arch }} -v gems:/usr/local/bundle -v ${{ github.workspace }}:/libddwaf-rb -w /libddwaf-rb libddwaf-rb-test:latest" >> "$GITHUB_OUTPUT"

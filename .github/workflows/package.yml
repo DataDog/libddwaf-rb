@@ -28,6 +28,7 @@ jobs:
         id: build-image
         uses: ./.github/actions/docker-build-ruby
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           ruby-version: ${{ matrix.ruby }}
           arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
@@ -80,6 +81,7 @@ jobs:
         id: build-image
         uses: ./.github/actions/docker-build-ruby
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           ruby-version: ${{ matrix.ruby }}
           arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
@@ -89,7 +91,7 @@ jobs:
         run: ${{ steps.build-image.outputs.run-cmd }} bundle install
 
       - name: Build binary gem
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake binary[${{ matrix.platform }}] 
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake binary[${{ matrix.platform }}]
 
       - name: List artifact files
         run: find .
@@ -114,6 +116,8 @@ jobs:
 
     name: Test gem build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout

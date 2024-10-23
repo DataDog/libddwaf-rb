@@ -1,7 +1,10 @@
-Gemfile.lock
 /.envrc
 /vendor/bundle
 /vendor/libddwaf
 /pkg
+/tmp
 *.gem
 *.vim
+.ruby-version
+.github-token
+Gemfile.lock
