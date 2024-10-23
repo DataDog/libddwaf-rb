@@ -628,26 +628,18 @@ module Datadog
 
         def run(persistent_data, ephemeral_data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           valid!
-
-          max_container_size  = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
-          max_container_depth = LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH
-          max_string_length   = LibDDWAF::DDWAF_MAX_STRING_LENGTH
-
-          # TODO: extract to a private function
-          persistent_data_obj = Datadog::AppSec::WAF.ruby_to_object(persistent_data,
-                                                                    max_container_size: max_container_size,
-                                                                    max_container_depth: max_container_depth,
-                                                                    max_string_length: max_string_length,
-                                                                    coerce: false)
+          ruby_to_obj_settings = {
+            max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
+            max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
+            max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
+            coerce: false
+          }
+          persistent_data_obj = Datadog::AppSec::WAF.ruby_to_object(persistent_data, **ruby_to_obj_settings)
           if persistent_data_obj.null?
             fail LibDDWAF::Error, "Could not convert persistent data: #{persistent_data.inspect}"
           end
 
-          ephemeral_data_obj = Datadog::AppSec::WAF.ruby_to_object(ephemeral_data,
-                                                                   max_container_size: max_container_size,
-                                                                   max_container_depth: max_container_depth,
-                                                                   max_string_length: max_string_length,
-                                                                   coerce: false)
+          ephemeral_data_obj = Datadog::AppSec::WAF.ruby_to_object(ephemeral_data, **ruby_to_obj_settings)
           if ephemeral_data_obj.null?
             fail LibDDWAF::Error, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
           end
