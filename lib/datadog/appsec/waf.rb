@@ -256,7 +256,7 @@ module Datadog
         typedef Result.by_ref, :ddwaf_result
         typedef :uint64, :timeout_us
 
-        attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_result, :timeout_us], :ddwaf_ret_code, blocking: true
+        attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_object, :ddwaf_result, :timeout_us], :ddwaf_ret_code, blocking: true
         attach_function :ddwaf_result_free, [:ddwaf_result], :void
 
         # logging
@@ -626,20 +626,30 @@ module Datadog
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
         end
 
-        def run(input, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
+        def run(persistent_data, ephemeral_data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           valid!
 
           max_container_size  = LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
           max_container_depth = LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH
           max_string_length   = LibDDWAF::DDWAF_MAX_STRING_LENGTH
 
-          input_obj = Datadog::AppSec::WAF.ruby_to_object(input,
-                                                          max_container_size: max_container_size,
-                                                          max_container_depth: max_container_depth,
-                                                          max_string_length: max_string_length,
-                                                          coerce: false)
-          if input_obj.null?
-            fail LibDDWAF::Error, "Could not convert input: #{input.inspect}"
+          # TODO: extract to a private function
+          persistent_data_obj = Datadog::AppSec::WAF.ruby_to_object(persistent_data,
+                                                                    max_container_size: max_container_size,
+                                                                    max_container_depth: max_container_depth,
+                                                                    max_string_length: max_string_length,
+                                                                    coerce: false)
+          if persistent_data_obj.null?
+            fail LibDDWAF::Error, "Could not convert persistent data: #{persistent_data.inspect}"
+          end
+
+          ephemeral_data_obj = Datadog::AppSec::WAF.ruby_to_object(ephemeral_data,
+                                                                   max_container_size: max_container_size,
+                                                                   max_container_depth: max_container_depth,
+                                                                   max_string_length: max_string_length,
+                                                                   coerce: false)
+          if ephemeral_data_obj.null?
+            fail LibDDWAF::Error, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
           end
 
           result_obj = Datadog::AppSec::WAF::LibDDWAF::Result.new
@@ -648,9 +658,10 @@ module Datadog
           end
 
           # retain C objects in memory for subsequent calls to run
-          retain(input_obj)
+          retain(persistent_data_obj)
+          retain(ephemeral_data_obj)
 
-          code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, input_obj, result_obj, timeout)
+          code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
 
           result = Result.new(
             RESULT_CODE[code],
