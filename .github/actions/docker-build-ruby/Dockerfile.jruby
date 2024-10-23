@@ -4,3 +4,4 @@ FROM jruby:${RUBY_VERSION:-9.2}
 
 RUN apt-get update
 RUN apt-get install -y build-essential git
+RUN git config --global --add safe.directory '/libddwaf-rb'
