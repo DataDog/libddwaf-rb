@@ -84,11 +84,6 @@ Then you can substitute e.g `--platform linux/x86_64` with `--platform linux/aar
 
 ```
 # this is too old for aarch64
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.1 sh -c 'rm -fv Gemfile.lock && gem install bundler -v "~> 1.17" && bundle install && bundle exec rake spec'
-# these are fine for aarch64
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.2 sh -c 'rm -fv Gemfile.lock && gem install bundler -v "~> 1.17" && bundle install && bundle exec rake spec'
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.3 sh -c 'rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.4 sh -c 'rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.5 sh -c 'rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.6 sh -c 'rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.7 sh -c 'rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
@@ -100,12 +95,6 @@ docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" rub
 
 ```
 # these are too old for aarch64
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.1-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler -v "~> 1.17" && bundle install && bundle exec rake spec'
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.2-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler -v "~> 1.17" && bundle install && bundle exec rake spec'
-# these are fine for aarch64
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.3-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.4-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.5-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.6-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:2.7-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" ruby:3.0-alpine sh -c 'apk update && apk add build-base git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
@@ -117,7 +106,6 @@ docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" rub
 
 ```
 # these are too old for aarch64
-docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" jruby:9.2.8.0 sh -c 'apt-get update && apt-get install -y build-essential git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" jruby:9.3.0.0 sh -c 'apt-get update && apt-get install -y build-essential git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
 # this is fine for aarch64
 docker run --rm -it --platform linux/x86_64 -v "${PWD}":"${PWD}" -w "${PWD}" jruby:9.3.4.0 sh -c 'apt-get update && apt-get install -y build-essential git && rm -fv Gemfile.lock && gem install bundler:2.2.22 && bundle install && bundle exec rake spec'
