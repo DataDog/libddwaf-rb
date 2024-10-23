@@ -1338,7 +1338,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(handle.null?).to be false
 
       count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
-      list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_required_addresses(handle, count)
+      list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_known_addresses(handle, count)
       expect(list.get_array_of_string(0, count[:value]).sort).to eq(['value1', 'value2'])
     end
 

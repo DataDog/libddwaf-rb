@@ -227,7 +227,7 @@ module Datadog
         attach_function :ddwaf_update, [:ddwaf_handle, :ddwaf_object, :ddwaf_object], :ddwaf_handle
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
-        attach_function :ddwaf_required_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr
+        attach_function :ddwaf_known_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr
 
         # updating
 
@@ -536,7 +536,7 @@ module Datadog
           valid!
 
           count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
-          list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_required_addresses(handle_obj, count)
+          list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_known_addresses(handle_obj, count)
 
           return [] if count == 0 # list is null
 
