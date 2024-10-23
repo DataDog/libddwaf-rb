@@ -243,9 +243,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
         [
           ['for array object', :ddwaf_object_array, nil, :ddwaf_obj_array],
           ['for map object', :ddwaf_object_map, nil, :ddwaf_obj_map],
-          ['for signed object', :ddwaf_object_signed, -12, :ddwaf_obj_signed,],
+          ['for signed object', :ddwaf_object_signed, -12, :ddwaf_obj_signed],
           ['for unsigened object', :ddwaf_object_unsigned, 12, :ddwaf_obj_unsigned],
-          ['for string object', :ddwaf_object_string, "Hello World", :ddwaf_obj_string],
+          ['for string object', :ddwaf_object_string, 'Hello World', :ddwaf_obj_string],
           ['for boolean object', :ddwaf_object_bool, true, :ddwaf_obj_bool]
         ].each do |message, method, value, expected_object_type|
           context message do
@@ -496,7 +496,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
         context 'for non float object' do
           it 'returns value' do
-            libddwaf.ddwaf_object_string(ddwaf_object, "Hello World")
+            libddwaf.ddwaf_object_string(ddwaf_object, 'Hello World')
             value = libddwaf.ddwaf_object_get_float(ddwaf_object)
             expect(value).to eq(0.0)
           end
@@ -603,7 +603,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
 
       it 'converts a non-empty hash' do
-        obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3})
+        obj = Datadog::AppSec::WAF.ruby_to_object({ foo: 1, bar: 2, baz: 3 })
         expect(obj[:type]).to eq :ddwaf_obj_map
         expect(obj[:nbEntries]).to eq 3
         hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
@@ -644,7 +644,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
           end
 
           it 'converts a hash up to the limit' do
-            obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size)
+            obj = Datadog::AppSec::WAF.ruby_to_object({ foo: 1, bar: 2, baz: 3, qux: 4 }, max_container_size: max_container_size)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 3
             hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
@@ -707,7 +707,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
           end
 
           it 'converts nested hashes up to the limit' do
-            obj = Datadog::AppSec::WAF.ruby_to_object({foo: { bar: { baz: { qux: 4}}}}, max_container_depth: max_container_depth)
+            obj = Datadog::AppSec::WAF.ruby_to_object({ foo: { bar: { baz: { qux: 4 } } } }, max_container_depth: max_container_depth)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
@@ -766,7 +766,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
           end
 
           it 'converts hash keys up to the limit' do
-            obj = Datadog::AppSec::WAF.ruby_to_object({('foo' << 'o' * 80) => 42}, max_string_length: max_string_length)
+            obj = Datadog::AppSec::WAF.ruby_to_object({ ('foo' << 'o' * 80) => 42 }, max_string_length: max_string_length)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
@@ -837,7 +837,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       it 'converts a negative integer' do
         obj = Datadog::AppSec::WAF.ruby_to_object(-42, coerce: false)
         expect(obj[:type]).to eq :ddwaf_obj_signed
-        expect(obj[:valueUnion][:intValue]).to eq -42
+        expect(obj[:valueUnion][:intValue]).to eq(-42)
       end
 
       it 'converts a float' do
@@ -875,7 +875,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
 
       it 'converts a non-empty hash' do
-        obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3}, coerce: false)
+        obj = Datadog::AppSec::WAF.ruby_to_object({ foo: 1, bar: 2, baz: 3 }, coerce: false)
         expect(obj[:type]).to eq :ddwaf_obj_map
         expect(obj[:nbEntries]).to eq 3
         hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
@@ -914,7 +914,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
           end
 
           it 'converts a hash up to the limit' do
-            obj = Datadog::AppSec::WAF.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size, coerce: false)
+            obj = Datadog::AppSec::WAF.ruby_to_object({ foo: 1, bar: 2, baz: 3, qux: 4 }, max_container_size: max_container_size, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 3
             hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
@@ -973,7 +973,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
           end
 
           it 'converts nested hashes up to the limit' do
-            obj = Datadog::AppSec::WAF.ruby_to_object({foo: { bar: { baz: { qux: 4}}}}, max_container_depth: max_container_depth, coerce: false)
+            obj = Datadog::AppSec::WAF.ruby_to_object({ foo: { bar: { baz: { qux: 4 } } } }, max_container_depth: max_container_depth,
+                                                                                             coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
@@ -1032,7 +1033,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
           end
 
           it 'converts hash keys up to the limit' do
-            obj = Datadog::AppSec::WAF.ruby_to_object({('foo' << 'o' * 80) => 42}, max_string_length: max_string_length, coerce: false)
+            obj = Datadog::AppSec::WAF.ruby_to_object({ ('foo' << 'o' * 80) => 42 }, max_string_length: max_string_length, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
@@ -1095,7 +1096,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1', 'value2'], 'regex' => 'rule1' } }
             ],
-            'action' => 'record',
+            'action' => 'record'
           },
           {
             'id' => 2,
@@ -1104,7 +1105,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } }
             ],
-            'action' => 'record',
+            'action' => 'record'
           },
           {
             'id' => 3,
@@ -1113,7 +1114,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule3' } }
             ],
-            'action' => 'record',
+            'action' => 'record'
           }
         ]
       }
@@ -1131,7 +1132,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } },
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule3' } }
             ],
-            'action' => 'record',
+            'action' => 'record'
           }
         ]
       }
@@ -1153,10 +1154,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
-              { 'operator' => 'match_regex', 'parameters' => { 'inputs' => [{ 'address' => 'value1'}], 'regex' => 'rule2' } }
+              { 'operator' => 'match_regex', 'parameters' => { 'inputs' => [{ 'address' => 'value1' }], 'regex' => 'rule2' } }
             ],
-            'action' => 'record',
-          },
+            'action' => 'record'
+          }
         ]
       }
     end
@@ -1173,11 +1174,11 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'name' => 'Rule 1',
             'tags' => { 'type' => 'flow1' },
             'conditions' => [
-              { 'operator' => 'match_regex', 'parameters' => { 'inputs' => [{ 'address' => 'value1'}], 'regex' => 'rule2' } }
+              { 'operator' => 'match_regex', 'parameters' => { 'inputs' => [{ 'address' => 'value1' }], 'regex' => 'rule2' } }
             ],
             'on_match' => ['action1', 'action2', 'action3', 'action4']
-          },
-        ],
+          }
+        ]
       }
     end
 
@@ -1192,7 +1193,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1', 'value2'], 'regex' => 'rule1' } }
             ],
-            'action' => 'record',
+            'action' => 'record'
           },
           {
             'id' => 2,
@@ -1201,7 +1202,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value1'], 'regex' => 'rule2' } }
             ],
-            'action' => 'record',
+            'action' => 'record'
           },
           {
             'id' => 3,
@@ -1210,7 +1211,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             'conditions' => [
               { 'operation' => 'match_regex', 'parameters' => { 'inputs' => ['value2'], 'regex' => 'rule3' } }
             ],
-            'action' => 'record',
+            'action' => 'record'
           }
         ]
       }
@@ -1296,7 +1297,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'logs via the log callback' do
-      expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
+      expect(log_store.select { |log| log[:message] == 'Sending log messages to binding, min level trace' }).to_not be_empty
     end
 
     context 'with diagnostics' do
@@ -1306,9 +1307,9 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
         diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
 
-        expect(diagnostics["rules"]["loaded"].size).to eq(3)
-        expect(diagnostics["rules"]["failed"].size).to eq(0)
-        expect(diagnostics["rules"]["errors"]).to be_empty
+        expect(diagnostics['rules']['loaded'].size).to eq(3)
+        expect(diagnostics['rules']['failed'].size).to eq(0)
+        expect(diagnostics['rules']['errors']).to be_empty
       end
 
       it 'records successful new diagnostics' do
@@ -1317,10 +1318,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
         diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
 
-        expect(diagnostics["rules"]["loaded"].size).to eq(1)
-        expect(diagnostics["rules"]["failed"].size).to eq(0)
-        expect(diagnostics["rules"]["errors"]).to be_empty
-        expect(diagnostics["ruleset_version"]).to eq('0.1.2')
+        expect(diagnostics['rules']['loaded'].size).to eq(1)
+        expect(diagnostics['rules']['failed'].size).to eq(0)
+        expect(diagnostics['rules']['errors']).to be_empty
+        expect(diagnostics['ruleset_version']).to eq('0.1.2')
       end
 
       it 'records failing diagnostics' do
@@ -1329,10 +1330,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
         diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
 
-        expect(diagnostics["rules"]["loaded"].size).to eq(2)
-        expect(diagnostics["rules"]["failed"].size).to eq(1)
-        expect(diagnostics["rules"]["errors"]).to_not be_empty
-        expect(diagnostics["ruleset_version"]).to be_nil
+        expect(diagnostics['rules']['loaded'].size).to eq(2)
+        expect(diagnostics['rules']['failed'].size).to eq(1)
+        expect(diagnostics['rules']['errors']).to_not be_empty
+        expect(diagnostics['ruleset_version']).to be_nil
       end
     end
 
