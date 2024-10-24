@@ -184,6 +184,7 @@ Style/FrozenStringLiteralComment:
     - 'lib/libddwaf.rb'
     - 'libddwaf.gemspec'
     - 'spec/datadog/appsec/waf_spec.rb'
+    - 'spec/datadog/appsec/libddwaf_spec.rb'
     - 'spec/spec_helper.rb'
 
 # Offense count: 1

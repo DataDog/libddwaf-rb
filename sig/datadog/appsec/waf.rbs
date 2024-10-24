@@ -112,7 +112,7 @@ module Datadog
         def self.ddwaf_update: (::FFI::Pointer, LibDDWAF::Object, LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_destroy: (::FFI::Pointer) -> void
 
-        def self.ddwaf_required_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
+        def self.ddwaf_known_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
         def self.ddwaf_rule_data_ids: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
 
         # updating
@@ -127,7 +127,7 @@ module Datadog
         class Result < ::FFI::Struct[::FFI::AbstractMemory, untyped]
         end
 
-        def self.ddwaf_run: (::FFI::Pointer, Object, Result, ::Integer) -> ::Symbol
+        def self.ddwaf_run: (::FFI::Pointer, Object, Object, Result, ::Integer) -> ::Symbol
         def self.ddwaf_result_free: (Result) -> void
 
         # logging
@@ -206,7 +206,7 @@ module Datadog
         def initialize: (Handle handle) -> void
         def finalize: () -> void
 
-        def run: (data input, ?::Integer timeout) -> ::Array[top]
+        def run: (data persistent_data, data ephemeral_data, ?::Integer timeout) -> ::Array[top]
 
         private
 
