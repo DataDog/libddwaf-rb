@@ -630,7 +630,7 @@ module Datadog
           valid!
 
           persistent_data_obj = Datadog::AppSec::WAF.ruby_to_object(
-            persistent_data,
+            persistent_data || {},
             max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
             max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
             max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
@@ -644,7 +644,7 @@ module Datadog
           retain(persistent_data_obj)
 
           ephemeral_data_obj = Datadog::AppSec::WAF.ruby_to_object(
-            ephemeral_data,
+            ephemeral_data || {},
             max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
             max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
             max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
