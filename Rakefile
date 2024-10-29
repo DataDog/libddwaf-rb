@@ -224,11 +224,22 @@ module Helpers
     response
   end
 
-  def download(url)
+  def download(url, redirects_allowed: 3)
+    if redirects_allowed.zero?
+      fail Helpers.format(<<~TEXT)
+
+        %red[ERROR:] exeeded maximum redirects count
+
+      TEXT
+    end
+
     uri = URI.parse(url)
     response = Net::HTTP.get_response(uri)
 
-    unless response.is_a?(Net::HTTPOK)
+    case response
+    when Net::HTTPFound then Helpers.download(response['Location'], redirects_allowed: redirects_allowed - 1)
+    when Net::HTTPOK then response.body
+    else
       fail Helpers.format(<<~TEXT)
 
            %red[ERROR:] fail to download #{uri}
@@ -236,8 +247,6 @@ module Helpers
 
       TEXT
     end
-
-    response.body
   end
 
   def github_token
@@ -398,40 +407,14 @@ namespace :libddwaf do
       next puts Helpers.format("%yellow[SKIP]     #{binary_name} (exists)")
     end
 
-    uri_base = 'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s'
-    uri = URI(Kernel.format(uri_base, version: version, filename: binary_name))
+    puts Helpers.format("%blue[DOWNLOAD] #{binary_name}")
 
-    binary = nil
-    Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
-      puts Helpers.format("%blue[DOWNLOAD] #{binary_name}")
+    release_url = Kernel.format(
+      'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s',
+      version: version, filename: binary_name
+    )
 
-      req = Net::HTTP::Get.new(uri)
-      res = http.request(req)
-      case res
-      when Net::HTTPFound
-        uri = URI(res['Location'])
-        Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
-          req = Net::HTTP::Get.new(uri)
-          res = http.request(req)
-          case res
-          when Net::HTTPFound
-            uri = URI(res['Location'])
-            fail "unexpected redirect: #{uri}"
-          when Net::HTTPOK
-            binary = res.body
-          else
-            puts "fetch failed: #{res.class.name}"
-            exit 1
-          end
-        end
-      when Net::HTTPOK
-        binary = res.body
-      else
-        puts "fetch failed: #{res.class.name}"
-        exit 1
-      end
-    end
-
+    binary = Helpers.download(release_url)
     binary_sha256 = Digest::SHA256.hexdigest(binary)
 
     if binary_sha256 != expected_binary_sha256
