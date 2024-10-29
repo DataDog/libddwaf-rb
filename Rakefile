@@ -28,11 +28,6 @@ RSpec::Core::RakeTask.new(:spec) do |t, args|
   t.rspec_opts = args.to_a.join(' ')
 end
 
-desc 'CI task; it runs all tests for current version of Ruby'
-task :ci do
-  system! 'bundle exec rake spec'
-end
-
 namespace :coverage do
   # Generates one global report for all tracer tests
   task :report do
