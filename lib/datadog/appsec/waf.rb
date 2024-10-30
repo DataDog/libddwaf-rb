@@ -1,5 +1,7 @@
 require 'ffi'
 require 'json'
+
+require 'datadog/appsec/waf/result'
 require 'datadog/appsec/waf/version'
 
 module Datadog
@@ -583,19 +585,6 @@ module Datadog
           return if valid?
 
           fail LibDDWAF::Error, "Attempt to use an invalid instance: #{inspect}"
-        end
-      end
-
-      class Result
-        attr_reader :status, :events, :total_runtime, :timeout, :actions, :derivatives
-
-        def initialize(status, events, total_runtime, timeout, actions, derivatives)
-          @status = status
-          @events = events
-          @total_runtime = total_runtime
-          @timeout = timeout
-          @actions = actions
-          @derivatives = derivatives
         end
       end
 
