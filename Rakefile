@@ -141,8 +141,8 @@ module Helpers
     unless response.is_a?(Net::HTTPOK)
       fail Helpers.format(<<~TEXT)
 
-          %red[ERROR:] Github API call was unsuccessful!
-        %green[RESPONSE:] #{response.body}
+           %red[error] Github API call was unsuccessful!
+        %yellow[response] #{response.body}
 
       TEXT
     end
@@ -158,8 +158,8 @@ module Helpers
 
       fail Helpers.format(<<~TEXT)
 
-           %red[ERROR:]    Github API call was unsuccessful!
-        %yellow[RESPONSE:] #{errors.join("\n")}
+           %red[error] Github API call was unsuccessful!
+        %yellow[response] #{errors.join("\n")}
 
       TEXT
     end
@@ -169,11 +169,7 @@ module Helpers
 
   def download(url, redirects_allowed: 3)
     if redirects_allowed.zero?
-      fail Helpers.format(<<~TEXT)
-
-        %red[ERROR:] exeeded maximum redirects count
-
-      TEXT
+      fail Helpers.format("\n   %red[error] exeeded maximum redirects count\n\n")
     end
 
     uri = URI.parse(url)
@@ -185,8 +181,8 @@ module Helpers
     else
       fail Helpers.format(<<~TEXT)
 
-           %red[ERROR:] fail to download #{uri}
-        %yellow[RESPONSE:] #{response.body}
+           %red[error] fail to download #{uri}
+        %yellow[response] #{response.body}
 
       TEXT
     end
@@ -196,14 +192,12 @@ module Helpers
     token_path = File.expand_path('.github-token', __dir__)
 
     if !ENV.key?('GITHUB_TOKEN') && !File.exist?(token_path)
-      fail Helpers.format(<<~TEXT)
-
-        %red[ERROR:] Github token file %red[#{token_path}] not found!
-               Please generate new token here %blue[https://github.com/settings/tokens/new]
-        %yellow[NOTE:]  Token requires only %yellow[repo:public_repo] access with authorised SSO and should expire.
-               See more %blue[https://docs.github.com/en/enterprise-cloud@latest/authentication/authenticating-with-saml-single-sign-on/authorizing-a-personal-access-token-for-use-with-saml-single-sign-:console]
-
-      TEXT
+      fail Helpers.format(
+        "\n   %red[error] Github token file %red[#{token_path}] not found!\n" \
+        "         Please generate new token here %blue[https://github.com/settings/tokens/new]\n" \
+        "   %yellow[NOTE:] Token requires only %yellow[repo:public_repo] access with authorised SSO and should expire.\n" \
+        "         See more %blue[https://docs.github.com/en/enterprise-cloud@latest/authentication/authenticating-with-saml-single-sign-on/authorizing-a-personal-access-token-for-use-with-saml-single-sign-:console]\n\n"
+      )
     end
 
     ENV.fetch('GITHUB_TOKEN') { File.read(token_path) }
@@ -269,9 +263,9 @@ namespace :libddwaf do
         next unless asset['name'].match?(/\Alibddwaf-[\d.]+-(?:linux|darwin)-(?:arm64|x86_64|aarch64)\.tar\.gz\.sha256\z/)
 
         sha256_path = releases_path.join(asset['name'])
-        next puts Helpers.format("%yellow[SKIP]     #{asset['name']} (exist)") if sha256_path.size?
+        next puts Helpers.format("    %yellow[skip] #{asset['name']} (exist)") if sha256_path.size?
 
-        puts Helpers.format("%blue[DOWNLOAD] #{asset['name']}")
+        puts Helpers.format("%blue[download] #{asset['name']}")
 
         binary = Helpers.download(asset['url'])
         File.open(sha256_path, 'wb') { |file| file.write(binary) }
@@ -296,7 +290,7 @@ namespace :libddwaf do
       end
     end
 
-    puts Helpers.format("%green[COMPLETE] #{checksums_path}")
+    puts Helpers.format("%green[complete] #{checksums_path}")
   end
 
   desc 'Extract pre-packaged `libddwaf` tarball into shared libs'
@@ -305,7 +299,7 @@ namespace :libddwaf do
 
     if Helpers.shared_lib_path(platform: platform).exist?
       path = Helpers.shared_lib_path(platform: platform)
-      next puts Helpers.format("%yellow[SKIP]     #{path} (exist)")
+      next puts Helpers.format("    %yellow[skip] #{path} (exist)")
     end
 
     Rake::Task['fetch'].execute(args)
@@ -316,14 +310,14 @@ namespace :libddwaf do
     binary_name = Helpers.libddwaf_filename(platform: platform)
     binary_path = vendor_dir.join(binary_name)
 
-    puts Helpers.format("%blue[EXTRACT]  #{binary_name}")
+    puts Helpers.format(" %blue[extract]  #{binary_name}")
 
     File.open(binary_path, 'rb') do |file|
       FileUtils.rm_rf(Helpers.libddwaf_dir(platform: platform))
       Gem::Package.new('').extract_tar_gz(file, vendor_dir)
     end
 
-    puts Helpers.format("%green[COMPLETE] #{Helpers.libddwaf_dir(platform: platform)}")
+    puts Helpers.format("%green[complete] #{Helpers.libddwaf_dir(platform: platform)}")
   end
 
   desc 'Download pre-packaged `libddwaf` tarball into shared libs'
@@ -338,19 +332,17 @@ namespace :libddwaf do
     expected_binary_sha256 = Helpers.libddwaf_binary_checksum(binary_name)
 
     if expected_binary_sha256.nil?
-      fail Helpers.format(<<~TEXT)
-
-        %red[ERROR:] Could not find checksum for %red[#{binary_name}]
-               Please run `%yellow[rake libddwaf:download_checksums]` to update the list
-
-      TEXT
+      fail Helpers.format(
+        "\n   %red[error] Could not find checksum for %red[#{binary_name}]" \
+        "\n         Please run `%yellow[rake libddwaf:download_checksums]` to update the list\n\n"
+      )
     end
 
     if binary_path.exist? && Digest::SHA256.hexdigest(File.read(binary_path)) == expected_binary_sha256
-      next puts Helpers.format("%yellow[SKIP]     #{binary_name} (exists)")
+      next puts Helpers.format("    %yellow[skip] #{binary_name} (exists)")
     end
 
-    puts Helpers.format("%blue[DOWNLOAD] #{binary_name}")
+    puts Helpers.format("%blue[download] #{binary_name}")
 
     release_url = Kernel.format(
       'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s',
@@ -363,9 +355,9 @@ namespace :libddwaf do
     if binary_sha256 != expected_binary_sha256
       fail Helpers.format(<<~TEXT)
 
-           %red[ERROR:]    fail to verify checksum of %blue[#{url}]
-        %green[EXPECTED:] #{binary_sha256}
-          %red[ACTUAL:] #{expected_binary_sha256}
+           %red[error] fail to verify checksum of %blue[#{release_url}]
+        %green[expected] #{binary_sha256}
+          %yellow[actual] #{expected_binary_sha256}
 
       TEXT
     end
@@ -373,7 +365,7 @@ namespace :libddwaf do
     FileUtils.mkdir_p(vendor_dir)
     File.open(binary_path, 'wb') { |file| file.write(binary) }
 
-    puts Helpers.format("%green[COMPLETE] #{binary_path}")
+    puts Helpers.format("%green[complete] #{binary_path}")
   end
 end
 
@@ -464,7 +456,7 @@ task :binary, [:platform] => [] do |_, args|
   FileUtils.chmod(0o0644, gemspec.files)
   FileUtils.mkdir_p('pkg')
 
-  puts Helpers.format("%blue[BUILD]    libddwaf-#{gemspec.version}-#{gemspec.platform}")
+  puts Helpers.format("   %blue[build] libddwaf-#{gemspec.version}-#{gemspec.platform}")
 
   package = if Gem::VERSION < '2.0.0'
               Gem::Builder.new(gemspec).build
@@ -475,7 +467,7 @@ task :binary, [:platform] => [] do |_, args|
 
   FileUtils.mv(package, 'pkg')
 
-  puts Helpers.format("%green[COMPLETE] pkg/#{package}")
+  puts Helpers.format("%green[complete] pkg/#{package}")
 end
 
 task test: :spec
