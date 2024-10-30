@@ -49,7 +49,8 @@ module Datadog
           count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
           list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_known_addresses(handle_obj, count)
 
-          return [] if count.zero? # list is null
+          # list is null
+          return [] if count == 0 # # rubocop:disable Style/NumericPredicate
 
           list.get_array_of_string(0, count[:value])
         end

@@ -1,3 +1,7 @@
+# frozen_string_literal: true
+
+require 'ffi'
+
 module Datadog
   module AppSec
     module WAF
@@ -63,7 +67,7 @@ module Datadog
         end
 
         def self.vendor_dir
-          File.join(source_dir, '../../../vendor')
+          File.join(source_dir, '../../../../vendor')
         end
 
         def self.libddwaf_vendor_dir
@@ -210,8 +214,10 @@ module Datadog
 
         callback :ddwaf_object_free_fn, [:ddwaf_object], :void
 
+        # Ruby representation of ddwaf_config
         # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L129-L152
         class Config < ::FFI::Struct
+          # Ruby representation of ddwaf_config_limits
           # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L131-L138
           class Limits < ::FFI::Struct
             layout :max_container_size,  :uint32,
@@ -219,6 +225,7 @@ module Datadog
                    :max_string_length,   :uint32
           end
 
+          # Ruby representation of ddwaf_config_obfuscator
           # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L141-L146
           class Obfuscator < ::FFI::Struct
             layout :key_regex,   :pointer, # should be :charptr
@@ -254,6 +261,8 @@ module Datadog
         attach_function :ddwaf_context_init, [:ddwaf_handle], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
+        # Ruby representation of ddwaf_result
+        # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L154-L173
         class Result < ::FFI::Struct
           layout :timeout,       :bool,
                  :events,        Object,
