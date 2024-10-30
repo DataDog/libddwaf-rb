@@ -1,15 +1,29 @@
+# frozen_string_literal: true
+
+require 'datadog/appsec/waf/converter'
+require 'datadog/appsec/waf/result'
+
 module Datadog
   module AppSec
     module WAF
-      # Ruby
+      # Ruby representation of the ddwaf_context in libddwaf
+      # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/BINDING_IMPL_NOTES.md?plain=1#L125-L158
       class Context
+        RESULT_CODE = {
+          ddwaf_ok: :ok,
+          ddwaf_match: :match,
+          ddwaf_err_internal: :err_internal,
+          ddwaf_err_invalid_object: :err_invalid_object,
+          ddwaf_err_invalid_argument: :err_invalid_argument
+        }.freeze
+
         attr_reader :context_obj
 
         def initialize(handle)
           handle_obj = handle.handle_obj
           retain(handle)
 
-          @context_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_init(handle_obj)
+          @context_obj = LibDDWAF.ddwaf_context_init(handle_obj)
           raise LibDDWAF::Error, 'Could not create context' if @context_obj.null?
 
           validate!
@@ -19,18 +33,18 @@ module Datadog
           invalidate!
 
           retained.each do |retained_obj|
-            next unless retained_obj.is_a?(Datadog::AppSec::WAF::LibDDWAF::Object)
+            next unless retained_obj.is_a?(LibDDWAF::Object)
 
-            Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(retained_obj)
+            LibDDWAF.ddwaf_object_free(retained_obj)
           end
 
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_destroy(context_obj)
+          LibDDWAF.ddwaf_context_destroy(context_obj)
         end
 
         def run(persistent_data, ephemeral_data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           valid!
 
-          persistent_data_obj = Datadog::AppSec::WAF.ruby_to_object(
+          persistent_data_obj = Converter.ruby_to_object(
             persistent_data,
             max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
             max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
