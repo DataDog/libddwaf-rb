@@ -1,3 +1,7 @@
+# 2024-10-29 v.1.15.0.0.0
+- Update to libddwaf 1.15.0
+- Changed `Datadog::AppSec::WAF::Context#run` interface to accommodate ephemeral data ([Breaking change](https://github.com/DataDog/libddwaf/blob/master/CHANGELOG.md#v1150-unstable))
+
 # 2023-09-11 v.1.14.0.0.0
 - Update to libddwaf 1.14.0
 - Add support for `Float` and `Nil` scalar values when converting from ruby to WAF Object and vice versa.
@@ -6,7 +10,7 @@
 # 2023-08-29 v.1.11.0.0.0
 
 - Update to libddwaf 1.11.0
-- Changed `Datadog::AppSec::WAF::Handle#ruleset_info` to `Datadog::AppSec::WAF::Handle#diagnostics``. (Breaking change)
+- Changed `Datadog::AppSec::WAF::Handle#ruleset_info` to `Datadog::AppSec::WAF::Handle#diagnostics`. (Breaking change)
   The schema of the diagnostics variable can be found [here](https://github.com/DataDog/libddwaf/blob/master/schema/diagnostics.json)
 - Changed `Datadog::AppSec::WAF::Result#data` to `Datadog::AppSec::WAF::Result#events`. (Breaking change)
   The schema of the events variable can be found [here](https://github.com/DataDog/libddwaf/blob/master/schema/events.json)

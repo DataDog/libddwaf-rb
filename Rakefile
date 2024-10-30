@@ -28,11 +28,6 @@ RSpec::Core::RakeTask.new(:spec) do |t, args|
   t.rspec_opts = args.to_a.join(' ')
 end
 
-desc 'CI task; it runs all tests for current version of Ruby'
-task :ci do
-  system! 'bundle exec rake spec'
-end
-
 namespace :coverage do
   # Generates one global report for all tracer tests
   task :report do
@@ -65,58 +60,6 @@ namespace :coverage do
         formatter SimpleCov::Formatter::HTMLFormatter
       end
     end
-  end
-end
-
-# TODO: Migrate images to Datadog Docker repo
-RUBY_VERSIONS = {
-  '2.1' => { version: '2.1', image: 'delner/ruby:2.1', service: 'ruby-2.1' },
-  '2.2' => { version: '2.2', image: 'delner/ruby:2.2', service: 'ruby-2.2' },
-  '2.3' => { version: '2.3', image: 'delner/ruby:2.3', service: 'ruby-2.3' },
-  '2.4' => { version: '2.4', image: 'delner/ruby:2.4', service: 'ruby-2.4' },
-  '2.5' => { version: '2.5', image: 'delner/ruby:2.5', service: 'ruby-2.5' },
-  '2.6' => { version: '2.6', image: 'delner/ruby:2.6', service: 'ruby-2.6' },
-  '2.7' => { version: '2.7', image: 'delner/ruby:2.7', service: 'ruby-2.7' },
-  '3.0' => { version: '3.0', image: 'delner/ruby:3.0', service: 'ruby-3.0' },
-  'jruby-9.2' => { version: 'jruby-9.2', image: 'delner/ruby:jruby-9.2', service: 'jruby-9.2' }
-}.freeze
-
-DEFAULT_RUBY_VERSION = RUBY_VERSIONS['2.7']
-
-namespace :docker do
-  task :build do
-    RUBY_VERSIONS.each_value do |ruby|
-      command = 'docker build'
-      command += " -t #{ruby[:image]}"
-      command += ' -t delner/ruby:latest' if ruby == DEFAULT_RUBY_VERSION
-      command += " -f .docker/images/ruby/#{ruby[:version]}/Dockerfile"
-      command += " .docker/images/ruby/#{ruby[:version]}"
-
-      system!(command)
-    end
-  end
-
-  task :push do
-    RUBY_VERSIONS.each_value do |ruby|
-      command = 'docker push'
-      command += " #{ruby[:image]}"
-
-      system!(command)
-      system!('docker push delner/ruby:latest') if ruby == DEFAULT_RUBY_VERSION
-    end
-  end
-
-  task :run do
-    # Select Docker service to run
-    ruby_version = RUBY_VERSIONS.find do |ver, ruby|
-      ver == ENV['RUBY_VER'] \
-        || ruby[:version] == ENV['RUBY_VER'] \
-        || ruby[:service] == ENV['RUBY_VER']
-    end || DEFAULT_RUBY_VERSION
-
-    # Build and start Docker container
-    system! "docker-compose build #{ruby_version[:service]}"
-    system! "docker-compose run --rm #{ruby_version[:service]}"
   end
 end
 
@@ -198,8 +141,8 @@ module Helpers
     unless response.is_a?(Net::HTTPOK)
       fail Helpers.format(<<~TEXT)
 
-          %red[ERROR:] Github API call was unsuccessful!
-        %green[RESPONSE:] #{response.body}
+           %red[error] Github API call was unsuccessful!
+        %yellow[response] #{response.body}
 
       TEXT
     end
@@ -215,8 +158,8 @@ module Helpers
 
       fail Helpers.format(<<~TEXT)
 
-           %red[ERROR:]    Github API call was unsuccessful!
-        %yellow[RESPONSE:] #{errors.join("\n")}
+           %red[error] Github API call was unsuccessful!
+        %yellow[response] #{errors.join("\n")}
 
       TEXT
     end
@@ -224,34 +167,37 @@ module Helpers
     response
   end
 
-  def download(url)
+  def download(url, redirects_allowed: 3)
+    if redirects_allowed.zero?
+      fail Helpers.format("\n   %red[error] exeeded maximum redirects count\n\n")
+    end
+
     uri = URI.parse(url)
     response = Net::HTTP.get_response(uri)
 
-    unless response.is_a?(Net::HTTPOK)
+    case response
+    when Net::HTTPFound then Helpers.download(response['Location'], redirects_allowed: redirects_allowed - 1)
+    when Net::HTTPOK then response.body
+    else
       fail Helpers.format(<<~TEXT)
 
-           %red[ERROR:] fail to download #{uri}
-        %yellow[RESPONSE:] #{response.body}
+           %red[error] fail to download #{uri}
+        %yellow[response] #{response.body}
 
       TEXT
     end
-
-    response.body
   end
 
   def github_token
     token_path = File.expand_path('.github-token', __dir__)
 
     if !ENV.key?('GITHUB_TOKEN') && !File.exist?(token_path)
-      fail Helpers.format(<<~TEXT)
-
-        %red[ERROR:] Github token file %red[#{token_path}] not found!
-               Please generate new token here %blue[https://github.com/settings/tokens/new]
-        %yellow[NOTE:]  Token requires only %yellow[repo:public_repo] access with authorised SSO and should expire.
-               See more %blue[https://docs.github.com/en/enterprise-cloud@latest/authentication/authenticating-with-saml-single-sign-on/authorizing-a-personal-access-token-for-use-with-saml-single-sign-:console]
-
-      TEXT
+      fail Helpers.format(
+        "\n   %red[error] Github token file %red[#{token_path}] not found!\n" \
+        "         Please generate new token here %blue[https://github.com/settings/tokens/new]\n" \
+        "   %yellow[NOTE:] Token requires only %yellow[repo:public_repo] access with authorised SSO and should expire.\n" \
+        "         See more %blue[https://docs.github.com/en/enterprise-cloud@latest/authentication/authenticating-with-saml-single-sign-on/authorizing-a-personal-access-token-for-use-with-saml-single-sign-:console]\n\n"
+      )
     end
 
     ENV.fetch('GITHUB_TOKEN') { File.read(token_path) }
@@ -317,9 +263,9 @@ namespace :libddwaf do
         next unless asset['name'].match?(/\Alibddwaf-[\d.]+-(?:linux|darwin)-(?:arm64|x86_64|aarch64)\.tar\.gz\.sha256\z/)
 
         sha256_path = releases_path.join(asset['name'])
-        next puts Helpers.format("%yellow[SKIP]     #{asset['name']} (exist)") if sha256_path.size?
+        next puts Helpers.format("    %yellow[skip] #{asset['name']} (exist)") if sha256_path.size?
 
-        puts Helpers.format("%blue[DOWNLOAD] #{asset['name']}")
+        puts Helpers.format("%blue[download] #{asset['name']}")
 
         binary = Helpers.download(asset['url'])
         File.open(sha256_path, 'wb') { |file| file.write(binary) }
@@ -344,7 +290,7 @@ namespace :libddwaf do
       end
     end
 
-    puts Helpers.format("%green[COMPLETE] #{checksums_path}")
+    puts Helpers.format("%green[complete] #{checksums_path}")
   end
 
   desc 'Extract pre-packaged `libddwaf` tarball into shared libs'
@@ -353,7 +299,7 @@ namespace :libddwaf do
 
     if Helpers.shared_lib_path(platform: platform).exist?
       path = Helpers.shared_lib_path(platform: platform)
-      next puts Helpers.format("%yellow[SKIP]     #{path} (exist)")
+      next puts Helpers.format("    %yellow[skip] #{path} (exist)")
     end
 
     Rake::Task['fetch'].execute(args)
@@ -364,22 +310,19 @@ namespace :libddwaf do
     binary_name = Helpers.libddwaf_filename(platform: platform)
     binary_path = vendor_dir.join(binary_name)
 
-    puts Helpers.format("%blue[EXTRACT]  #{binary_name}")
+    puts Helpers.format(" %blue[extract]  #{binary_name}")
 
     File.open(binary_path, 'rb') do |file|
       FileUtils.rm_rf(Helpers.libddwaf_dir(platform: platform))
       Gem::Package.new('').extract_tar_gz(file, vendor_dir)
     end
 
-    puts Helpers.format("%green[COMPLETE] #{Helpers.libddwaf_dir(platform: platform)}")
+    puts Helpers.format("%green[complete] #{Helpers.libddwaf_dir(platform: platform)}")
   end
 
   desc 'Download pre-packaged `libddwaf` tarball into shared libs'
   task :fetch, [:platform] do |_, args|
     platform = Helpers.parse_platform(args.to_h[:platform])
-
-    # NOTE: Check Github Token upfront to fail-fast
-    Helpers.github_token
 
     version = Helpers.libddwaf_version
     vendor_dir = Helpers.libddwaf_vendor_dir
@@ -389,50 +332,32 @@ namespace :libddwaf do
     expected_binary_sha256 = Helpers.libddwaf_binary_checksum(binary_name)
 
     if expected_binary_sha256.nil?
-      fail Helpers.format(<<~TEXT)
-
-        %red[ERROR:] Could not find checksum for %red[#{binary_name}]
-               Please run `%yellow[rake libddwaf:download_checksums]` to update the list
-
-      TEXT
+      fail Helpers.format(
+        "\n   %red[error] Could not find checksum for %red[#{binary_name}]" \
+        "\n         Please run `%yellow[rake libddwaf:download_checksums]` to update the list\n\n"
+      )
     end
 
     if binary_path.exist? && Digest::SHA256.hexdigest(File.read(binary_path)) == expected_binary_sha256
-      next puts Helpers.format("%yellow[SKIP]     #{binary_name} (exists)")
+      next puts Helpers.format("    %yellow[skip] #{binary_name} (exists)")
     end
 
-    response = Helpers.query_github_api(<<~QUERY)
-      query {
-        repository(name: "libddwaf", owner: "DataDog") {
-          release(tagName: "#{version}") {
-            releaseAssets(first: 1, name: "#{binary_name}") {
-              nodes { url }
-            }
-          }
-        }
-      }
-    QUERY
+    puts Helpers.format("%blue[download] #{binary_name}")
 
-    puts Helpers.format("%blue[DOWNLOAD] #{binary_name}")
+    release_url = Kernel.format(
+      'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s',
+      version: version, filename: binary_name
+    )
 
-    url = response.dig('data', 'repository', 'release', 'releaseAssets', 'nodes', 0, 'url')
-    if url.nil?
-      fail Helpers.format(<<~TEXT)
-
-        %red[ERROR:] possibly wrong libddwaf version `%yellow[#{version}]` or binary name `%yellow[#{binary_name}]`
-
-      TEXT
-    end
-
-    binary = Helpers.download(url)
+    binary = Helpers.download(release_url)
     binary_sha256 = Digest::SHA256.hexdigest(binary)
 
     if binary_sha256 != expected_binary_sha256
       fail Helpers.format(<<~TEXT)
 
-           %red[ERROR:]    fail to verify checksum of %blue[#{url}]
-        %green[EXPECTED:] #{binary_sha256}
-          %red[ACTUAL:] #{expected_binary_sha256}
+           %red[error] fail to verify checksum of %blue[#{release_url}]
+        %green[expected] #{binary_sha256}
+          %yellow[actual] #{expected_binary_sha256}
 
       TEXT
     end
@@ -440,7 +365,7 @@ namespace :libddwaf do
     FileUtils.mkdir_p(vendor_dir)
     File.open(binary_path, 'wb') { |file| file.write(binary) }
 
-    puts Helpers.format("%green[COMPLETE] #{binary_path}")
+    puts Helpers.format("%green[complete] #{binary_path}")
   end
 end
 
@@ -531,7 +456,7 @@ task :binary, [:platform] => [] do |_, args|
   FileUtils.chmod(0o0644, gemspec.files)
   FileUtils.mkdir_p('pkg')
 
-  puts Helpers.format("%blue[BUILD]    libddwaf-#{gemspec.version}-#{gemspec.platform}")
+  puts Helpers.format("   %blue[build] libddwaf-#{gemspec.version}-#{gemspec.platform}")
 
   package = if Gem::VERSION < '2.0.0'
               Gem::Builder.new(gemspec).build
@@ -542,7 +467,7 @@ task :binary, [:platform] => [] do |_, args|
 
   FileUtils.mv(package, 'pkg')
 
-  puts Helpers.format("%green[COMPLETE] pkg/#{package}")
+  puts Helpers.format("%green[complete] pkg/#{package}")
 end
 
 task test: :spec

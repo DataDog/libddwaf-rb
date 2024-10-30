@@ -28,7 +28,6 @@ jobs:
         id: build-image
         uses: ./.github/actions/docker-build-ruby
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           ruby-version: ${{ matrix.ruby }}
           arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
@@ -69,7 +68,6 @@ jobs:
         id: build-image
         uses: ./.github/actions/docker-build-ruby
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           ruby-version: ${{ matrix.jruby }}
           jruby: true
           arch: ${{ matrix.arch }}
