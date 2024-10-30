@@ -9,64 +9,70 @@ module Datadog
         attr_reader :handle_obj, :diagnostics, :config
 
         def initialize(rule, limits: {}, obfuscator: {})
-          rule_obj = Datadog::AppSec::WAF.ruby_to_object(rule)
-          raise LibDDWAF::Error, "Could not convert object #{rule.inspect}" if rule_obj.null? || rule_obj[:type] == :ddwaf_object_invalid
+          rule_obj = Converter.ruby_to_object(rule)
+          if rule_obj.null? || rule_obj[:type] == :ddwaf_object_invalid
+            raise LibDDWAF::Error, "Could not convert object #{rule.inspect}"
+          end
 
           config_obj = Datadog::AppSec::WAF::LibDDWAF::Config.new
-          raise LibDDWAF::Error, 'Could not create config struct' if config_obj.null?
+          if config_obj.null?
+            raise LibDDWAF::Error, 'Could not create config struct'
+          end
 
           config_obj[:limits][:max_container_size]  = limits[:max_container_size]  || LibDDWAF::DEFAULT_MAX_CONTAINER_SIZE
           config_obj[:limits][:max_container_depth] = limits[:max_container_depth] || LibDDWAF::DEFAULT_MAX_CONTAINER_DEPTH
           config_obj[:limits][:max_string_length]   = limits[:max_string_length]   || LibDDWAF::DEFAULT_MAX_STRING_LENGTH
           config_obj[:obfuscator][:key_regex]       = FFI::MemoryPointer.from_string(obfuscator[:key_regex])   if obfuscator[:key_regex]
           config_obj[:obfuscator][:value_regex]     = FFI::MemoryPointer.from_string(obfuscator[:value_regex]) if obfuscator[:value_regex]
-          config_obj[:free_fn] = Datadog::AppSec::WAF::LibDDWAF::ObjectNoFree
+          config_obj[:free_fn] = LibDDWAF::ObjectNoFree
 
           @config = config_obj
 
-          diagnostics_obj = Datadog::AppSec::WAF::LibDDWAF::Object.new
+          diagnostics_obj = LibDDWAF::Object.new
 
-          @handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(rule_obj, config_obj, diagnostics_obj)
-          @diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
+          @handle_obj = LibDDWAF.ddwaf_init(rule_obj, config_obj, diagnostics_obj)
 
-          raise LibDDWAF::Error.new('Could not create handle', diagnostics: @diagnostics) if @handle_obj.null?
+          @diagnostics = Converter.object_to_ruby(diagnostics_obj)
+
+          if @handle_obj.null?
+            raise LibDDWAF::Error.new('Could not create handle', diagnostics: @diagnostics)
+          end
 
           validate!
         ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(diagnostics_obj) if diagnostics_obj
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
+          LibDDWAF.ddwaf_object_free(diagnostics_obj) if diagnostics_obj
+          LibDDWAF.ddwaf_object_free(rule_obj) if rule_obj
         end
 
         def finalize
           invalidate!
 
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_destroy(handle_obj)
+          LibDDWAF.ddwaf_destroy(handle_obj)
         end
 
         def required_addresses
           valid!
 
-          count = Datadog::AppSec::WAF::LibDDWAF::UInt32Ptr.new
-          list = Datadog::AppSec::WAF::LibDDWAF.ddwaf_known_addresses(handle_obj, count)
+          count = LibDDWAF::UInt32Ptr.new
+          list = LibDDWAF.ddwaf_known_addresses(handle_obj, count)
 
-          # list is null
-          return [] if count == 0 # # rubocop:disable Style/NumericPredicate
+          return [] if count == 0 # list is null
 
           list.get_array_of_string(0, count[:value])
         end
 
         def merge(data)
-          data_obj = Datadog::AppSec::WAF.ruby_to_object(data, coerce: false)
+          data_obj = Converter.ruby_to_object(data, coerce: false)
           diagnostics_obj = LibDDWAF::Object.new
-          new_handle = Datadog::AppSec::WAF::LibDDWAF.ddwaf_update(handle_obj, data_obj, diagnostics_obj)
+          new_handle = LibDDWAF.ddwaf_update(handle_obj, data_obj, diagnostics_obj)
 
           return if new_handle.null?
 
-          diagnostics = Datadog::AppSec::WAF.object_to_ruby(diagnostics_obj)
+          diagnostics = Converter.object_to_ruby(diagnostics_obj)
           new_from_handle(new_handle, diagnostics, config)
         ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(data_obj) if data_obj
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_free(diagnostics_obj) if diagnostics_obj
+          LibDDWAF.ddwaf_object_free(data_obj) if data_obj
+          LibDDWAF.ddwaf_object_free(diagnostics_obj) if diagnostics_obj
         end
 
         private

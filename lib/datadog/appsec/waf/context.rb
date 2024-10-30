@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require 'datadog/appsec/waf/converter'
-require 'datadog/appsec/waf/result'
-
 module Datadog
   module AppSec
     module WAF
@@ -51,37 +48,41 @@ module Datadog
             max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
             coerce: false
           )
-          raise LibDDWAF::Error, "Could not convert persistent data: #{persistent_data.inspect}" if persistent_data_obj.null?
+          if persistent_data_obj.null?
+            raise LibDDWAF::Error, "Could not convert persistent data: #{persistent_data.inspect}"
+          end
 
           # retain C objects in memory for subsequent calls to run
           retain(persistent_data_obj)
 
-          ephemeral_data_obj = Datadog::AppSec::WAF.ruby_to_object(
+          ephemeral_data_obj = Converter.ruby_to_object(
             ephemeral_data,
             max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
             max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
             max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
             coerce: false
           )
-          raise LibDDWAF::Error, "Could not convert ephemeral data: #{ephemeral_data.inspect}" if ephemeral_data_obj.null?
+          if ephemeral_data_obj.null?
+            raise LibDDWAF::Error, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
+          end
 
-          result_obj = Datadog::AppSec::WAF::LibDDWAF::Result.new
+          result_obj = LibDDWAF::Result.new
           raise LibDDWAF::Error, 'Could not create result object' if result_obj.null?
 
-          code = Datadog::AppSec::WAF::LibDDWAF.ddwaf_run(@context_obj, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
+          code = LibDDWAF.ddwaf_run(@context_obj, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
 
           result = Result.new(
             RESULT_CODE[code],
-            Datadog::AppSec::WAF.object_to_ruby(result_obj[:events]),
+            Converter.object_to_ruby(result_obj[:events]),
             result_obj[:total_runtime],
             result_obj[:timeout],
-            Datadog::AppSec::WAF.object_to_ruby(result_obj[:actions]),
-            Datadog::AppSec::WAF.object_to_ruby(result_obj[:derivatives])
+            Converter.object_to_ruby(result_obj[:actions]),
+            Converter.object_to_ruby(result_obj[:derivatives])
           )
 
           [RESULT_CODE[code], result]
         ensure
-          Datadog::AppSec::WAF::LibDDWAF.ddwaf_result_free(result_obj) if result_obj
+          LibDDWAF.ddwaf_result_free(result_obj) if result_obj
         end
 
         private
