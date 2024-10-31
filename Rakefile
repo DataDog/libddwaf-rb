@@ -260,7 +260,18 @@ namespace :libddwaf do
 
     response.dig('data', 'repository', 'releases', 'nodes').each do |release|
       release.dig('releaseAssets', 'nodes').each do |asset|
-        next unless asset['name'].match?(/\Alibddwaf-[\d.]+-(?:linux|darwin)-(?:arm64|x86_64|aarch64)\.tar\.gz\.sha256\z/)
+        # rubocop:disable Style/RegexpLiteral
+        filename_regex = %r{
+          \Alibddwaf-[\d.]+-
+          (
+            (?:linux|darwin)-(?:arm64|x86_64|aarch64)|       # for versions < 1.16.0
+            ((?:armv7|x86_64|aarch64)-(?:linux|darwin)-musl) # for versions >= 1.16.0
+          )
+          \.tar\.gz\.sha256\z
+        }x
+        # rubocop:enable Style/RegexpLiteral
+
+        next unless asset['name'].match?(filename_regex)
 
         sha256_path = releases_path.join(asset['name'])
         next puts Helpers.format("    %yellow[skip] #{asset['name']} (exist)") if sha256_path.size?
