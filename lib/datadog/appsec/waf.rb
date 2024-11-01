@@ -11,11 +11,13 @@ require 'datadog/appsec/waf/version'
 module Datadog
   module AppSec
     module WAF
-      def self.version
+      module_function
+
+      def version
         LibDDWAF.ddwaf_get_version
       end
 
-      def self.log_callback(level, func, file, line, message, len)
+      def log_callback(level, func, file, line, message, len)
         return if logger.nil?
 
         logger.debug do
@@ -29,11 +31,11 @@ module Datadog
         end
       end
 
-      def self.logger
+      def logger
         @logger
       end
 
-      def self.logger=(logger)
+      def logger=(logger)
         unless @log_callback
           log_callback = method(:log_callback)
           Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(log_callback, :ddwaf_log_trace)
