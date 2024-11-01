@@ -78,7 +78,7 @@ module Datadog
         private
 
         def new_from_handle(handle_object, diagnostics, config)
-          obj = self.class.allocate
+          obj = Handle.allocate
           obj.instance_variable_set(:@handle_obj, handle_object)
           obj.instance_variable_set(:@diagnostics, diagnostics)
           obj.instance_variable_set(:@config, config)

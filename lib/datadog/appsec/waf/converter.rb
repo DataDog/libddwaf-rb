@@ -18,12 +18,12 @@ module Datadog
             end
 
             max_index = max_container_size - 1 if max_container_size
-            val.each.with_index do |e, i|
-              member = ruby_to_object(e,
-                                      max_container_size: max_container_size,
-                                      max_container_depth: (max_container_depth - 1 if max_container_depth),
-                                      max_string_length: max_string_length,
-                                      coerce: coerce)
+            val.each.with_index do |e, i| # rubocop:disable Style/MultilineIfModifier
+              member = Converter.ruby_to_object(e,
+                                                 max_container_size: max_container_size,
+                                                 max_container_depth: (max_container_depth - 1 if max_container_depth),
+                                                 max_string_length: max_string_length,
+                                                 coerce: coerce)
               e_res = LibDDWAF.ddwaf_object_array_add(obj, member)
               raise LibDDWAF::Error, "Could not add to array object: #{e.inspect}" unless e_res
 
@@ -39,15 +39,16 @@ module Datadog
             end
 
             max_index = max_container_size - 1 if max_container_size
-            val.each.with_index do |e, i|
-              k, v = e[0], e[1] # for Steep, which doesn't handle |(k, v), i|
+            val.each.with_index do |e, i| # rubocop:disable Style/MultilineIfModifier
+              # for Steep, which doesn't handle |(k, v), i|
+              k, v = e[0], e[1] # rubocop:disable Style/ParallelAssignment
 
               k = k.to_s[0, max_string_length] if max_string_length
-              member = ruby_to_object(v,
-                                      max_container_size: max_container_size,
-                                      max_container_depth: (max_container_depth - 1 if max_container_depth),
-                                      max_string_length: max_string_length,
-                                      coerce: coerce)
+              member = Converter.ruby_to_object(v,
+                                                max_container_size: max_container_size,
+                                                max_container_depth: (max_container_depth - 1 if max_container_depth),
+                                                max_string_length: max_string_length,
+                                                coerce: coerce)
               kv_res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, member)
               unless kv_res
                 raise LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}"
@@ -129,7 +130,7 @@ module Datadog
 
             obj
           else
-            ruby_to_object(''.freeze)
+            Converter.ruby_to_object('')
           end
         end
         # rubocop:enable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
@@ -151,7 +152,7 @@ module Datadog
           when :ddwaf_obj_array
             (0...obj[:nbEntries]).each.with_object([]) do |i, a|
               ptr = obj[:valueUnion][:array] + i * LibDDWAF::Object.size
-              e = object_to_ruby(LibDDWAF::Object.new(ptr))
+              e = Converter.object_to_ruby(LibDDWAF::Object.new(ptr))
               a << e # steep:ignore
             end
           when :ddwaf_obj_map
@@ -160,7 +161,7 @@ module Datadog
               o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
               l = o[:parameterNameLength]
               k = o[:parameterName].read_bytes(l)
-              v = object_to_ruby(LibDDWAF::Object.new(ptr))
+              v = Converter.object_to_ruby(LibDDWAF::Object.new(ptr))
               h[k] = v # steep:ignore
             end
           end

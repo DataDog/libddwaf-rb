@@ -475,8 +475,11 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
           it 'converts nested hashes up to the limit' do
-            obj = described_class.ruby_to_object({ foo: { bar: { baz: { qux: 4 } } } }, max_container_depth: max_container_depth,
-                                                                                             coerce: false)
+            obj = described_class.ruby_to_object(
+              { foo: { bar: { baz: { qux: 4 } } } },
+              max_container_depth: max_container_depth,
+              coerce: false
+            )
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
