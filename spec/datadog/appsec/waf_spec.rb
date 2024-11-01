@@ -1,6 +1,7 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 require 'datadog/appsec/waf'
-require 'json'
 
 RSpec.describe Datadog::AppSec::WAF do
   let(:rule) do
@@ -26,21 +27,11 @@ RSpec.describe Datadog::AppSec::WAF do
     }
   end
 
-  let(:timeout) do
-    10_000_000 # in us
-  end
+  let(:timeout_usec) { 10_000_000 }
 
-  let(:diagnostics_obj) do
-    Datadog::AppSec::WAF::LibDDWAF::Object.new
-  end
-
-  let(:handle) do
-    Datadog::AppSec::WAF::Handle.new(rule)
-  end
-
-  let(:context) do
-    Datadog::AppSec::WAF::Context.new(handle)
-  end
+  let(:diagnostics_obj) { described_class::LibDDWAF::Object.new }
+  let(:handle) { described_class::Handle.new(rule) }
+  let(:context) { described_class::Context.new(handle) }
 
   let(:passing_input) do
     { value1: [4242, 'randomString'], value2: ['nope'] }
@@ -50,9 +41,7 @@ RSpec.describe Datadog::AppSec::WAF do
     { value1: [4242, 'randomString'], value2: ['rule1'] }
   end
 
-  let(:log_store) do
-    []
-  end
+  let(:log_store) { [] }
 
   let(:perf_store) do
     {
@@ -69,7 +58,9 @@ RSpec.describe Datadog::AppSec::WAF do
   before(:each) do
     expect(perf_store).to eq({ total_runtime: [] })
     expect(log_store).to eq([])
-    Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+
+    described_class::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+
     expect(log_store.size).to eq 1
     expect(log_store.select { |log| log[:message] =~ /Sending log messages to binding/ })
   end
@@ -100,21 +91,21 @@ RSpec.describe Datadog::AppSec::WAF do
 
   it 'raises an error when failing to create a handle' do
     invalid_rule = {}
-    expect { Datadog::AppSec::WAF::Handle.new(invalid_rule) }.to raise_error Datadog::AppSec::WAF::LibDDWAF::Error
+    expect { described_class::Handle.new(invalid_rule) }.to raise_error described_class::LibDDWAF::Error
   end
 
   it 'raises an error when failing to create a context' do
     invalid_rule = {}
-    invalid_rule_obj = Datadog::AppSec::WAF.ruby_to_object(invalid_rule)
-    config_obj = Datadog::AppSec::WAF::LibDDWAF::Config.new
-    invalid_handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, diagnostics_obj)
+    invalid_rule_obj = described_class::Converter.ruby_to_object(invalid_rule)
+    config_obj = described_class::LibDDWAF::Config.new
+    invalid_handle_obj = described_class::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, diagnostics_obj)
     expect(invalid_handle_obj.null?).to be true
-    invalid_handle = Datadog::AppSec::WAF::Handle.new(rule)
+    invalid_handle = described_class::Handle.new(rule)
     invalid_handle.instance_eval do
       @handle_obj = invalid_handle_obj
     end
     expect(invalid_handle.handle_obj.null?).to be true
-    expect { Datadog::AppSec::WAF::Context.new(invalid_handle) }.to raise_error Datadog::AppSec::WAF::LibDDWAF::Error
+    expect { described_class::Context.new(invalid_handle) }.to raise_error described_class::LibDDWAF::Error
   end
 
   it 'records good diagnostics' do
@@ -127,7 +118,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
   describe '#run' do
     it 'passes non-matching persistent data' do
-      code, result = context.run(passing_input, {}, timeout)
+      code, result = context.run(passing_input, {}, timeout_usec)
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :ok
       expect(result.status).to eq :ok
@@ -138,7 +129,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'passes non-matching ephemeral data' do
-      code, result = context.run({}, passing_input, timeout)
+      code, result = context.run({}, passing_input, timeout_usec)
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :ok
       expect(result.status).to eq :ok
@@ -149,7 +140,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'catches a match on persistent data' do
-      code, result = context.run(matching_input, {}, timeout)
+      code, result = context.run(matching_input, {}, timeout_usec)
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :match
       expect(result.status).to eq :match
@@ -160,7 +151,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'catches a match on ephemeral data' do
-      code, result = context.run({}, matching_input, timeout)
+      code, result = context.run({}, matching_input, timeout_usec)
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :match
       expect(result.status).to eq :match
@@ -173,11 +164,11 @@ RSpec.describe Datadog::AppSec::WAF do
     context 'encoding' do
       context 'with a non UTF-8 string' do
         let(:matching_input) do
-          { value1: [4242, 'randomString'], value2: ['rule1'.force_encoding('ASCII-8BIT')] }
+          { value1: [4242, 'randomString'], value2: ['rule1'.dup.force_encoding('ASCII-8BIT')] }
         end
 
         it 'catches a match' do
-          code, result = context.run(matching_input, {}, timeout)
+          code, result = context.run(matching_input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -190,17 +181,17 @@ RSpec.describe Datadog::AppSec::WAF do
 
       context 'with badly encoded string' do
         let(:matching_input) do
-          { value1: [4242, 'randomString'], value2: ["rule1\xE2".force_encoding('ASCII-8BIT')] }
+          { value1: [4242, 'randomString'], value2: ["rule1\xE2".dup.force_encoding('ASCII-8BIT')] }
         end
 
         it 'returns valid UTF-8' do
-          _code, result = context.run(matching_input, {}, timeout)
+          _code, result = context.run(matching_input, {}, timeout_usec)
           expect(result.events.first['rule_matches'].first['parameters'].first['value']).to be_valid_encoding
           expect(result.events.first['rule_matches'].first['parameters'].first['highlight'].first).to be_valid_encoding
         end
 
         it 'catches a match' do
-          code, result = context.run(matching_input, {}, timeout)
+          code, result = context.run(matching_input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -291,7 +282,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'records bad diagnostics in the exception' do
-      expect(handle_exception).to be_a(Datadog::AppSec::WAF::LibDDWAF::Error)
+      expect(handle_exception).to be_a(described_class::LibDDWAF::Error)
       expect(handle_exception.diagnostics).to be_a Hash
       expect(handle_exception.diagnostics["rules"]["loaded"].size).to eq(0)
       expect(handle_exception.diagnostics["rules"]["failed"].size).to eq(1)
@@ -343,7 +334,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'matches custom rule' do
-      code, = context.run(matching_input, {}, timeout)
+      code, = context.run(matching_input, {}, timeout_usec)
       expect(code).to eq :match
     end
   end
@@ -361,14 +352,14 @@ RSpec.describe Datadog::AppSec::WAF do
             ]
           }
 
-          code, = context.run(matching_input, {}, timeout)
+          code, = context.run(matching_input, {}, timeout_usec)
           expect(code).to eq :match
 
           new_handle = handle.merge(data)
-          expect(new_handle).to be_a(Datadog::AppSec::WAF::Handle)
+          expect(new_handle).to be_a(described_class::Handle)
 
-          new_context = Datadog::AppSec::WAF::Context.new(new_handle)
-          code, = new_context.run(matching_input, {}, timeout)
+          new_context = described_class::Context.new(new_handle)
+          code, = new_context.run(matching_input, {}, timeout_usec)
           expect(code).to eq :ok
 
           new_context.finalize
@@ -387,15 +378,15 @@ RSpec.describe Datadog::AppSec::WAF do
             ]
           }
 
-          code, result = context.run(matching_input, {}, timeout)
+          code, result = context.run(matching_input, {}, timeout_usec)
           expect(code).to eq :match
           expect(result.actions).to be_empty
 
           new_handle = handle.merge(data)
-          expect(new_handle).to be_a(Datadog::AppSec::WAF::Handle)
+          expect(new_handle).to be_a(described_class::Handle)
 
-          new_context = Datadog::AppSec::WAF::Context.new(new_handle)
-          code, result = new_context.run(matching_input, {}, timeout)
+          new_context = described_class::Context.new(new_handle)
+          code, result = new_context.run(matching_input, {}, timeout_usec)
           expect(code).to eq :match
           expect(result.actions).to eq(['block'])
 
@@ -450,14 +441,14 @@ RSpec.describe Datadog::AppSec::WAF do
             ]
           }
 
-          code, = context.run(matching_input, {}, timeout)
+          code, = context.run(matching_input, {}, timeout_usec)
           expect(code).to eq :ok
 
           new_handle = handle.merge(data)
-          expect(new_handle).to be_a(Datadog::AppSec::WAF::Handle)
+          expect(new_handle).to be_a(described_class::Handle)
 
-          new_context = Datadog::AppSec::WAF::Context.new(new_handle)
-          code, = new_context.run(matching_input, {}, timeout)
+          new_context = described_class::Context.new(new_handle)
+          code, = new_context.run(matching_input, {}, timeout_usec)
           expect(code).to eq :match
 
           new_context.finalize
@@ -515,14 +506,14 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       it 'retains old handle obfuscator configured' do
-        old_handle = Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
-        old_context = Datadog::AppSec::WAF::Context.new(old_handle)
+        old_handle = described_class::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
+        old_context = described_class::Context.new(old_handle)
 
-        code, = old_context.run(matching_input, {}, timeout)
+        code, = old_context.run(matching_input, {}, timeout_usec)
         expect(code).to eq :ok
 
         new_handle = old_handle.merge(new_ruleset)
-        expect(new_handle).to be_a(Datadog::AppSec::WAF::Handle)
+        expect(new_handle).to be_a(described_class::Handle)
 
         # Finalize old handle and context
         # It should free all related information from old_handle and old_context
@@ -530,9 +521,9 @@ RSpec.describe Datadog::AppSec::WAF do
         old_handle.finalize
         old_context.finalize
 
-        new_context = Datadog::AppSec::WAF::Context.new(new_handle)
+        new_context = described_class::Context.new(new_handle)
 
-        new_code, new_result = new_context.run(matching_input, {}, timeout)
+        new_code, new_result = new_context.run(matching_input, {}, timeout_usec)
         expect(new_code).to eq :match
 
         expect(new_result.events.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
@@ -543,7 +534,9 @@ RSpec.describe Datadog::AppSec::WAF do
 
   context 'run with a big ruleset' do
     let(:rule) do
-      JSON.parse(File.read(File.join(__dir__, '../../fixtures/waf_rules.json')))
+      require 'json'
+
+      JSON.parse(File.read(File.expand_path('../../fixtures/waf_rules.json', __dir__)))
     end
 
     let(:passing_input) do
@@ -559,7 +552,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'passes non-matching input' do
-      code, result = context.run(passing_input, {}, timeout)
+      code, result = context.run(passing_input, {}, timeout_usec)
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :ok
       expect(result.status).to eq :ok
@@ -572,7 +565,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
 
     it 'catches a match' do
-      code, result = context.run(matching_input, {}, timeout)
+      code, result = context.run(matching_input, {}, timeout_usec)
       perf_store[:total_runtime] << result.total_runtime
       expect(code).to eq :match
       expect(result.status).to eq :match
@@ -588,7 +581,7 @@ RSpec.describe Datadog::AppSec::WAF do
     context 'with configured limits' do
       context 'exceeding max_container_size' do
         let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_size: 1 })
+          described_class::Handle.new(rule, limits: { max_container_size: 1 })
         end
 
         context 'when key is ouside of limit yet found by path' do
@@ -597,7 +590,7 @@ RSpec.describe Datadog::AppSec::WAF do
           end
 
           it 'matches on matching input' do
-            code, result = context.run(matching_input, {}, timeout)
+            code, result = context.run(matching_input, {}, timeout_usec)
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :match
             expect(result.status).to eq :match
@@ -617,7 +610,7 @@ RSpec.describe Datadog::AppSec::WAF do
           end
 
           it 'matches on matching input' do
-            code, result = context.run(matching_input, {}, timeout)
+            code, result = context.run(matching_input, {}, timeout_usec)
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :match
             expect(result.status).to eq :match
@@ -637,7 +630,7 @@ RSpec.describe Datadog::AppSec::WAF do
           end
 
           it 'passes on matching input outside of limit' do
-            code, result = context.run(matching_input, {}, timeout)
+            code, result = context.run(matching_input, {}, timeout_usec)
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :ok
             expect(result.status).to eq :ok
@@ -657,7 +650,7 @@ RSpec.describe Datadog::AppSec::WAF do
           end
 
           it 'passes input inside of limit' do
-            code, result = context.run(matching_input, {}, timeout)
+            code, result = context.run(matching_input, {}, timeout_usec)
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :ok
             expect(result.status).to eq :ok
@@ -674,7 +667,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       context 'exceeding max_container_depth' do
         let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_depth: 1 })
+          described_class::Handle.new(rule, limits: { max_container_depth: 1 })
         end
 
         context 'when value is outside of limit' do
@@ -683,7 +676,7 @@ RSpec.describe Datadog::AppSec::WAF do
           end
 
           it 'passes on matching input outside of limit' do
-            code, result = context.run(matching_input, {}, timeout)
+            code, result = context.run(matching_input, {}, timeout_usec)
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :ok
             expect(result.status).to eq :ok
@@ -702,7 +695,7 @@ RSpec.describe Datadog::AppSec::WAF do
           end
 
           it 'matches on matching input inside of limit' do
-            code, result = context.run(matching_input, {}, timeout)
+            code, result = context.run(matching_input, {}, timeout_usec)
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :match
             expect(result.status).to eq :match
@@ -719,7 +712,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       context 'exceeding max_string_length' do
         let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_string_length: 1 })
+          described_class::Handle.new(rule, limits: { max_string_length: 1 })
         end
 
         let(:matching_input) do
@@ -727,7 +720,7 @@ RSpec.describe Datadog::AppSec::WAF do
         end
 
         it 'passes on matching input outside of limit' do
-          code, result = context.run(matching_input, {}, timeout)
+          code, result = context.run(matching_input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
 
           expect(code).to eq :ok
@@ -746,7 +739,7 @@ RSpec.describe Datadog::AppSec::WAF do
     context 'with obfuscator' do
       context 'matching a key' do
         let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
+          described_class::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
         end
 
         let(:matching_input) do
@@ -754,7 +747,7 @@ RSpec.describe Datadog::AppSec::WAF do
         end
 
         it 'obfuscates the key' do
-          code, result = context.run(matching_input, {}, timeout)
+          code, result = context.run(matching_input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -772,7 +765,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       context 'matching a value' do
         let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { value_regex: 'SOAP' })
+          described_class::Handle.new(rule, obfuscator: { value_regex: 'SOAP' })
         end
 
         let(:matching_input) do
@@ -780,7 +773,7 @@ RSpec.describe Datadog::AppSec::WAF do
         end
 
         it 'obfuscates the value' do
-          code, result = context.run(matching_input, {}, timeout)
+          code, result = context.run(matching_input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -831,7 +824,7 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       it 'runs once on passing input' do
-        code, result = context.run(passing_input_user_agent, {}, timeout)
+        code, result = context.run(passing_input_user_agent, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
@@ -843,7 +836,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
-        code, result = context.run(passing_input_user_agent, {}, timeout)
+        code, result = context.run(passing_input_user_agent, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
@@ -857,7 +850,7 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       it 'runs once on unchanged input' do
-        code, result = context.run(matching_input_user_agent, {}, timeout)
+        code, result = context.run(matching_input_user_agent, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
@@ -866,7 +859,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result.timeout).to eq false
         expect(result.actions).to eq []
 
-        code, result = context.run(matching_input_user_agent, {}, timeout)
+        code, result = context.run(matching_input_user_agent, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
@@ -886,7 +879,7 @@ RSpec.describe Datadog::AppSec::WAF do
           first_matching_input = {
             'server.request.body' => { 'a' => '/.htaccess' }
           }
-          code, result = context.run(first_matching_input, {}, timeout)
+          code, result = context.run(first_matching_input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -904,7 +897,7 @@ RSpec.describe Datadog::AppSec::WAF do
           last_matching_input = {
             'server.request.body' => { 'a' => '/yarn.lock' }
           }
-          code, result = context.run(last_matching_input, {}, timeout)
+          code, result = context.run(last_matching_input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -922,7 +915,7 @@ RSpec.describe Datadog::AppSec::WAF do
         it 'runs once on unchanged input' do
           skip 'slow'
 
-          code, result = context.run(matching_input_user_agent, timeout)
+          code, result = context.run(matching_input_user_agent, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -934,7 +927,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
           # stress test rerun on unchanged input
           100.times do
-            code, result = context.run(matching_input_user_agent, timeout)
+            code, result = context.run(matching_input_user_agent, timeout_usec)
             perf_store[:total_runtime] << result.total_runtime
             expect(code).to eq :ok
             expect(result.status).to eq :ok
@@ -951,12 +944,10 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       context 'with timeout' do
-        let(:timeout) do
-          1 # in us
-        end
+        let(:timeout_usec) { 1 }
 
         it 'runs but does not match' do
-          code, result = context.run(matching_input_user_agent, {}, timeout)
+          code, result = context.run(matching_input_user_agent, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
 
           expect(code).to eq :ok
@@ -971,7 +962,7 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       it 'runs twice on changed input value' do
-        code, result = context.run(passing_input_user_agent, {}, timeout)
+        code, result = context.run(passing_input_user_agent, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
@@ -983,7 +974,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
-        code, result = context.run(matching_input_user_agent, {}, timeout)
+        code, result = context.run(matching_input_user_agent, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
@@ -998,7 +989,7 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       it 'runs twice on additional input key for an independent rule' do
-        code, result = context.run(matching_input_user_agent, {}, timeout)
+        code, result = context.run(matching_input_user_agent, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
@@ -1011,7 +1002,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_user_agent_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
-        code, result = context.run(matching_input_sqli, {}, timeout)
+        code, result = context.run(matching_input_sqli, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
@@ -1027,7 +1018,7 @@ RSpec.describe Datadog::AppSec::WAF do
       end
 
       it 'runs twice on additional input key for a rule needing both keys to match' do
-        code, result = context.run(matching_input_path, {}, timeout)
+        code, result = context.run(matching_input_path, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :ok
         expect(result.status).to eq :ok
@@ -1039,7 +1030,7 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(log_store.find { |log| log[:message] =~ /Evaluating .* '#{matching_input_path_rule}'/ }).to_not be_nil
         expect(log_store.find { |log| log[:message] =~ /Ran out of time/ }).to be_nil
 
-        code, result = context.run(matching_input_status, {}, timeout)
+        code, result = context.run(matching_input_status, {}, timeout_usec)
         perf_store[:total_runtime] << result.total_runtime
         expect(code).to eq :match
         expect(result.status).to eq :match
@@ -1058,7 +1049,7 @@ RSpec.describe Datadog::AppSec::WAF do
           # for this test the first input needs to be in a short-lived scope
           input = { 'server.request.uri.raw' => '/admin.php' }
 
-          code, result = context.run(input, {}, timeout)
+          code, result = context.run(input, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :ok
           expect(result.status).to eq :ok
@@ -1076,7 +1067,7 @@ RSpec.describe Datadog::AppSec::WAF do
         GC.start
 
         lambda do
-          code, result = context.run(matching_input_status, {}, timeout)
+          code, result = context.run(matching_input_status, {}, timeout_usec)
           perf_store[:total_runtime] << result.total_runtime
           expect(code).to eq :match
           expect(result.status).to eq :match
@@ -1231,7 +1222,7 @@ RSpec.describe Datadog::AppSec::WAF do
           }
         }
 
-        code, result = context.run(waf_args, {}, timeout)
+        code, result = context.run(waf_args, {}, timeout_usec)
         expect(code).to eq :ok
         expect(result.derivatives).to_not be_empty
         expect(result.derivatives).to eq({"_dd.appsec.s.req.query" => [{"hello" => [8]}]})
@@ -1249,7 +1240,7 @@ RSpec.describe Datadog::AppSec::WAF do
           }
         }
 
-        code, result = context.run(waf_args, {}, timeout)
+        code, result = context.run(waf_args, {}, timeout_usec)
         expect(code).to eq :ok
         expect(result.derivatives).to be_empty
       end
