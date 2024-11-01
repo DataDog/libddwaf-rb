@@ -95,6 +95,16 @@ module Helpers
     "#{libddwaf_basename(platform: platform)}.tar.gz"
   end
 
+  def libddwaf_basename(platform:)
+    filename = "libddwaf-#{libddwaf_version}-"
+
+    if Gem::Version.new(libddwaf_version) >= Gem::Version.new('1.16.0') && platform.os == 'linux'
+      filename + [platform.cpu, platform.os, 'musl'].compact.join('-')
+    else
+      filename + [platform.os, platform.version, platform.cpu].compact.join('-')
+    end
+  end
+
   def libddwaf_binary_checksum(binary_name)
     checksums = File.readlines(libddwaf_checksums_path, chomp: true).map do |line|
       sha256, name = line.split(' ')
@@ -109,8 +119,11 @@ module Helpers
   end
 
   def shared_lib_path(platform:)
-    ext = platform.os == 'darwin' ? 'dylib' : 'so'
-    libddwaf_dir(platform: platform).join("lib/libddwaf.#{ext}")
+    folder_name = "libddwaf-#{libddwaf_version}-#{[platform.os, platform.version, platform.cpu].compact.join('-')}"
+    extension = platform.os == 'darwin' ? 'dylib' : 'so'
+
+    # unfortunately archive name does not match extracted folder name for linux since libddwaf v1.16.0.
+    libddwaf_vendor_dir.join(folder_name, "lib/libddwaf.#{extension}")
   end
 
   def parse_platform(platform_string = nil)
@@ -231,16 +244,6 @@ module Helpers
     end
 
     payload
-  end
-
-  # private
-
-  def shared_lib_triplet(platform:)
-    platform.version ? "#{platform.os}-#{platform.version}-#{platform.cpu}" : "#{platform.os}-#{platform.cpu}"
-  end
-
-  def libddwaf_basename(platform:)
-    "libddwaf-#{libddwaf_version}-#{shared_lib_triplet(platform: platform)}"
   end
 end
 
