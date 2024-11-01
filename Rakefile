@@ -264,8 +264,8 @@ namespace :libddwaf do
         filename_regex = %r{
           \Alibddwaf-[\d.]+-
           (
-            (?:linux|darwin)-(?:arm64|x86_64|aarch64)|       # for versions < 1.16.0
-            ((?:armv7|x86_64|aarch64)-(?:linux|darwin)-musl) # for versions >= 1.16.0
+            (?:linux|darwin)-(?:arm64|x86_64|aarch64)|       # for linux builds versions < 1.16.0, and darwin builds
+            ((?:armv7|x86_64|aarch64)-(?:linux|darwin)-musl) # for linux builds versions >= 1.16.0
           )
           \.tar\.gz\.sha256\z
         }x
