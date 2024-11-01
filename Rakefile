@@ -133,6 +133,17 @@ module Helpers
     platform
   end
 
+  def release_url(kind, binary_name:, version:)
+    unless [:binary, :checksum].include?(kind)
+      fail Helpers.format("\n   %red[error] unknown release asset kind #{kind.inspect}\n\n")
+    end
+
+    url = 'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s'
+    url += '.sha256' if kind == :checksum
+
+    Kernel.format(url, version: version, filename: binary_name)
+  end
+
   def query_github_api(query)
     uri = URI.parse('https://api.github.com/graphql')
     headers = { 'Authorization' => "bearer #{github_token}", 'Content-Type' => 'application/json' }
@@ -234,65 +245,6 @@ module Helpers
 end
 
 namespace :libddwaf do
-  desc 'Download last 100 `libddwaf` releases checksums into a single checksum file'
-  task :download_checksums do
-    Helpers.github_token
-
-    releases_path = Pathname.new('tmp/releases')
-    FileUtils.mkdir_p(releases_path)
-
-    response = Helpers.query_github_api(<<~QUERY)
-      query {
-        repository(name: "libddwaf", owner: "DataDog") {
-          releases(last: 100) {
-            nodes {
-              releaseAssets(last: 100) {
-                nodes {
-                  url
-                  name
-                }
-              }
-            }
-          }
-        }
-      }
-    QUERY
-
-    response.dig('data', 'repository', 'releases', 'nodes').each do |release|
-      release.dig('releaseAssets', 'nodes').each do |asset|
-        next unless asset['name'].match?(/\Alibddwaf-[\d.]+-(?:linux|darwin)-(?:arm64|x86_64|aarch64)\.tar\.gz\.sha256\z/)
-
-        sha256_path = releases_path.join(asset['name'])
-        next puts Helpers.format("    %yellow[skip] #{asset['name']} (exist)") if sha256_path.size?
-
-        puts Helpers.format("%blue[download] #{asset['name']}")
-
-        binary = Helpers.download(asset['url'])
-        File.open(sha256_path, 'wb') { |file| file.write(binary) }
-      end
-    end
-
-    checksums_path = Helpers.libddwaf_checksums_path
-    File.open(checksums_path, 'wb') do |file|
-      # NOTE: To sort releases descending in the checksum file we will need to
-      #       sort them in a consistent way. We turn version into the number,
-      #       group files by the version and additionally sort files within same
-      #       version.
-      versions = Dir[releases_path.join('*.sha256')].each_with_object({}) do |file, memo|
-        version = file.match(/libddwaf-([\d.]+)-/)[1].tr('.', '').to_i
-
-        memo[version] ||= []
-        memo[version].push(file)
-      end
-
-      versions.each_value(&:sort!).sort.reverse.flat_map { |_, values| values }.each do |sha256_path|
-        file.write(File.read(sha256_path))
-      end
-    end
-
-    puts Helpers.format("%green[complete] #{checksums_path}")
-  end
-
   desc 'Extract pre-packaged `libddwaf` tarball into shared libs'
   task :extract, [:platform] do |_, args|
     platform = Helpers.parse_platform(args.to_h[:platform])
@@ -329,7 +281,9 @@ namespace :libddwaf do
 
     binary_name = Helpers.libddwaf_filename(platform: platform)
     binary_path = vendor_dir.join(binary_name)
-    expected_binary_sha256 = Helpers.libddwaf_binary_checksum(binary_name)
+
+    checksum_url = Helpers.release_url(:checksum, binary_name: binary_name, version: version)
+    expected_binary_sha256 = Helpers.download(checksum_url).split(' ', 2)[0]
 
     if expected_binary_sha256.nil?
       fail Helpers.format(
@@ -344,11 +298,7 @@ namespace :libddwaf do
 
     puts Helpers.format("%blue[download] #{binary_name}")
 
-    release_url = Kernel.format(
-      'https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s',
-      version: version, filename: binary_name
-    )
-
+    release_url = Helpers.release_url(:binary, binary_name: binary_name, version: version)
     binary = Helpers.download(release_url)
     binary_sha256 = Digest::SHA256.hexdigest(binary)
 
