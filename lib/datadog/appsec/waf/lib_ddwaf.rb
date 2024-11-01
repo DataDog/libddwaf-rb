@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'ffi'
+require 'datadog/appsec/waf/version'
 
 module Datadog
   module AppSec
