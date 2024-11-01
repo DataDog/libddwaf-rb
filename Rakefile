@@ -83,26 +83,20 @@ module Helpers
     Datadog::AppSec::WAF::VERSION::BASE_STRING
   end
 
-  def libddwaf_dir(platform:)
-    libddwaf_vendor_dir.join(libddwaf_basename(platform: platform))
-  end
-
   def libddwaf_vendor_dir
     Pathname.new('vendor/libddwaf')
   end
 
-  def libddwaf_filename(platform:)
-    "#{libddwaf_basename(platform: platform)}.tar.gz"
-  end
-
-  def libddwaf_basename(platform:)
+  def libddwaf_tarball_filename(platform:)
     filename = "libddwaf-#{libddwaf_version}-"
 
-    if Gem::Version.new(libddwaf_version) >= Gem::Version.new('1.16.0') && platform.os == 'linux'
-      filename + [platform.cpu, platform.os, 'musl'].compact.join('-')
-    else
-      filename + [platform.os, platform.version, platform.cpu].compact.join('-')
-    end
+    filename += if Gem::Version.new(libddwaf_version) >= Gem::Version.new('1.16.0') && platform.os == 'linux'
+                  [platform.cpu, platform.os, 'musl'].compact.join('-')
+                else
+                  [platform.os, platform.version, platform.cpu].compact.join('-')
+                end
+
+    filename + '.tar.gz'
   end
 
   def libddwaf_binary_checksum(binary_name)
@@ -118,7 +112,7 @@ module Helpers
     Pathname.new('libddwaf-releases.sha256')
   end
 
-  def shared_lib_path(platform:)
+  def libddwaf_library_path(platform:)
     folder_name = "libddwaf-#{libddwaf_version}-#{[platform.os, platform.version, platform.cpu].compact.join('-')}"
     extension = platform.os == 'darwin' ? 'dylib' : 'so'
 
@@ -252,8 +246,8 @@ namespace :libddwaf do
   task :extract, [:platform] do |_, args|
     platform = Helpers.parse_platform(args.to_h[:platform])
 
-    if Helpers.shared_lib_path(platform: platform).exist?
-      path = Helpers.shared_lib_path(platform: platform)
+    if Helpers.libddwaf_library_path(platform: platform).exist?
+      path = Helpers.libddwaf_library_path(platform: platform)
       next puts Helpers.format("    %yellow[skip] #{path} (exist)")
     end
 
@@ -262,17 +256,17 @@ namespace :libddwaf do
     require 'rubygems/package'
 
     vendor_dir = Helpers.libddwaf_vendor_dir
-    binary_name = Helpers.libddwaf_filename(platform: platform)
+    binary_name = Helpers.libddwaf_tarball_filename(platform: platform)
     binary_path = vendor_dir.join(binary_name)
 
     puts Helpers.format(" %blue[extract]  #{binary_name}")
 
     File.open(binary_path, 'rb') do |file|
-      FileUtils.rm_rf(Helpers.libddwaf_dir(platform: platform))
+      FileUtils.rm_rf(Helpers.libddwaf_library_path(platform: platform))
       Gem::Package.new('').extract_tar_gz(file, vendor_dir)
     end
 
-    puts Helpers.format("%green[complete] #{Helpers.libddwaf_dir(platform: platform)}")
+    puts Helpers.format("%green[complete] #{Helpers.libddwaf_library_path(platform: platform)}")
   end
 
   desc 'Download pre-packaged `libddwaf` tarball into shared libs'
@@ -282,7 +276,7 @@ namespace :libddwaf do
     version = Helpers.libddwaf_version
     vendor_dir = Helpers.libddwaf_vendor_dir
 
-    binary_name = Helpers.libddwaf_filename(platform: platform)
+    binary_name = Helpers.libddwaf_tarball_filename(platform: platform)
     binary_path = vendor_dir.join(binary_name)
 
     checksum_url = Helpers.release_url(:checksum, binary_name: binary_name, version: version)
@@ -389,12 +383,12 @@ task :binary, [:platform] => [] do |_, args|
   end
 
   # loop for multiple deps on a single target, accumulating each shared lib path
-  shared_lib_paths = subplatforms.map do |subplatform_string|
+  libddwaf_library_paths = subplatforms.map do |subplatform_string|
     subplatform = Helpers.parse_platform(subplatform_string)
 
     Rake::Task['extract'].execute(Rake::TaskArguments.new([:platform], [subplatform]))
 
-    Helpers.shared_lib_path(platform: subplatform).to_s
+    Helpers.libddwaf_library_path(platform: subplatform).to_s
   end
 
   gemspec = Helpers.binary_gemspec(platform: platform)
@@ -404,7 +398,7 @@ task :binary, [:platform] => [] do |_, args|
   gemspec.files += Dir['lib/**/*.rb']
   gemspec.files += ['NOTICE', 'CHANGELOG.md'] + Dir['LICENSE*']
 
-  gemspec.files += shared_lib_paths
+  gemspec.files += libddwaf_library_paths
 
   FileUtils.chmod(0o0644, gemspec.files)
   FileUtils.mkdir_p('pkg')
