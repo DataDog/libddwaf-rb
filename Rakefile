@@ -88,11 +88,11 @@ module Helpers
   end
 
   def libddwaf_tarball_filename(platform:)
-    platform += if Gem::Version.new(libddwaf_version) >= Gem::Version.new('1.16.0') && platform.os == 'linux'
-                  [platform.cpu, platform.os, 'musl'].compact.join('-')
-                else
-                  [platform.os, platform.version, platform.cpu].compact.join('-')
-                end
+    platform = if Gem::Version.new(libddwaf_version) >= Gem::Version.new('1.16.0') && platform.os == 'linux'
+                 [platform.cpu, platform.os, 'musl'].compact.join('-')
+               else
+                 [platform.os, platform.version, platform.cpu].compact.join('-')
+               end
 
     "libddwaf-#{libddwaf_version}-#{platform}.tar.gz"
   end
