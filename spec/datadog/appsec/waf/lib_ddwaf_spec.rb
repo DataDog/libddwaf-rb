@@ -601,6 +601,28 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
             ],
             'on_match' => ['action1', 'action2', 'action3', 'action4']
           }
+        ],
+        'actions' => [
+          {
+            'id' => 'action1',
+            'type' => 'block',
+            'parameters' => { 'status_code' => '401', 'grpc_status_code' => '41', 'type' => 'auto' }
+          },
+          {
+            'id' => 'action2',
+            'type' => 'extract_schema',
+            'parameters' => { 'status_code' => '402', 'grpc_status_code' => '42', 'type' => 'auto' }
+          },
+          {
+            'id' => 'action3',
+            'type' => 'stacktrace',
+            'parameters' => { 'status_code' => '403', 'grpc_status_code' => '43', 'type' => 'auto' }
+          },
+          {
+            'id' => 'action4',
+            'type' => 'unblock',
+            'parameters' => { 'status_code' => '404', 'grpc_status_code' => '44', 'type' => 'auto' }
+          }
         ]
       }
     end
@@ -844,7 +866,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(result[:actions]).to be_a described_class::Object
       expect(described_class.ddwaf_object_size(result[:actions])).to eq 4
       # TODO: not sure why libddwaf reverses actions
-      expect(Datadog::AppSec::WAF::Converter.object_to_ruby(result[:actions])).to eq ['action1', 'action2', 'action3', 'action4'].reverse
+      actions = Datadog::AppSec::WAF::Converter.object_to_ruby(result[:actions]).keys
+      expect(actions).to eq ['block', 'extract_schema', 'stacktrace', 'unblock'].reverse
     end
   end
 end
