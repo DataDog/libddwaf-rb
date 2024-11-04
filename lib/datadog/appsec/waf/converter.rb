@@ -20,10 +20,10 @@ module Datadog
             max_index = max_container_size - 1 if max_container_size
             val.each.with_index do |e, i| # rubocop:disable Style/MultilineIfModifier
               member = Converter.ruby_to_object(e,
-                                                 max_container_size: max_container_size,
-                                                 max_container_depth: (max_container_depth - 1 if max_container_depth),
-                                                 max_string_length: max_string_length,
-                                                 coerce: coerce)
+                                                max_container_size: max_container_size,
+                                                max_container_depth: (max_container_depth - 1 if max_container_depth),
+                                                max_string_length: max_string_length,
+                                                coerce: coerce)
               e_res = LibDDWAF.ddwaf_object_array_add(obj, member)
               raise LibDDWAF::Error, "Could not add to array object: #{e.inspect}" unless e_res
 
