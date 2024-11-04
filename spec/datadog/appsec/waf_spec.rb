@@ -12,7 +12,7 @@ RSpec.describe Datadog::AppSec::WAF do
       },
       'rules' => [
         {
-          'id' => 1,
+          'id' => '1',
           'name' => 'Rule 1',
           'tags' => { 'type' => 'flow1' },
           'conditions' => [
@@ -200,6 +200,41 @@ RSpec.describe Datadog::AppSec::WAF do
           expect(result.timeout).to eq false
           expect(result.actions).to eq({})
         end
+      end
+    end
+
+    context 'stress testing' do
+      let(:run_count) { 500 }
+      let(:thread_count) { 200 }
+
+      it 'creates a context in each thread' do
+        handle
+
+        result = { ok: 0, match: 0, err_internal: 0, err_invalid_object: 0, err_invalid_argument: 0 }
+        start_barrier = Barrier.new(thread_count)
+        res_mutex = Mutex.new
+        threads = []
+
+        thread_count.times do
+          threads << Thread.new do
+            local_context = Datadog::AppSec::WAF::Context.new(handle)
+            start_barrier.sync
+            run_count.times do |i|
+              input = i.even? ? matching_input : passing_input
+              input[:value3] = [i]
+              code, = local_context.run({}, input, 10_000_000)
+              res_mutex.synchronize { result[code] += 1 }
+            end
+          end
+        end
+
+        threads.each(&:join)
+
+        expect(result[:err_internal]).to eq 0
+        expect(result[:err_invalid_object]).to eq 0
+        expect(result[:err_invalid_argument]).to eq 0
+        expect(result[:ok]).to eq run_count * thread_count / 2
+        expect(result[:match]).to eq run_count * thread_count / 2
       end
     end
   end
