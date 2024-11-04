@@ -16,6 +16,17 @@ module Datadog
           @actions = actions
           @derivatives = derivatives
         end
+
+        def to_h
+          {
+            status: @status,
+            events: @events,
+            total_runtime: @total_runtime,
+            timeout: @timeout,
+            actions: @actions,
+            derivatives: @derivatives
+          }
+        end
       end
     end
   end
