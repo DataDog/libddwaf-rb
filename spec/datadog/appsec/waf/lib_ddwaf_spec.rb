@@ -662,33 +662,51 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       }
     end
 
-    let(:rule1) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object(data1)
+    let(:invalid_action_data) do
+      {
+        'version' => '2.2',
+        'metadata' => {
+          'rules_version' => '0.1.2'
+        },
+        'rules' => [
+          {
+            'id' => 1,
+            'name' => 'Rule 1',
+            'tags' => { 'type' => 'flow1' },
+            'conditions' => [
+              { 'operator' => 'match_regex', 'parameters' => { 'inputs' => [{ 'address' => 'value1' }], 'regex' => 'rule2' } }
+            ],
+            'on_match' => ['invalid-action', 'valid-action-1', 'valid-action-2', 'unknown-action']
+          }
+        ],
+        'actions' => [
+          {
+            'id' => 'valid-action-1',
+            'type' => 'block',
+            'parameters' => { 'status_code' => '401', 'grpc_status_code' => '41', 'type' => 'auto' }
+          },
+          {
+            'id' => 'valid-action-2',
+            'type' => 'unblock',
+            'parameters' => { 'status_code' => '402', 'grpc_status_code' => '42', 'type' => 'auto' }
+          },
+          {
+            'id' => 'invalid-action',
+            'parameters' => { 'status' => '500', 'grpc_status' => '??', 'type' => 'invalid' }
+          }
+        ]
+      }
     end
 
-    let(:rule2) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object(data2)
-    end
+    let(:rule1) { Datadog::AppSec::WAF::Converter.ruby_to_object(data1) }
+    let(:rule2) { Datadog::AppSec::WAF::Converter.ruby_to_object(data2) }
+    let(:rule3) { Datadog::AppSec::WAF::Converter.ruby_to_object(data3) }
+    let(:rule4) { Datadog::AppSec::WAF::Converter.ruby_to_object(data4) }
+    let(:rule5) { Datadog::AppSec::WAF::Converter.ruby_to_object(data5) }
+    let(:bad_rule) { Datadog::AppSec::WAF::Converter.ruby_to_object(bad_data) }
+    let(:invalid_action_rule) { Datadog::AppSec::WAF::Converter.ruby_to_object(invalid_action_data) }
 
-    let(:rule3) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object(data3)
-    end
-
-    let(:rule4) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object(data4)
-    end
-
-    let(:rule5) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object(data5)
-    end
-
-    let(:bad_rule) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object(bad_data)
-    end
-
-    let(:log_store) do
-      []
-    end
+    let(:log_store) { [] }
 
     let(:log_cb) do
       proc do |level, func, file, line, message, len|
@@ -696,33 +714,22 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
     end
 
-    let(:config) do
-      described_class::Config.new
-    end
+    let(:config) { described_class::Config.new }
 
     let(:input) do
       Datadog::AppSec::WAF::Converter.ruby_to_object({ value1: [4242, 'randomString'], value2: ['rule1'] })
     end
 
-    let(:empty_input) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object({})
-    end
+    let(:empty_input) { Datadog::AppSec::WAF::Converter.ruby_to_object({}) }
 
     let(:attack) do
       Datadog::AppSec::WAF::Converter.ruby_to_object({ 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } })
     end
 
-    let(:block) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object({ value1: 'rule2' })
-    end
+    let(:block) { Datadog::AppSec::WAF::Converter.ruby_to_object({ value1: 'rule2' }) }
 
-    let(:timeout) do
-      10_000_000 # in us
-    end
-
-    let(:diagnostics_obj) do
-      described_class::Object.new
-    end
+    let(:timeout_usec) { 10_000_000 }
+    let(:diagnostics_obj) { described_class::Object.new }
 
     before(:each) do
       expect(log_store).to eq([])
@@ -799,7 +806,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(context.null?).to be false
 
       result = described_class::Result.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, timeout)
+      code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
 
       expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
@@ -814,7 +821,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
       context = described_class.ddwaf_context_init(handle)
       result = described_class::Result.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, timeout)
+      code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
       expect(code).to eq :ddwaf_ok
       expect(result[:timeout]).to eq false
       expect(result[:events]).to be_a described_class::Object
@@ -845,7 +852,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
       context = described_class.ddwaf_context_init(handle)
       result = described_class::Result.new
-      code = described_class.ddwaf_run(context, attack, empty_input, result, timeout)
+      code = described_class.ddwaf_run(context, attack, empty_input, result, timeout_usec)
       expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
       expect(result[:events]).to be_a described_class::Object
@@ -859,7 +866,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
       context = described_class.ddwaf_context_init(handle)
       result = described_class::Result.new
-      code = described_class.ddwaf_run(context, block, empty_input, result, timeout)
+      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
       expect(code).to eq :ddwaf_match
       expect(result[:timeout]).to eq false
       expect(result[:events]).to be_a described_class::Object
@@ -868,6 +875,23 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       # TODO: not sure why libddwaf reverses actions
       actions = Datadog::AppSec::WAF::Converter.object_to_ruby(result[:actions]).keys
       expect(actions).to eq ['block', 'extract_schema', 'stacktrace', 'unblock'].reverse
+    end
+
+    it 'silently drops invalid or unknown actions on actionable attack' do
+      handle = described_class.ddwaf_init(invalid_action_rule, config, diagnostics_obj)
+      expect(handle.null?).to be false
+
+      context = described_class.ddwaf_context_init(handle)
+      result = described_class::Result.new
+      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
+      expect(code).to eq :ddwaf_match
+      expect(result[:timeout]).to eq false
+      expect(result[:events]).to be_a described_class::Object
+      expect(result[:actions]).to be_a described_class::Object
+      expect(described_class.ddwaf_object_size(result[:actions])).to eq 2
+
+      actions = Datadog::AppSec::WAF::Converter.object_to_ruby(result[:actions]).keys
+      expect(actions).to eq ['unblock', 'block']
     end
   end
 end
