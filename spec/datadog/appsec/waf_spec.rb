@@ -212,18 +212,17 @@ RSpec.describe Datadog::AppSec::WAF do
 
         result = { ok: 0, match: 0, err_internal: 0, err_invalid_object: 0, err_invalid_argument: 0 }
         start_barrier = Barrier.new(thread_count)
-        res_mutex = Mutex.new
-        threads = []
+        mutex = Mutex.new
 
-        thread_count.times do
-          threads << Thread.new do
+        threads = thread_count.times.map do
+          Thread.new do
             local_context = Datadog::AppSec::WAF::Context.new(handle)
             start_barrier.sync
             run_count.times do |i|
-              input = i.even? ? matching_input : passing_input
-              input[:value3] = [i]
-              code, = local_context.run({}, input, 10_000_000)
-              res_mutex.synchronize { result[code] += 1 }
+              ephemeral_data = i.even? ? matching_input : passing_input
+              ephemeral_data[:value3] = [i]
+              code, = local_context.run({}, ephemeral_data, 10_000_000)
+              mutex.synchronize { result[code] += 1 }
             end
           end
         end
@@ -233,8 +232,8 @@ RSpec.describe Datadog::AppSec::WAF do
         expect(result[:err_internal]).to eq 0
         expect(result[:err_invalid_object]).to eq 0
         expect(result[:err_invalid_argument]).to eq 0
-        expect(result[:ok]).to eq run_count * thread_count / 2
-        expect(result[:match]).to eq run_count * thread_count / 2
+        expect(result[:ok]).to eq 50_000
+        expect(result[:match]).to eq 50_000
       end
     end
   end
