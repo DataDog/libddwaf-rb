@@ -18,9 +18,9 @@ RSpec.shared_context 'waf context' do
             {
               'operator' => 'match_regex',
               'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule1' }
-            },
+            }
           ],
-          'action' => 'record',
+          'action' => 'record'
         }
       ]
     }
