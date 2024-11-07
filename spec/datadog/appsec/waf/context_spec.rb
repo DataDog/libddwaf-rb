@@ -124,12 +124,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
         threads = thread_count.times.map do
           Thread.new do
-            local_context = described_class.new(handle)
+            context = described_class.new(handle)
             start_barrier.sync
             run_count.times do |i|
               ephemeral_data = i.even? ? matching_input : passing_input
               ephemeral_data[:value3] = [i]
-              code, = local_context.run({}, ephemeral_data, 10_000_000)
+              code, = context.run({}, ephemeral_data, 10_000_000)
               mutex.synchronize { result[code] += 1 }
             end
           end
