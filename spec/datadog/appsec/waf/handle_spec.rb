@@ -26,10 +26,6 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
     }
   end
 
-  let(:passing_input) do
-    { value1: [4242, 'randomString'], value2: ['nope'] }
-  end
-
   let(:matching_input) do
     { value1: [4242, 'randomString'], value2: ['rule1'] }
   end
@@ -37,7 +33,6 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
   let(:timeout_usec) { 10_000_000 }
   let(:handle) { described_class.new(rule) }
   let(:context) { Datadog::AppSec::WAF::Context.new(handle) }
-  let(:diagnostics_obj) { Datadog::AppSec::WAF::LibDDWAF::Object.new }
   let(:log_store) { [] }
 
   let(:perf_store) do

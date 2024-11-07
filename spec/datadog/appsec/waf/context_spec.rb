@@ -37,7 +37,6 @@ RSpec.describe Datadog::AppSec::WAF::Context do
   let(:timeout_usec) { 10_000_000 }
   let(:handle) { Datadog::AppSec::WAF::Handle.new(rule) }
   let(:context) { described_class.new(handle) }
-  let(:diagnostics_obj) { Datadog::AppSec::WAF::LibDDWAF::Object.new }
   let(:log_store) { [] }
 
   let(:perf_store) do
@@ -82,7 +81,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     invalid_rule = {}
     invalid_rule_obj = Datadog::AppSec::WAF::Converter.ruby_to_object(invalid_rule)
     config_obj = Datadog::AppSec::WAF::LibDDWAF::Config.new
-    invalid_handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, diagnostics_obj)
+    invalid_handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, Datadog::AppSec::WAF::LibDDWAF::Object.new)
     expect(invalid_handle_obj.null?).to be true
     invalid_handle = Datadog::AppSec::WAF::Handle.new(rule)
     invalid_handle.instance_eval do
