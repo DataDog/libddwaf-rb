@@ -23,22 +23,15 @@ YARD::Rake::YardocTask.new(:docs) do |t|
   t.options += ['--markup-provider', 'redcarpet']
 end
 
-desc 'Run RSpec'
-task spec: [:'spec:all']
+RSpec::Core::RakeTask.new(:spec) do |t, args|
+  t.pattern = 'spec/**/*_spec.rb'
+  t.rspec_opts = args.to_a.join(' ')
+end
 
 namespace :spec do
-  task all: [:main, :stress_tests]
-
-  desc 'Main specs, excluding slow stress tests'
-  RSpec::Core::RakeTask.new(:main) do |t, args|
+  RSpec::Core::RakeTask.new(:stress_tests) do |t, _args|
     t.pattern = 'spec/**/*_spec.rb'
-    t.rspec_opts = args.to_a.append('--tag ~stress_tests').join(' ')
-  end
-
-  desc 'Stress tests'
-  RSpec::Core::RakeTask.new(:stress_tests) do |t, args|
-    t.pattern = 'spec/**/*_spec.rb'
-    t.rspec_opts = args.to_a.append('--tag stress_tests').join(' ')
+    t.rspec_opts = '--tag stress_tests'
   end
 end
 

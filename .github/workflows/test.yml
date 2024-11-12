@@ -44,6 +44,9 @@ jobs:
       - name: Run specs
         run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
 
+      - name: Run stress tests
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec:stress_tests
+
   test-jruby-linux:
     strategy:
       fail-fast: false
@@ -85,6 +88,9 @@ jobs:
       - name: Run specs
         run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
 
+      - name: Run stress tests
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec:stress_tests
+
   test-darwin:
     strategy:
       fail-fast: false
@@ -116,3 +122,6 @@ jobs:
 
       - name: Run specs
         run: bundle exec rake spec
+
+      - name: Run stress tests
+        run: bundle exec rake spec:stress_tests
