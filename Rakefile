@@ -446,10 +446,10 @@ task(:binary, [:platform]) { |_, args| Rake::Task['libddwaf:binary'].execute(arg
 desc 'Release gem for variaty of platforms'
 task release_multi: :release do
   platforms = [
-    'x86_64-linux-gnu',
+    'x86_64-linux',
     'x86_64-darwin',
     'arm64-darwin',
-    'aarch64-linux-gnu',
+    'aarch64-linux',
     'java'
   ]
 
