@@ -28,41 +28,6 @@ RSpec::Core::RakeTask.new(:spec) do |t, args|
   t.rspec_opts = args.to_a.join(' ')
 end
 
-namespace :coverage do
-  # Generates one global report for all tracer tests
-  task :report do
-    require 'simplecov'
-
-    resultset_files = Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/.resultset.json"] +
-                      Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/versions/**/.resultset.json"]
-
-    SimpleCov.collate resultset_files do
-      coverage_dir "#{ENV.fetch('COVERAGE_DIR', 'coverage')}/report"
-      if ENV['CI'] == 'true'
-        require 'codecov'
-        formatter SimpleCov::Formatter::MultiFormatter.new([SimpleCov::Formatter::HTMLFormatter,
-                                                            SimpleCov::Formatter::Codecov])
-      else
-        formatter SimpleCov::Formatter::HTMLFormatter
-      end
-    end
-  end
-
-  # Generates one report for each Ruby version
-  task :report_per_ruby_version do
-    require 'simplecov'
-
-    versions = Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/versions/*"].map { |f| File.basename(f) }
-    versions.map do |version|
-      puts "Generating report for: #{version}"
-      SimpleCov.collate Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/versions/#{version}/**/.resultset.json"] do
-        coverage_dir "#{ENV.fetch('COVERAGE_DIR', 'coverage')}/report/versions/#{version}"
-        formatter SimpleCov::Formatter::HTMLFormatter
-      end
-    end
-  end
-end
-
 module Helpers
   require 'uri'
   require 'json'
@@ -95,19 +60,6 @@ module Helpers
                end
 
     "libddwaf-#{libddwaf_version}-#{platform}.tar.gz"
-  end
-
-  def libddwaf_binary_checksum(binary_name)
-    checksums = File.readlines(libddwaf_checksums_path, chomp: true).map do |line|
-      sha256, name = line.split(' ')
-      [name, sha256]
-    end
-
-    checksums.to_h[binary_name]
-  end
-
-  def libddwaf_checksums_path
-    Pathname.new('libddwaf-releases.sha256')
   end
 
   def libddwaf_library_path(platform:)
@@ -239,6 +191,41 @@ module Helpers
   end
 end
 
+namespace :coverage do
+  # Generates one global report for all tracer tests
+  task :report do
+    require 'simplecov'
+
+    resultset_files = Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/.resultset.json"] +
+                      Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/versions/**/.resultset.json"]
+
+    SimpleCov.collate resultset_files do
+      coverage_dir "#{ENV.fetch('COVERAGE_DIR', 'coverage')}/report"
+      if ENV['CI'] == 'true'
+        require 'codecov'
+        formatter SimpleCov::Formatter::MultiFormatter.new([SimpleCov::Formatter::HTMLFormatter,
+                                                            SimpleCov::Formatter::Codecov])
+      else
+        formatter SimpleCov::Formatter::HTMLFormatter
+      end
+    end
+  end
+
+  # Generates one report for each Ruby version
+  task :report_per_ruby_version do
+    require 'simplecov'
+
+    versions = Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/versions/*"].map { |f| File.basename(f) }
+    versions.map do |version|
+      puts "Generating report for: #{version}"
+      SimpleCov.collate Dir["#{ENV.fetch('COVERAGE_DIR', 'coverage')}/versions/#{version}/**/.resultset.json"] do
+        coverage_dir "#{ENV.fetch('COVERAGE_DIR', 'coverage')}/report/versions/#{version}"
+        formatter SimpleCov::Formatter::HTMLFormatter
+      end
+    end
+  end
+end
+
 namespace :libddwaf do
   desc 'Extract pre-packaged `libddwaf` tarball into shared libs'
   task :extract, [:platform] do |_, args|
@@ -283,7 +270,7 @@ namespace :libddwaf do
     if expected_binary_sha256.nil?
       fail Helpers.format(
         "\n   %red[error] Could not find checksum for %red[#{binary_name}]" \
-        "\n         Please run `%yellow[rake libddwaf:download_checksums]` to update the list\n\n"
+        "\n         Please check https://github.com/DataDog/libddwaf/releases page.\n\n"
       )
     end
 
@@ -312,110 +299,104 @@ namespace :libddwaf do
 
     puts Helpers.format("%green[complete] #{binary_path}")
   end
+
+  desc 'Build `libddwaf` gem binary'
+  task :binary, [:platform] do |_, args|
+    subplatform_for = {
+      # lean gems
+      'x86_64-linux-gnu'       => ['x86_64-linux'],
+      'x86_64-linux-musl'      => ['x86_64-linux-musl'],
+      'aarch64-linux-gnu'      => ['aarch64-linux'],
+      'aarch64-linux-musl'     => ['aarch64-linux-musl'],
+      'x86_64-darwin'          => ['x86_64-darwin'],
+      'arm64-darwin'           => ['arm64-darwin'],
+
+      # portable gems
+      'x86_64-linux:llvm'      => ['x86_64-linux'],
+      'aarch64-linux:llvm'     => ['aarch64-linux'],
+
+      # fat gems
+      'x86_64-linux:gnu+musl' => [
+        'x86_64-linux',
+        'x86_64-linux-musl',
+      ],
+      'aarch64-linux:gnu+musl' => [
+        'aarch64-linux',
+        'aarch64-linux-musl',
+      ],
+      'java' => [
+        'x86_64-linux',
+        'aarch64-linux',
+        'x86_64-darwin',
+        'arm64-darwin',
+      ],
+    }
+
+    # alias default portable build
+    subplatform_for['x86_64-linux']  = subplatform_for['x86_64-linux:llvm']
+    subplatform_for['aarch64-linux'] = subplatform_for['aarch64-linux:llvm']
+
+    # preprocess argument
+    platform_arg = args.to_h[:platform]
+    if platform_arg.nil?
+      platform_arg = if RUBY_PLATFORM =~ /-linux$/
+                       # no arg + -linux$ should build linux-gnu only
+                       RUBY_PLATFORM + '-gnu'
+                     elsif RUBY_PLATFORM =~ /^(.+-darwin)/
+                       # no arg + darwin should build darwin$
+                       $1
+                     elsif RUBY_PLATFORM =~ /-linux-musl$/
+                       # no arg + -linux-musl$ should build linux-musl on old rubygems
+                       RUBY_PLATFORM
+                     else
+                       RUBY_PLATFORM
+                     end
+    end
+
+    platform_string, _opts = platform_arg.split(':')
+    platform = Helpers.parse_platform(platform_string)
+
+    subplatforms = subplatform_for[platform_arg]
+
+    if subplatforms.nil?
+      fail "target platform not found: #{platform_arg.inspect}"
+    end
+
+    # loop for multiple deps on a single target, accumulating each shared lib path
+    libddwaf_library_paths = subplatforms.map do |subplatform_string|
+      subplatform = Helpers.parse_platform(subplatform_string)
+
+      Rake::Task['extract'].execute(Rake::TaskArguments.new([:platform], [subplatform]))
+
+      Helpers.libddwaf_library_path(platform: subplatform).to_s
+    end
+
+    gemspec = Helpers.binary_gemspec(platform: platform)
+    gemspec.extensions.clear
+
+    gemspec.files = []
+    gemspec.files += Dir['lib/**/*.rb']
+    gemspec.files += ['NOTICE', 'CHANGELOG.md'] + Dir['LICENSE*']
+
+    gemspec.files += libddwaf_library_paths
+
+    FileUtils.chmod(0o0644, gemspec.files)
+    FileUtils.mkdir_p('pkg')
+
+    puts Helpers.format("   %blue[build] libddwaf-#{gemspec.version}-#{gemspec.platform}")
+
+    package = if Gem::VERSION < '2.0.0'
+                Gem::Builder.new(gemspec).build
+              else
+                require 'rubygems/package'
+                Gem::Package.build(gemspec)
+              end
+
+    FileUtils.mv(package, 'pkg')
+
+    puts Helpers.format("%green[complete] pkg/#{package}")
+  end
 end
-
-# NOTE: Left for compatibility and should be removed after pipelines are migrated
-task(:fetch, [:platform]) { |_, args| Rake::Task['libddwaf:fetch'].execute(args) }
-task(:extract, [:platform]) { |_, args| Rake::Task['libddwaf:extract'].execute(args) }
-
-desc 'Build `libddwaf` gem binary'
-task :binary, [:platform] => [] do |_, args|
-  subplatform_for = {
-    # lean gems
-    'x86_64-linux-gnu'       => ['x86_64-linux'],
-    'x86_64-linux-musl'      => ['x86_64-linux-musl'],
-    'aarch64-linux-gnu'      => ['aarch64-linux'],
-    'aarch64-linux-musl'     => ['aarch64-linux-musl'],
-    'x86_64-darwin'          => ['x86_64-darwin'],
-    'arm64-darwin'           => ['arm64-darwin'],
-
-    # portable gems
-    'x86_64-linux:llvm'      => ['x86_64-linux'],
-    'aarch64-linux:llvm'     => ['aarch64-linux'],
-
-    # fat gems
-    'x86_64-linux:gnu+musl' => [
-      'x86_64-linux',
-      'x86_64-linux-musl',
-    ],
-    'aarch64-linux:gnu+musl' => [
-      'aarch64-linux',
-      'aarch64-linux-musl',
-    ],
-    'java' => [
-      'x86_64-linux',
-      'aarch64-linux',
-      'x86_64-darwin',
-      'arm64-darwin',
-    ],
-  }
-
-  # alias default portable build
-  subplatform_for['x86_64-linux']  = subplatform_for['x86_64-linux:llvm']
-  subplatform_for['aarch64-linux'] = subplatform_for['aarch64-linux:llvm']
-
-  # preprocess argument
-  platform_arg = args.to_h[:platform]
-  if platform_arg.nil?
-    platform_arg = if RUBY_PLATFORM =~ /-linux$/
-                     # no arg + -linux$ should build linux-gnu only
-                     RUBY_PLATFORM + '-gnu'
-                   elsif RUBY_PLATFORM =~ /^(.+-darwin)/
-                     # no arg + darwin should build darwin$
-                     $1
-                   elsif RUBY_PLATFORM =~ /-linux-musl$/
-                     # no arg + -linux-musl$ should build linux-musl on old rubygems
-                     RUBY_PLATFORM
-                   else
-                     RUBY_PLATFORM
-                   end
-  end
-
-  platform_string, _opts = platform_arg.split(':')
-  platform = Helpers.parse_platform(platform_string)
-
-  subplatforms = subplatform_for[platform_arg]
-
-  if subplatforms.nil?
-    fail "target platform not found: #{platform_arg.inspect}"
-  end
-
-  # loop for multiple deps on a single target, accumulating each shared lib path
-  libddwaf_library_paths = subplatforms.map do |subplatform_string|
-    subplatform = Helpers.parse_platform(subplatform_string)
-
-    Rake::Task['extract'].execute(Rake::TaskArguments.new([:platform], [subplatform]))
-
-    Helpers.libddwaf_library_path(platform: subplatform).to_s
-  end
-
-  gemspec = Helpers.binary_gemspec(platform: platform)
-  gemspec.extensions.clear
-
-  gemspec.files = []
-  gemspec.files += Dir['lib/**/*.rb']
-  gemspec.files += ['NOTICE', 'CHANGELOG.md'] + Dir['LICENSE*']
-
-  gemspec.files += libddwaf_library_paths
-
-  FileUtils.chmod(0o0644, gemspec.files)
-  FileUtils.mkdir_p('pkg')
-
-  puts Helpers.format("   %blue[build] libddwaf-#{gemspec.version}-#{gemspec.platform}")
-
-  package = if Gem::VERSION < '2.0.0'
-              Gem::Builder.new(gemspec).build
-            else
-              require 'rubygems/package'
-              Gem::Package.build(gemspec)
-            end
-
-  FileUtils.mv(package, 'pkg')
-
-  puts Helpers.format("%green[complete] pkg/#{package}")
-end
-
-task test: :spec
 
 namespace :steep do
   task :check do
@@ -454,4 +435,28 @@ namespace :steep do
   end
 end
 
-task default: 'spec'
+task test: :spec
+task default: :spec
+
+# NOTE: Left for compatibility and should be removed after pipelines are migrated
+task(:fetch, [:platform]) { |_, args| Rake::Task['libddwaf:fetch'].execute(args) }
+task(:extract, [:platform]) { |_, args| Rake::Task['libddwaf:extract'].execute(args) }
+task(:binary, [:platform]) { |_, args| Rake::Task['libddwaf:binary'].execute(args) }
+
+desc 'Release gem for variaty of platforms'
+task release_multi: :release do
+  platforms = [
+    'x86_64-linux',
+    'x86_64-darwin',
+    'arm64-darwin',
+    'aarch64-linux',
+    'java'
+  ]
+
+  platforms.each do |platform|
+    Rake::Task['libddwaf:binary'].execute(platform: platform)
+
+    gem_path = "pkg/#{Helpers.binary_gemspec(platform: platform).file_name}"
+    Kernel.system("gem push #{gem_path}", exception: true)
+  end
+end
