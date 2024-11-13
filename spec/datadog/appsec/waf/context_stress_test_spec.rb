@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe 'stress tests', stress_tests: true do
+RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
   let(:rule) do
     {
       'version' => '2.2',
@@ -84,7 +84,7 @@ RSpec.describe 'stress tests', stress_tests: true do
 
       threads = thread_count.times.map do
         Thread.new do
-          context = Datadog::AppSec::WAF::Context.new(handle)
+          context = described_class.new(handle)
           start_barrier.sync
           run_count.times do |i|
             ephemeral_data = i.even? ? matching_input : passing_input

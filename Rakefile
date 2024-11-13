@@ -28,13 +28,6 @@ RSpec::Core::RakeTask.new(:spec) do |t, args|
   t.rspec_opts = args.to_a.join(' ')
 end
 
-namespace :spec do
-  RSpec::Core::RakeTask.new(:stress_tests) do |t, _args|
-    t.pattern = 'spec/**/*_spec.rb'
-    t.rspec_opts = '--tag stress_tests'
-  end
-end
-
 module Helpers
   require 'uri'
   require 'json'
@@ -195,6 +188,13 @@ module Helpers
     end
 
     payload
+  end
+end
+
+namespace :spec do
+  RSpec::Core::RakeTask.new(:stress_tests) do |t, _args|
+    t.pattern = 'spec/**/*_spec.rb'
+    t.rspec_opts = '--tag stress_tests'
   end
 end
 
