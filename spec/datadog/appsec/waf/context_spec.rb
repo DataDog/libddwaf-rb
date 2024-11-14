@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
-require 'datadog/appsec/waf'
 
-RSpec.describe Datadog::AppSec::WAF do
+RSpec.describe Datadog::AppSec::WAF::Context do
   let(:rule) do
     {
       'version' => '2.2',
@@ -12,26 +11,20 @@ RSpec.describe Datadog::AppSec::WAF do
       },
       'rules' => [
         {
-          'id' => 1,
+          'id' => '1',
           'name' => 'Rule 1',
           'tags' => { 'type' => 'flow1' },
           'conditions' => [
             {
               'operator' => 'match_regex',
               'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule1' }
-            },
+            }
           ],
-          'action' => 'record',
+          'action' => 'record'
         }
       ]
     }
   end
-
-  let(:timeout_usec) { 10_000_000 }
-
-  let(:diagnostics_obj) { described_class::LibDDWAF::Object.new }
-  let(:handle) { described_class::Handle.new(rule) }
-  let(:context) { described_class::Context.new(handle) }
 
   let(:passing_input) do
     { value1: [4242, 'randomString'], value2: ['nope'] }
@@ -41,11 +34,14 @@ RSpec.describe Datadog::AppSec::WAF do
     { value1: [4242, 'randomString'], value2: ['rule1'] }
   end
 
+  let(:timeout_usec) { 10_000_000 }
+  let(:handle) { Datadog::AppSec::WAF::Handle.new(rule) }
+  let(:context) { described_class.new(handle) }
   let(:log_store) { [] }
 
   let(:perf_store) do
     {
-      total_runtime: [],
+      total_runtime: []
     }
   end
 
@@ -59,7 +55,7 @@ RSpec.describe Datadog::AppSec::WAF do
     expect(perf_store).to eq({ total_runtime: [] })
     expect(log_store).to eq([])
 
-    described_class::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
+    Datadog::AppSec::WAF::LibDDWAF.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
 
     expect(log_store.size).to eq 1
     expect(log_store.select { |log| log[:message] =~ /Sending log messages to binding/ })
@@ -77,43 +73,22 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 
-  it 'creates a valid handle' do
-    expect(handle.handle_obj.null?).to be false
-  end
-
   it 'creates a valid context' do
     expect(context.context_obj.null?).to be false
   end
 
-  it 'lists required addresses' do
-    expect(handle.required_addresses).to eq ['value2']
-  end
-
-  it 'raises an error when failing to create a handle' do
-    invalid_rule = {}
-    expect { described_class::Handle.new(invalid_rule) }.to raise_error described_class::LibDDWAF::Error
-  end
-
   it 'raises an error when failing to create a context' do
     invalid_rule = {}
-    invalid_rule_obj = described_class::Converter.ruby_to_object(invalid_rule)
-    config_obj = described_class::LibDDWAF::Config.new
-    invalid_handle_obj = described_class::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, diagnostics_obj)
+    invalid_rule_obj = Datadog::AppSec::WAF::Converter.ruby_to_object(invalid_rule)
+    config_obj = Datadog::AppSec::WAF::LibDDWAF::Config.new
+    invalid_handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, Datadog::AppSec::WAF::LibDDWAF::Object.new)
     expect(invalid_handle_obj.null?).to be true
-    invalid_handle = described_class::Handle.new(rule)
+    invalid_handle = Datadog::AppSec::WAF::Handle.new(rule)
     invalid_handle.instance_eval do
       @handle_obj = invalid_handle_obj
     end
     expect(invalid_handle.handle_obj.null?).to be true
-    expect { described_class::Context.new(invalid_handle) }.to raise_error described_class::LibDDWAF::Error
-  end
-
-  it 'records good diagnostics' do
-    expect(handle.diagnostics).to be_a Hash
-    expect(handle.diagnostics["rules"]["loaded"].size).to eq(1)
-    expect(handle.diagnostics["rules"]["failed"].size).to eq(0)
-    expect(handle.diagnostics["rules"]["errors"]).to be_empty
-    expect(handle.diagnostics["ruleset_version"]).to eq('1.2.3')
+    expect { described_class.new(invalid_handle) }.to raise_error Datadog::AppSec::WAF::LibDDWAF::Error
   end
 
   describe '#run' do
@@ -204,94 +179,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 
-  context 'with a partially bad ruleset' do
-    let(:rule) do
-      {
-        'version' => '2.2',
-        'metadata' => {
-          'rules_version' => '1.2.3'
-        },
-        'rules' => [
-          {
-            'id' => 1,
-            'name' => 'Rule 1',
-            'tags' => { 'type' => 'flow1' },
-            'conditions' => [
-              {
-                'operator' => 'match_regex',
-                'parameters' => { 'inputs' => [{ 'address' => 'value1' }], 'regex' => 'badregex(' }
-              },
-            ],
-            'action' => 'record',
-          },
-          {
-            'id' => 2,
-            'name' => 'Rule 2',
-            'tags' => { 'type' => 'flow2' },
-            'conditions' => [
-              {
-                'operator' => 'match_regex',
-                'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule2' }
-              },
-            ],
-            'action' => 'record',
-          }
-        ]
-      }
-    end
-
-    it 'records bad diagnostics' do
-      expect(handle.diagnostics).to be_a Hash
-      expect(handle.diagnostics["rules"]["loaded"].size).to eq(1)
-      expect(handle.diagnostics["rules"]["failed"].size).to eq(1)
-      expect(handle.diagnostics["rules"]["errors"]).to_not be_empty
-      expect(handle.diagnostics["ruleset_version"]).to eq('1.2.3')
-    end
-  end
-
-  context 'with a fully bad ruleset' do
-    let(:rule) do
-      {
-        'version' => '2.2',
-        'metadata' => {
-          'rules_version' => '1.2.3'
-        },
-        'rules' => [
-          {
-            'id' => 1,
-            'name' => 'Rule 1',
-            'tags' => { 'type' => 'flow1' },
-            'conditions' => [
-              {
-                'operator' => 'match_regex',
-                'parameters' => { 'inputs' => [{ 'address' => 'value1' }], 'regex' => 'badregex(' }
-              },
-            ],
-            'action' => 'record',
-          }
-        ]
-      }
-    end
-
-    let(:handle_exception) do
-      begin
-        handle
-      rescue StandardError => e
-        return e
-      end
-    end
-
-    it 'records bad diagnostics in the exception' do
-      expect(handle_exception).to be_a(described_class::LibDDWAF::Error)
-      expect(handle_exception.diagnostics).to be_a Hash
-      expect(handle_exception.diagnostics["rules"]["loaded"].size).to eq(0)
-      expect(handle_exception.diagnostics["rules"]["failed"].size).to eq(1)
-      expect(handle_exception.diagnostics["rules"]["errors"]).to_not be_empty
-      expect(handle_exception.diagnostics["ruleset_version"]).to eq('1.2.3')
-    end
-  end
-
-  context 'with a custom rules' do
+  context 'run with a custom rules' do
     let(:rule) do
       {
         'version' => '2.2',
@@ -307,9 +195,9 @@ RSpec.describe Datadog::AppSec::WAF do
               {
                 'operator' => 'match_regex',
                 'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule1' }
-              },
+              }
             ],
-            'action' => 'record',
+            'action' => 'record'
           }
         ],
         'custom_rules' => [
@@ -321,9 +209,9 @@ RSpec.describe Datadog::AppSec::WAF do
               {
                 'operator' => 'match_regex',
                 'parameters' => { 'inputs' => [{ 'address' => 'custom_address' }], 'regex' => 'custom_value' }
-              },
+              }
             ],
-            'action' => 'record',
+            'action' => 'record'
           }
         ]
       }
@@ -339,204 +227,11 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 
-  describe '#merge' do
-    context 'valid merge data' do
-      context 'rules override' do
-        it 'disable an exiting rule' do
-          data = {
-            "rules_override" => [
-              {
-                "enabled" => false,
-                "id" => "1"
-              }
-            ]
-          }
-
-          code, = context.run(matching_input, {}, timeout_usec)
-          expect(code).to eq :match
-
-          new_handle = handle.merge(data)
-          expect(new_handle).to be_a(described_class::Handle)
-
-          new_context = described_class::Context.new(new_handle)
-          code, = new_context.run(matching_input, {}, timeout_usec)
-          expect(code).to eq :ok
-
-          new_context.finalize
-          new_handle.finalize
-          handle.finalize
-          context.finalize
-        end
-
-        it 'updates rule actions' do
-          data = {
-            "rules_override" => [
-              {
-                "id" => "1",
-                "on_match" => ["block"]
-              },
-            ]
-          }
-
-          code, result = context.run(matching_input, {}, timeout_usec)
-          expect(code).to eq :match
-          expect(result.actions).to be_empty
-
-          new_handle = handle.merge(data)
-          expect(new_handle).to be_a(described_class::Handle)
-
-          new_context = described_class::Context.new(new_handle)
-          code, result = new_context.run(matching_input, {}, timeout_usec)
-          expect(code).to eq :match
-          expect(result.actions.keys).to eq(['block_request'])
-
-          new_context.finalize
-          new_handle.finalize
-          handle.finalize
-          context.finalize
-        end
-      end
-
-      context 'rules data' do
-        let(:rule) do
-          {
-            'version' => '2.2',
-            'metadata' => {
-              'rules_version' => '1.4.1'
-            },
-            'rules' => [
-              {
-                'id' => 'blk-001-001',
-                'name' => 'Block IP Addresses',
-                'tags' => { 'type' => 'block_ip', 'category' => 'security_response' },
-                'conditions' => [
-                  {
-                    'operator' => 'ip_match',
-                    'parameters' => { 'inputs' => [{ 'address' => 'http.client_ip' }], 'data' => 'blocked_ips' }
-                  }
-                ],
-                'transformers' => [],
-                'on_match' => ['block']
-              }
-            ]
-          }
-        end
-
-        let(:matching_ip) do
-          '1.2.3.4'
-        end
-
-        let(:matching_input) do
-          { 'http.client_ip' => matching_ip }
-        end
-
-        it 'adds rules data' do
-          data = {
-            "rules_data" => [
-              {
-                'id' => 'blocked_ips',
-                'type' => 'data_with_expiration',
-                'data' => [{ 'value' => matching_ip, 'expiration' => (Time.now + 1000).to_i }]
-              }
-            ]
-          }
-
-          code, = context.run(matching_input, {}, timeout_usec)
-          expect(code).to eq :ok
-
-          new_handle = handle.merge(data)
-          expect(new_handle).to be_a(described_class::Handle)
-
-          new_context = described_class::Context.new(new_handle)
-          code, = new_context.run(matching_input, {}, timeout_usec)
-          expect(code).to eq :match
-
-          new_context.finalize
-          new_handle.finalize
-          handle.finalize
-          context.finalize
-        end
-      end
-    end
-
-    context 'with invalid merge data' do
-      it 'does not return a Handle instance' do
-        data = {'invalid_data' => 'a'}
-
-        new_handle = handle.merge(data)
-        expect(new_handle).to be_nil
-      end
-    end
-
-    context 'with a handle with obfuscator configuration' do
-      let(:new_ruleset) do
-        {
-          'rules' => [
-            {
-              'id' => 'ua0-600-10x',
-              'name' => 'Nessus',
-              'tags' => {
-                'type' => 'security_scanner',
-                'category' => 'attack_attempt'
-              },
-              'conditions' => [
-                {
-                  'parameters' => {
-                    'inputs' => [
-                      {
-                        'address' => 'server.request.headers.no_cookies',
-                        'key_path' => [
-                          'user-agent'
-                        ]
-                      }
-                    ],
-                    'regex' => '(?i)^Nessus(/|([ :]+SOAP))'
-                  },
-                  'operator' => 'match_regex'
-                }
-              ],
-              'transformers' => []
-            },
-          ]
-        }
-      end
-
-      let(:matching_input) do
-        { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } }
-      end
-
-      it 'retains old handle obfuscator configured' do
-        old_handle = described_class::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
-        old_context = described_class::Context.new(old_handle)
-
-        code, = old_context.run(matching_input, {}, timeout_usec)
-        expect(code).to eq :ok
-
-        new_handle = old_handle.merge(new_ruleset)
-        expect(new_handle).to be_a(described_class::Handle)
-
-        # Finalize old handle and context
-        # It should free all related information from old_handle and old_context
-        # Except the old handle configuration, which is propagateed through #merge
-        old_handle.finalize
-        old_context.finalize
-
-        new_context = described_class::Context.new(new_handle)
-
-        new_code, new_result = new_context.run(matching_input, {}, timeout_usec)
-        expect(new_code).to eq :match
-
-        expect(new_result.events.first['rule_matches'].first['parameters'].first['value']).to eq '<Redacted>'
-        expect(new_result.events.first['rule_matches'].first['parameters'].first['highlight']).to include '<Redacted>'
-      end
-    end
-  end
-
   context 'run with a big ruleset' do
     let(:rule) do
       require 'json'
 
-      JSON.parse(File.read(File.expand_path('../../fixtures/waf_rules.json', __dir__)))
+      JSON.parse(File.read(File.expand_path('../../../fixtures/waf_rules.json', __dir__)))
     end
 
     let(:passing_input) do
@@ -581,7 +276,7 @@ RSpec.describe Datadog::AppSec::WAF do
     context 'with configured limits' do
       context 'exceeding max_container_size' do
         let(:handle) do
-          described_class::Handle.new(rule, limits: { max_container_size: 1 })
+          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_size: 1 })
         end
 
         context 'when key is ouside of limit yet found by path' do
@@ -667,7 +362,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       context 'exceeding max_container_depth' do
         let(:handle) do
-          described_class::Handle.new(rule, limits: { max_container_depth: 1 })
+          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_depth: 1 })
         end
 
         context 'when value is outside of limit' do
@@ -712,7 +407,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       context 'exceeding max_string_length' do
         let(:handle) do
-          described_class::Handle.new(rule, limits: { max_string_length: 1 })
+          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_string_length: 1 })
         end
 
         let(:matching_input) do
@@ -739,7 +434,7 @@ RSpec.describe Datadog::AppSec::WAF do
     context 'with obfuscator' do
       context 'matching a key' do
         let(:handle) do
-          described_class::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
+          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
         end
 
         let(:matching_input) do
@@ -765,7 +460,7 @@ RSpec.describe Datadog::AppSec::WAF do
 
       context 'matching a value' do
         let(:handle) do
-          described_class::Handle.new(rule, obfuscator: { value_regex: 'SOAP' })
+          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { value_regex: 'SOAP' })
         end
 
         let(:matching_input) do
@@ -1084,7 +779,7 @@ RSpec.describe Datadog::AppSec::WAF do
     end
   end
 
-  context 'with processors' do
+  context 'run with processors' do
     let(:rule) do
       {
         'version' => '2.2',
@@ -1093,119 +788,119 @@ RSpec.describe Datadog::AppSec::WAF do
         },
         'rules' => [
           {
-            "id" => "crs-913-120",
-            "name" => "Known security scanner filename/argument",
-            "tags" => {
-              "type" => "security_scanner",
-              "crs_id" => "913120",
-              "category" => "attack_attempt"
+            'id' => 'crs-913-120',
+            'name' => 'Known security scanner filename/argument',
+            'tags' => {
+              'type' => 'security_scanner',
+              'crs_id' => '913120',
+              'category' => 'attack_attempt'
             },
-            "conditions" => [
+            'conditions' => [
               {
-                "parameters" => {
-                  "inputs" => [
+                'parameters' => {
+                  'inputs' => [
                     {
-                      "address" => "server.request.query"
-                    },
+                      'address' => 'server.request.query'
+                    }
                   ],
-                  "regex" => "<EMBED[\\s/+].*?(?:src|type).*?=",
-                  "options" => {
-                    "min_length" => 11
+                  'regex' => '<EMBED[\\s/+].*?(?:src|type).*?=',
+                  'options' => {
+                    'min_length' => 11
                   }
                 },
-                "operator" => "match_regex"
+                'operator' => 'match_regex'
               }
             ],
-            "transformers" => [
-              "removeNulls"
+            'transformers' => [
+              'removeNulls'
             ]
           }
         ],
         # Extracted the processor configuration from
         # https://gist.github.com/Anilm3/db97e3f24869ee4f4d0eb96655df6983
-        "processors" => [
+        'processors' => [
           {
-            "id" => "processor-001",
-            "generator" => "extract_schema",
-            "conditions" => [
+            'id' => 'processor-001',
+            'generator' => 'extract_schema',
+            'conditions' => [
               {
-                "operator" => "equals",
-                "parameters" => {
-                  "inputs" => [
+                'operator' => 'equals',
+                'parameters' => {
+                  'inputs' => [
                     {
-                      "address" => "waf.context.processor",
-                      "key_path" => [
-                        "extract-schema"
+                      'address' => 'waf.context.processor',
+                      'key_path' => [
+                        'extract-schema'
                       ]
                     }
                   ],
-                  "type" => "boolean",
-                  "value" => true
+                  'type' => 'boolean',
+                  'value' => true
                 }
               }
             ],
-            "parameters" => {
-              "mappings" => [
+            'parameters' => {
+              'mappings' => [
                 {
-                  "inputs" => [
+                  'inputs' => [
                     {
-                      "address" => "server.request.body"
+                      'address' => 'server.request.body'
                     }
                   ],
-                  "output" => "_dd.appsec.s.req.body"
+                  'output' => '_dd.appsec.s.req.body'
                 },
                 {
-                  "inputs" => [
+                  'inputs' => [
                     {
-                      "address" => "server.request.headers.no_cookies"
+                      'address' => 'server.request.headers.no_cookies'
                     }
                   ],
-                  "output" => "_dd.appsec.s.req.headers"
+                  'output' => '_dd.appsec.s.req.headers'
                 },
                 {
-                  "inputs" => [
+                  'inputs' => [
                     {
-                      "address" => "server.request.query"
+                      'address' => 'server.request.query'
                     }
                   ],
-                  "output" => "_dd.appsec.s.req.query"
+                  'output' => '_dd.appsec.s.req.query'
                 },
                 {
-                  "inputs" => [
+                  'inputs' => [
                     {
-                      "address" => "server.request.path_params"
+                      'address' => 'server.request.path_params'
                     }
                   ],
-                  "output" => "_dd.appsec.s.req.params"
+                  'output' => '_dd.appsec.s.req.params'
                 },
                 {
-                  "inputs" => [
+                  'inputs' => [
                     {
-                      "address" => "server.request.cookies"
+                      'address' => 'server.request.cookies'
                     }
                   ],
-                  "output" => "_dd.appsec.s.req.cookies"
+                  'output' => '_dd.appsec.s.req.cookies'
                 },
                 {
-                  "inputs" => [
+                  'inputs' => [
                     {
-                      "address" => "server.response.headers.no_cookies"
+                      'address' => 'server.response.headers.no_cookies'
                     }
                   ],
-                  "output" => "_dd.appsec.s.res.headers"
+                  'output' => '_dd.appsec.s.res.headers'
                 },
                 {
-                  "inputs" => [
+                  'inputs' => [
                     {
-                      "address" => "server.response.body"
+                      'address' => 'server.response.body'
                     }
                   ],
-                  "output" => "_dd.appsec.s.res.body"
+                  'output' => '_dd.appsec.s.res.body'
                 }
               ]
             },
-            "evaluate" => false,
-            "output" => true
+            'evaluate' => false,
+            'output' => true
           }
         ]
       }
@@ -1215,28 +910,28 @@ RSpec.describe Datadog::AppSec::WAF do
       it 'populates derivatives' do
         waf_args = {
           'server.request.query' => {
-            'hello' => 'EMBED',
+            'hello' => 'EMBED'
           },
           'waf.context.processor' => {
-            "extract-schema" => true
+            'extract-schema' => true
           }
         }
 
         code, result = context.run(waf_args, {}, timeout_usec)
         expect(code).to eq :ok
         expect(result.derivatives).to_not be_empty
-        expect(result.derivatives).to eq({"_dd.appsec.s.req.query" => [{"hello" => [8]}]})
+        expect(result.derivatives).to eq({ '_dd.appsec.s.req.query' => [{ 'hello' => [8] }] })
       end
     end
 
-    context 'with schema extraction' do
+    context 'without schema extraction' do
       it 'populates derivatives' do
         waf_args = {
           'server.request.query' => {
-            'hello' => 'EMBED',
+            'hello' => 'EMBED'
           },
           'waf.context.processor' => {
-            "extract-schema" => false
+            'extract-schema' => false
           }
         }
 

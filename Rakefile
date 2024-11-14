@@ -191,6 +191,13 @@ module Helpers
   end
 end
 
+namespace :spec do
+  RSpec::Core::RakeTask.new(:stress_tests) do |t, _args|
+    t.pattern = 'spec/**/*_spec.rb'
+    t.rspec_opts = '--tag stress_tests'
+  end
+end
+
 namespace :coverage do
   # Generates one global report for all tracer tests
   task :report do
