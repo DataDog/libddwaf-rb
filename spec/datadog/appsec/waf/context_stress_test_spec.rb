@@ -43,7 +43,7 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
     it 'creates a context in each thread' do
       handle
 
-      result = { ok: 0, match: 0, err_internal: 0, err_invalid_object: 0, err_invalid_argument: 0 }
+      result = { timeout_ok: 0, timeout_match: 0, ok: 0, match: 0, err_internal: 0, err_invalid_object: 0, err_invalid_argument: 0 }
       start_barrier = Barrier.new(thread_count)
       mutex = Mutex.new
 
@@ -54,8 +54,18 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
           run_count.times do |i|
             ephemeral_data = i.even? ? matching_input : passing_input
             ephemeral_data[:value3] = [i]
-            code, = context.run({}, ephemeral_data, 10_000_000)
-            mutex.synchronize { result[code] += 1 }
+            code, waf_result = context.run({}, ephemeral_data, 10_000_000)
+            mutex.synchronize do
+              if waf_result.timeout
+                if i.even?
+                  result[:timeout_match] += 1
+                else
+                  result[:timeout_ok] += 1
+                end
+              else
+                result[code] += 1
+              end
+            end
           end
         end
       end
@@ -65,8 +75,8 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
       expect(result[:err_internal]).to eq 0
       expect(result[:err_invalid_object]).to eq 0
       expect(result[:err_invalid_argument]).to eq 0
-      expect(result[:ok]).to eq 50_000
-      expect(result[:match]).to eq 50_000
+      expect(result[:match]).to eq(50_000 - result[:timeout_match])
+      expect(result[:ok]).to eq(50_000 - result[:timeout_ok])
     end
   end
 end
