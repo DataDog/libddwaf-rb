@@ -95,7 +95,9 @@ module Datadog
         end
 
         def self.shared_lib_extname
-          if Gem::Platform.local.os == 'darwin' || Gem::Platform.local.os == 'java' && java.lang.System.get_property('os.name').match(/mac/i)
+          if Gem::Platform.local.os == 'darwin'
+            '.dylib'
+          elsif Gem::Platform.local.os == 'java' && java.lang.System.get_property('os.name').match(/mac/i)
             '.dylib'
           else
             '.so'
