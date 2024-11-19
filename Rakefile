@@ -87,6 +87,22 @@ module Helpers
       platform.instance_eval { @version = $1 }
     end
 
+    if platform.os == 'java'
+      os_name = java.lang.System.get_property('os.name')
+      os_arch = java.lang.System.get_property('os.arch')
+      os = case os_name
+           when /linux/i then 'linux'
+           when /mac/i   then 'darwin'
+           else raise Error, "unsupported JRuby os.name: #{os_name.inspect}"
+           end
+      cpu = case os_arch
+            when 'amd64' then 'x86_64'
+            when 'aarch64' then os == 'darwin' ? 'arm64' : 'aarch64'
+            else raise Error, "unsupported JRuby os.arch: #{os_arch.inspect}"
+            end
+      return Gem::Platform.new("#{cpu}-#{os}")
+    end
+
     platform
   end
 

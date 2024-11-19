@@ -53,7 +53,7 @@ module Datadog
 
             cpu = case os_arch
                   when 'amd64' then 'x86_64'
-                  when 'aarch64' then 'aarch64'
+                  when 'aarch64' then local_os == 'darwin' ? 'arm64' : 'aarch64'
                   else raise Error, "unsupported JRuby os.arch: #{os_arch.inspect}"
                   end
 
@@ -95,7 +95,13 @@ module Datadog
         end
 
         def self.shared_lib_extname
-          Gem::Platform.local.os == 'darwin' ? '.dylib' : '.so'
+          if Gem::Platform.local.os == 'darwin'
+            '.dylib'
+          elsif Gem::Platform.local.os == 'java' && java.lang.System.get_property('os.name').match(/mac/i)
+            '.dylib'
+          else
+            '.so'
+          end
         end
 
         def self.shared_lib_path
