@@ -27,13 +27,7 @@ Gem::Specification.new do |spec|
   end
 
   spec.files =
-    `git ls-files -z`
-    .split("\x0")
-    .reject { |f| f.match(%r{^(spec|[.]circleci)/}) }
-    .reject do |f|
-      ['.dockerignore', '.env', '.rspec', '.rubocop.yml', '.rubocop_todo.yml',
-      '.simplecov', 'Gemfile', 'Rakefile', 'docker-compose.yml'].include?(f)
-    end
+    `git ls-files -z`.split("\x0") & (Dir['lib/**/*.rb'] + Dir['sig/**/*.rbs'] + ['NOTICE', 'CHANGELOG.md'] + Dir['LICENSE*'])
   spec.require_paths = ['lib']
 
   spec.add_dependency 'ffi', '~> 1.0'
