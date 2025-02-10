@@ -1,15 +1,10 @@
 name: Build docker image
 description:
-  Github Actions does not support setting the platform for the container yet.
-  This action builds the image for the specified architecture and libc.
+  This action builds the image for the specified ruby version and libc.
 
 inputs:
   ruby-version:
     description: Ruby version
-    required: true
-
-  arch:
-    description: Build architecture
     required: true
 
   libc:
@@ -29,11 +24,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: ${{ inputs.arch }}
-
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -48,10 +38,9 @@ runs:
         tags: libddwaf-rb-test:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        platforms: linux/${{ inputs.arch }}
 
     - name: Set run-cmd output
       id: set-run-cmd
       shell: bash
       run: |
-        echo "run-cmd=docker run --platform linux/${{ inputs.arch }} -v gems:/usr/local/bundle -v ${{ github.workspace }}:/libddwaf-rb -w /libddwaf-rb libddwaf-rb-test:latest" >> "$GITHUB_OUTPUT"
+        echo "run-cmd=docker run -v gems:/usr/local/bundle -v ${{ github.workspace }}:/libddwaf-rb -w /libddwaf-rb libddwaf-rb-test:latest" >> "$GITHUB_OUTPUT"

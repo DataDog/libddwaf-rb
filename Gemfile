@@ -5,19 +5,11 @@ gemspec
 gem 'climate_control', '~> 0.2.0'
 gem 'pry'
 
-if RUBY_PLATFORM != 'java'
-  # There's a few incompatibilities between pry/pry-byebug on older Rubies
-  gem 'pry-byebug' if RUBY_VERSION >= '2.6.0' && RUBY_VERSION < '3.0' && RUBY_ENGINE != 'truffleruby'
-  gem 'pry-nav' if RUBY_VERSION < '2.6.0'
-  gem 'pry-stack_explorer' if RUBY_VERSION >= '2.2.0'
-end
-
 gem 'rake', '>= 10.5'
 gem 'redcarpet', '~> 3.4' if RUBY_PLATFORM != 'java'
 gem 'rspec', '~> 3.10'
 gem 'rspec-collection_matchers', '~> 1.1'
 gem 'rspec_junit_formatter', '>= 0.4.1'
-gem 'rspec_n', '~> 1.3' if RUBY_VERSION >= '2.4.0'
 
 if RUBY_VERSION >= '2.6.0'
   gem 'rubocop', '~> 1.36', require: false
