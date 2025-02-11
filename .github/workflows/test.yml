@@ -7,17 +7,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04]
-        ruby: ["2.5", "2.6", "2.7", "3.0", "3.1", "3.2", "3.3"]
-        arch: [amd64, arm64]
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+        ruby: ["2.5", "2.6", "2.7", "3.0", "3.1", "3.2", "3.3", "3.4"]
         libc: [gnu, musl]
         include:
-          - arch: amd64
+          - os: ubuntu-24.04
             platform: x86_64-linux
-          - arch: arm64
+          - os: ubuntu-24.04-arm
             platform: aarch64-linux
 
-    name: Test (Ruby ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
+    name: Test (Ruby ${{ matrix.ruby }}, ${{ matrix.os }}, ${{ matrix.libc }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -29,7 +28,6 @@ jobs:
         uses: ./.github/actions/docker-build-ruby
         with:
           ruby-version: ${{ matrix.ruby }}
-          arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
 
       - name: Bundle install
@@ -51,16 +49,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04]
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
         jruby: ["9.3", "9.4"]
-        arch: [amd64, arm64]
         include:
-          - arch: amd64
+          - os: ubuntu-24.04
             platform: x86_64-linux
-          - arch: arm64
+          - os: ubuntu-24.04-arm
             platform: aarch64-linux
 
-    name: Test (Jruby ${{ matrix.jruby }}, ${{ matrix.arch }})
+    name: Test (Jruby ${{ matrix.jruby }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -73,7 +70,6 @@ jobs:
         with:
           ruby-version: ${{ matrix.jruby }}
           jruby: true
-          arch: ${{ matrix.arch }}
           libc: gnu
 
       - name: Bundle install

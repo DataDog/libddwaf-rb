@@ -7,17 +7,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04]
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
         ruby: ["3.3"]
-        arch: [amd64, arm64]
         libc: [gnu]
         include:
-          - arch: amd64
+          - os: ubuntu-24.04
             platform: x86_64-linux
-          - arch: arm64
+          - os: ubuntu-24.04-arm
             platform: aarch64-linux
 
-    name: Test build without fetching libddwaf (Ruby ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
+    name: Test build without fetching libddwaf (Ruby ${{ matrix.ruby }}, ${{ matrix.os }}, ${{ matrix.libc }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -29,7 +28,6 @@ jobs:
         uses: ./.github/actions/docker-build-ruby
         with:
           ruby-version: ${{ matrix.ruby }}
-          arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
 
       - name: Bundle install
@@ -52,14 +50,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04]
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
         ruby: ["3.3", "9.4"]
-        arch: [amd64, arm64]
         libc: [gnu, musl]
         include:
-          - arch: amd64
+          - os: ubuntu-24.04
             platform: x86_64-linux:llvm
-          - arch: arm64
+          - os: ubuntu-24.04-arm
             platform: aarch64-linux:llvm
           - ruby: 3.3
             jruby: false
@@ -69,7 +66,7 @@ jobs:
           - ruby: 9.4
             libc: musl
 
-    name: Test gem build (${{ matrix.jruby == true && 'Jruby' || 'Ruby'}} ${{ matrix.ruby }}, ${{ matrix.arch }}, ${{ matrix.libc }})
+    name: Test gem build (${{ matrix.jruby == true && 'Jruby' || 'Ruby'}} ${{ matrix.ruby }}, ${{ matrix.os }}, ${{ matrix.libc }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -81,7 +78,6 @@ jobs:
         uses: ./.github/actions/docker-build-ruby
         with:
           ruby-version: ${{ matrix.ruby }}
-          arch: ${{ matrix.arch }}
           libc: ${{ matrix.libc }}
           jruby: ${{ matrix.jruby }}
 
