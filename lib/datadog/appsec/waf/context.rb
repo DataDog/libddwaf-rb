@@ -35,6 +35,7 @@ module Datadog
             LibDDWAF.ddwaf_object_free(retained_obj)
           end
 
+          retained.clear
           LibDDWAF.ddwaf_context_destroy(context_obj)
         end
 
@@ -83,10 +84,13 @@ module Datadog
           [RESULT_CODE[code], result]
         ensure
           LibDDWAF.ddwaf_result_free(result_obj) if result_obj
+          LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
         end
 
         private
 
+        # FIXME: Rename into something which reflect that it's impossible to run
+        #        libddwaf on finalized context (closed)
         def validate!
           @valid = true
         end
