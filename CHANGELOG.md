@@ -1,8 +1,14 @@
+# 2025-02-20 v.1.18.0.0.1
+
+- Fixed memory-leak in `Datadog::AppSec::WAF::Context#run` when non-empty ephemeral data passed
+
 # 2024-10-29 v.1.15.0.0.0
+
 - Update to libddwaf 1.15.0
 - Changed `Datadog::AppSec::WAF::Context#run` interface to accommodate ephemeral data ([Breaking change](https://github.com/DataDog/libddwaf/blob/master/CHANGELOG.md#v1150-unstable))
 
 # 2023-09-11 v.1.14.0.0.0
+
 - Update to libddwaf 1.14.0
 - Add support for `Float` and `Nil` scalar values when converting from ruby to WAF Object and vice versa.
 
