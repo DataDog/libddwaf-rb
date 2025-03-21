@@ -21,6 +21,18 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
             }
           ],
           'action' => 'record'
+        },
+        {
+          'id' => 2,
+          'name' => 'Rule 2',
+          'tags' => { 'type' => 'flow2' },
+          'conditions' => [
+            {
+              'operator' => 'match_regex',
+              'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule2' }
+            }
+          ],
+          'action' => 'record'
         }
       ]
     }
@@ -84,7 +96,7 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
 
   it 'records good diagnostics' do
     expect(handle.diagnostics).to be_a Hash
-    expect(handle.diagnostics['rules']['loaded'].size).to eq(1)
+    expect(handle.diagnostics['rules']['loaded'].size).to eq(2)
     expect(handle.diagnostics['rules']['failed'].size).to eq(0)
     expect(handle.diagnostics['rules']['errors']).to be_empty
     expect(handle.diagnostics['ruleset_version']).to eq('1.2.3')
