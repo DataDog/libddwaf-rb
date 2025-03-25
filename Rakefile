@@ -71,9 +71,11 @@ module Helpers
   end
 
   def parse_platform(platform_string = nil)
+    local_platform = Gem::Platform.local
+
     # use provided platform string, defaulting to the local platform
     # dup the local platform as we may side-effectfully patch the platform instance
-    platform = platform_string ? Gem::Platform.new(platform_string) : Gem::Platform.local.dup
+    platform = platform_string ? Gem::Platform.new(platform_string) : local_platform.dup
 
     if platform.os == 'darwin'
       # darwin has a single libddwaf build, strip any version passed
@@ -88,8 +90,18 @@ module Helpers
     end
 
     if platform.os == 'java'
-      os_name = java.lang.System.get_property('os.name')
-      os_arch = java.lang.System.get_property('os.arch')
+      os_name = begin
+        java.lang.System.get_property('os.name')
+      rescue NameError # we build java on non-java platform
+        local_platform.os
+      end
+
+      os_arch = begin
+        java.lang.System.get_property('os.arch')
+      rescue NameError # we build java on non-java platform
+        local_platform.cpu
+      end
+
       os = case os_name
            when /linux/i then 'linux'
            when /mac/i   then 'darwin'
@@ -97,7 +109,7 @@ module Helpers
            end
       cpu = case os_arch
             when 'amd64' then 'x86_64'
-            when 'aarch64' then os == 'darwin' ? 'arm64' : 'aarch64'
+            when 'arm64', 'aarch64' then os == 'darwin' ? 'arm64' : 'aarch64'
             else raise Error, "unsupported JRuby os.arch: #{os_arch.inspect}"
             end
       return Gem::Platform.new("#{cpu}-#{os}")
