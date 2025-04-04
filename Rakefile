@@ -104,7 +104,7 @@ module Helpers
 
       os = case os_name
            when /linux/i then 'linux'
-           when /darwin/i   then 'darwin'
+           when /darwin/i then 'darwin'
            else raise ArgumentError, "unsupported JRuby os.name: #{os_name.inspect}"
            end
       cpu = case os_arch
