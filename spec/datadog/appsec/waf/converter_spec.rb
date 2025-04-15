@@ -587,5 +587,80 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       obj = described_class.ruby_to_object({ foo: [{ bar: [42] }], 21 => 10.5 }, coerce: false)
       expect(described_class.object_to_ruby(obj)).to eq({ 'foo' => [{ 'bar' => [42] }], '21' => 10.5 })
     end
+
+    context 'with string values' do
+      it 'correctly handles ASCII strings' do
+        ascii_string = 'Hello, world!'
+        obj = described_class.ruby_to_object(ascii_string)
+
+        result = described_class.object_to_ruby(obj)
+
+        expect(result).to eq(ascii_string)
+        expect(result.encoding).to eq(Encoding::ASCII_8BIT)
+        expect(result.ascii_only?).to be(true)
+      end
+
+      it 'correctly handles UTF-8 strings' do
+        utf8_string = 'UTF-8 string with some non-ASCII: é à ö'
+        obj = described_class.ruby_to_object(utf8_string)
+
+        result = described_class.object_to_ruby(obj)
+
+        expect(result).to eq(utf8_string)
+        expect(result.encoding).to eq(Encoding::UTF_8)
+        expect(result.valid_encoding?).to be(true)
+      end
+
+      it 'correctly handles strings with complex Unicode characters' do
+        complex_string = '😀🌍👋🚀💻 Unicode test'
+        obj = described_class.ruby_to_object(complex_string)
+
+        result = described_class.object_to_ruby(obj)
+
+        expect(result).to eq(complex_string)
+        expect(result.encoding).to eq(Encoding::UTF_8)
+        expect(result.valid_encoding?).to be(true)
+      end
+
+      it 'returns correctly encoded strings when nested in arrays' do
+        mixed_array = ['ASCII string', 'UTF-8 string: é à ö', '😀 emoji']
+        obj = described_class.ruby_to_object(mixed_array)
+
+        result = described_class.object_to_ruby(obj)
+
+        expect(result[0]).to eq('ASCII string')
+        expect(result[0].encoding).to eq(Encoding::ASCII_8BIT)
+
+        expect(result[1]).to eq('UTF-8 string: é à ö')
+        expect(result[1].encoding).to eq(Encoding::UTF_8)
+        expect(result[1].valid_encoding?).to be(true)
+
+        expect(result[2]).to eq('😀 emoji')
+        expect(result[2].encoding).to eq(Encoding::UTF_8)
+        expect(result[2].valid_encoding?).to be(true)
+      end
+
+      it 'returns correctly encoded strings when nested in hashes' do
+        mixed_hash = {
+          'ascii_key' => 'ASCII string',
+          'utf8_key' => 'UTF-8 string: é à ö',
+          'emoji_key' => '😀 emoji'
+        }
+        obj = described_class.ruby_to_object(mixed_hash)
+
+        result = described_class.object_to_ruby(obj)
+
+        expect(result['ascii_key']).to eq('ASCII string')
+        expect(result['ascii_key'].encoding).to eq(Encoding::ASCII_8BIT)
+
+        expect(result['utf8_key']).to eq('UTF-8 string: é à ö')
+        expect(result['utf8_key'].encoding).to eq(Encoding::UTF_8)
+        expect(result['utf8_key'].valid_encoding?).to be(true)
+
+        expect(result['emoji_key']).to eq('😀 emoji')
+        expect(result['emoji_key'].encoding).to eq(Encoding::UTF_8)
+        expect(result['emoji_key'].valid_encoding?).to be(true)
+      end
+    end
   end
 end

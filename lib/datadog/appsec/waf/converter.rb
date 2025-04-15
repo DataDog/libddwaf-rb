@@ -142,7 +142,11 @@ module Datadog
           when :ddwaf_obj_bool
             obj[:valueUnion][:boolean]
           when :ddwaf_obj_string
-            obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])
+            # NOTE: FFI's `AbstractMemoryPointer#read_bytes` returns a binary string,
+            #       which is not automatically encoded as UTF-8 and will raise an error
+            #       if it contains non-ASCII characters and is used in a JSON#generate call.
+            bytes = obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])
+            bytes.ascii_only? ? bytes : bytes.force_encoding(Encoding::UTF_8)
           when :ddwaf_obj_signed
             obj[:valueUnion][:intValue]
           when :ddwaf_obj_unsigned
