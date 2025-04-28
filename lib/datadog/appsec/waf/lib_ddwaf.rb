@@ -214,10 +214,11 @@ module Datadog
         ObjectFree = attach_function :ddwaf_object_free, [:ddwaf_object], :void
         ObjectNoFree = ::FFI::Pointer::NULL
 
-        # main handle
+        # handle builder
 
+        typedef :pointer, :ddwaf_builder
         typedef :pointer, :ddwaf_handle
-        typedef Object.by_ref, :ddwaf_rule
+        typedef :pointer, :ddwaf_diagnostics
 
         callback :ddwaf_object_free_fn, [:ddwaf_object], :void
 
@@ -246,8 +247,18 @@ module Datadog
 
         typedef Config.by_ref, :ddwaf_config
 
-        attach_function :ddwaf_init, [:ddwaf_rule, :ddwaf_config, :ddwaf_object], :ddwaf_handle
-        attach_function :ddwaf_update, [:ddwaf_handle, :ddwaf_object, :ddwaf_object], :ddwaf_handle
+        attach_function :ddwaf_builder_init, [:ddwaf_config], :ddwaf_builder
+        attach_function :ddwaf_builder_destroy, [:ddwaf_builder], :void
+
+        attach_function :ddwaf_builder_add_or_update_config, [:ddwaf_builder, :string, :size_t, :ddwaf_object, :ddwaf_diagnostics], :bool
+        attach_function :ddwaf_builder_remove_config, [:ddwaf_builder, :string, :size_t], :void
+
+        attach_function :ddwaf_builder_build_instance, [:ddwaf_builder], :ddwaf_handle
+
+        # handle
+
+        callback :ddwaf_object_free_fn, [:ddwaf_object], :void
+
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
         attach_function :ddwaf_known_addresses, [:ddwaf_handle, UInt32Ptr], :charptrptr

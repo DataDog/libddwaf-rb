@@ -98,6 +98,16 @@ module Datadog
         ObjectFree: ::FFI::Function
         ObjectNoFree: ::FFI::Pointer
 
+        # handle builder
+
+        def self.ddwaf_builder_init: (Config) -> ::FFI::Pointer
+        def self.ddwaf_builder_destroy: (::FFI::Pointer) -> void
+
+        def self.ddwaf_builder_add_or_update_config: (::FFI::Pointer, ::String, ::Integer, LibDDWAF::Object, LibDDWAF::Object) -> bool
+        def self.ddwaf_builder_remove_config: (::FFI::Pointer, ::String, ::Integer) -> void
+
+        def self.ddwaf_builder_build_instance: (::FFI::Pointer) -> ::FFI::Pointer
+
         # main handle
 
         class Config < ::FFI::Struct[::FFI::AbstractMemory, untyped]
@@ -108,8 +118,6 @@ module Datadog
           end
         end
 
-        def self.ddwaf_init: (top, Config, Object) -> ::FFI::Pointer
-        def self.ddwaf_update: (::FFI::Pointer, LibDDWAF::Object, LibDDWAF::Object) -> ::FFI::Pointer
         def self.ddwaf_destroy: (::FFI::Pointer) -> void
 
         def self.ddwaf_known_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer

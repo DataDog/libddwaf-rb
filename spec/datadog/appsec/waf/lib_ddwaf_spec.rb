@@ -731,6 +731,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     let(:timeout_usec) { 10_000_000 }
     let(:diagnostics_obj) { described_class::Object.new }
 
+    let(:builder) { described_class.ddwaf_builder_init(config) }
+
     before(:each) do
       expect(log_store).to eq([])
       described_class.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
@@ -754,7 +756,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     context 'with diagnostics' do
       it 'records successful old diagnostics' do
-        handle = described_class.ddwaf_init(rule1, config, diagnostics_obj)
+        described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule1, diagnostics_obj)
+        handle = described_class.ddwaf_builder_build_instance(builder)
         expect(handle.null?).to be false
 
         diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
@@ -765,7 +768,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
 
       it 'records successful new diagnostics' do
-        handle = described_class.ddwaf_init(rule4, config, diagnostics_obj)
+        described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule4, diagnostics_obj)
+        handle = described_class.ddwaf_builder_build_instance(builder)
         expect(handle.null?).to be false
 
         diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
@@ -777,7 +781,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
 
       it 'records failing diagnostics' do
-        handle = described_class.ddwaf_init(bad_rule, config, diagnostics_obj)
+        described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, bad_rule, diagnostics_obj)
+        handle = described_class.ddwaf_builder_build_instance(builder)
         expect(handle.null?).to be false
 
         diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
@@ -790,7 +795,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'lists required addresses' do
-      handle = described_class.ddwaf_init(rule1, config, diagnostics_obj)
+      described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule1, diagnostics_obj)
+      handle = described_class.ddwaf_builder_build_instance(builder)
       expect(handle.null?).to be false
 
       count = described_class::UInt32Ptr.new
@@ -799,7 +805,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'triggers a monitoring rule' do
-      handle = described_class.ddwaf_init(rule1, config, diagnostics_obj)
+      described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule1, diagnostics_obj)
+      handle = described_class.ddwaf_builder_build_instance(builder)
       expect(handle.null?).to be false
 
       context = described_class.ddwaf_context_init(handle)
@@ -816,7 +823,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'does not trigger' do
-      handle = described_class.ddwaf_init(rule2, config, diagnostics_obj)
+      described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule2, diagnostics_obj)
+      handle = described_class.ddwaf_builder_build_instance(builder)
       expect(handle.null?).to be false
 
       context = described_class.ddwaf_context_init(handle)
@@ -830,7 +838,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'does not trigger a monitoring rule due to timeout' do
-      handle = described_class.ddwaf_init(rule1, config, diagnostics_obj)
+      described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule1, diagnostics_obj)
+      handle = described_class.ddwaf_builder_build_instance(builder)
       expect(handle.null?).to be false
 
       context = described_class.ddwaf_context_init(handle)
@@ -847,7 +856,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'triggers a known attack' do
-      handle = described_class.ddwaf_init(rule3, config, diagnostics_obj)
+      described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule3, diagnostics_obj)
+      handle = described_class.ddwaf_builder_build_instance(builder)
       expect(handle.null?).to be false
 
       context = described_class.ddwaf_context_init(handle)
@@ -861,7 +871,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'triggers a known actionable attack' do
-      handle = described_class.ddwaf_init(rule5, config, diagnostics_obj)
+      described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, rule5, diagnostics_obj)
+      handle = described_class.ddwaf_builder_build_instance(builder)
       expect(handle.null?).to be false
 
       context = described_class.ddwaf_context_init(handle)
@@ -878,7 +889,8 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
 
     it 'silently drops invalid or unknown actions on actionable attack' do
-      handle = described_class.ddwaf_init(invalid_action_rule, config, diagnostics_obj)
+      described_class.ddwaf_builder_add_or_update_config(builder, 'some/path', 9, invalid_action_rule, diagnostics_obj)
+      handle = described_class.ddwaf_builder_build_instance(builder)
       expect(handle.null?).to be false
 
       context = described_class.ddwaf_context_init(handle)
