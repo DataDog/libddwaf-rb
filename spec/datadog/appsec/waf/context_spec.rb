@@ -35,7 +35,14 @@ RSpec.describe Datadog::AppSec::WAF::Context do
   end
 
   let(:timeout_usec) { 10_000_000 }
-  let(:handle) { Datadog::AppSec::WAF::Handle.new(rule) }
+
+  let(:handle_builder) do
+    Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
+      builder.add_or_update_configuration(configuration: rule, path: 'some/path')
+    end
+  end
+
+  let(:handle) { handle_builder.build_handle }
   let(:context) { described_class.new(handle) }
   let(:log_store) { [] }
 
@@ -78,17 +85,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
   end
 
   it 'raises an error when failing to create a context' do
-    invalid_rule = {}
-    invalid_rule_obj = Datadog::AppSec::WAF::Converter.ruby_to_object(invalid_rule)
-    config_obj = Datadog::AppSec::WAF::LibDDWAF::Config.new
-    invalid_handle_obj = Datadog::AppSec::WAF::LibDDWAF.ddwaf_init(invalid_rule_obj, config_obj, Datadog::AppSec::WAF::LibDDWAF::Object.new)
-    expect(invalid_handle_obj.null?).to be true
-    invalid_handle = Datadog::AppSec::WAF::Handle.new(rule)
-    invalid_handle.instance_eval do
-      @handle_obj = invalid_handle_obj
-    end
-    expect(invalid_handle.handle_obj.null?).to be true
-    expect { described_class.new(invalid_handle) }.to raise_error Datadog::AppSec::WAF::LibDDWAF::Error
+    expect { described_class.new(nil) }.to raise_error Datadog::AppSec::WAF::LibDDWAF::Error
   end
 
   describe '#run' do
@@ -275,9 +272,13 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
     context 'with configured limits' do
       context 'exceeding max_container_size' do
-        let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_size: 1 })
+        let(:handle_builder) do
+          Datadog::AppSec::WAF::HandleBuilder.new(limits: { max_container_size: 1 }).tap do |builder|
+            builder.add_or_update_configuration(configuration: rule, path: 'some/path')
+          end
         end
+
+        let(:handle) { handle_builder.build_handle }
 
         context 'when key is ouside of limit yet found by path' do
           let(:matching_input) do
@@ -361,9 +362,13 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
 
       context 'exceeding max_container_depth' do
-        let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_container_depth: 1 })
+        let(:handle_builder) do
+          Datadog::AppSec::WAF::HandleBuilder.new(limits: { max_container_depth: 1 }).tap do |builder|
+            builder.add_or_update_configuration(configuration: rule, path: 'some/path')
+          end
         end
+
+        let(:handle) { handle_builder.build_handle }
 
         context 'when value is outside of limit' do
           let(:matching_input) do
@@ -406,9 +411,13 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
 
       context 'exceeding max_string_length' do
-        let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, limits: { max_string_length: 1 })
+        let(:handle_builder) do
+          Datadog::AppSec::WAF::HandleBuilder.new(limits: { max_string_length: 1 }).tap do |builder|
+            builder.add_or_update_configuration(configuration: rule, path: 'some/path')
+          end
         end
+
+        let(:handle) { handle_builder.build_handle }
 
         let(:matching_input) do
           { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } }
@@ -433,9 +442,13 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
     context 'with obfuscator' do
       context 'matching a key' do
-        let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { key_regex: 'user-agent' })
+        let(:handle_builder) do
+          Datadog::AppSec::WAF::HandleBuilder.new(obfuscator: { key_regex: 'user-agent' }).tap do |builder|
+            builder.add_or_update_configuration(configuration: rule, path: 'some/path')
+          end
         end
+
+        let(:handle) { handle_builder.build_handle }
 
         let(:matching_input) do
           { 'server.request.headers.no_cookies' => { 'user-agent' => 'Nessus SOAP' } }
@@ -459,9 +472,13 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
 
       context 'matching a value' do
-        let(:handle) do
-          Datadog::AppSec::WAF::Handle.new(rule, obfuscator: { value_regex: 'SOAP' })
+        let(:handle_builder) do
+          Datadog::AppSec::WAF::HandleBuilder.new(obfuscator: { value_regex: 'SOAP' }).tap do |builder|
+            builder.add_or_update_configuration(configuration: rule, path: 'some/path')
+          end
         end
+
+        let(:handle) { handle_builder.build_handle }
 
         let(:matching_input) do
           { 'server.request.headers.no_cookies' => { 'user-agent' => ['Nessus SOAP'] } }

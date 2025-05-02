@@ -16,9 +16,8 @@ module Datadog
 
         attr_reader :context_obj
 
-        def initialize(handle)
-          handle_obj = handle.handle_obj
-          retain(handle)
+        def initialize(handle_obj)
+          retain(handle_obj)
 
           @context_obj = LibDDWAF.ddwaf_context_init(handle_obj)
           raise LibDDWAF::Error, 'Could not create context' if @context_obj.null?

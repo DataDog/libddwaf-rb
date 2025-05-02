@@ -224,7 +224,7 @@ module Datadog
 
         # Ruby representation of ddwaf_config
         # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L129-L152
-        class Config < ::FFI::Struct
+        class HandleConfig < ::FFI::Struct
           # Ruby representation of ddwaf_config_limits
           # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L131-L138
           class Limits < ::FFI::Struct
@@ -245,13 +245,13 @@ module Datadog
                  :free_fn,    :pointer # :ddwaf_object_free_fn
         end
 
-        typedef Config.by_ref, :ddwaf_config
+        typedef HandleConfig.by_ref, :ddwaf_config
 
         attach_function :ddwaf_builder_init, [:ddwaf_config], :ddwaf_builder
         attach_function :ddwaf_builder_destroy, [:ddwaf_builder], :void
 
         attach_function :ddwaf_builder_add_or_update_config, [:ddwaf_builder, :string, :size_t, :ddwaf_object, :ddwaf_diagnostics], :bool
-        attach_function :ddwaf_builder_remove_config, [:ddwaf_builder, :string, :size_t], :void
+        attach_function :ddwaf_builder_remove_config, [:ddwaf_builder, :string, :size_t], :bool
 
         attach_function :ddwaf_builder_build_instance, [:ddwaf_builder], :ddwaf_handle
 
