@@ -714,7 +714,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
     end
 
-    let(:config) { described_class::HandleConfig.new }
+    let(:config) { described_class::HandleBuilderConfig.new }
 
     let(:input) do
       Datadog::AppSec::WAF::Converter.ruby_to_object({ value1: [4242, 'randomString'], value2: ['rule1'] })

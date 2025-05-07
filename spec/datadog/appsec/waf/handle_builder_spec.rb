@@ -6,45 +6,7 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
   subject(:builder) { described_class.new }
 
   let(:valid_config) do
-    {
-      'version' => '2.2',
-      'metadata' => {
-        'rules_version' => '1.13.0'
-      },
-      'rules' => [
-        {
-          'id' => 'rasp-003-001',
-          'name' => 'SQL Injection',
-          'tags' => {
-            'type' => 'sql_injection',
-            'category' => 'exploit',
-            'module' => 'rasp'
-          },
-          'conditions' => [
-            {
-              'operator' => 'sqli_detector',
-              'parameters' => {
-                'resource' => [{ 'address' => 'server.db.statement' }],
-                'params' => [{ 'address' => 'server.request.query' }],
-                'db_type' => [{ 'address' => 'server.db.system' }]
-              }
-            }
-          ],
-          'on_match' => ['block-sqli']
-        }
-      ],
-      'actions' => [
-        {
-          'id' => 'block-sqli',
-          'type' => 'block',
-          'parameters' => {
-            'status_code' => '418',
-            'grpc_status_code' => '42',
-            'type' => 'auto'
-          }
-        }
-      ]
-    }
+    JSON.parse(File.read('spec/fixtures/valid_config.json'))
   end
 
   describe '#build_handle' do
@@ -62,20 +24,14 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
       end
     end
 
-    context 'when no valid rule has been loaded' do
-      it 'raises LibDDWAF::Error' do
-        expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /Could not create handle/)
-      end
+    it 'raises LibDDWAF::Error when no valid rule has been loaded' do
+      expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /Could not create handle/)
     end
 
-    context 'when builder has been finalized' do
-      before do
-        builder.finalize!
-      end
+    it 'raises LibDDWAF::Error when builder has been finalized' do
+      builder.finalize!
 
-      it 'raises LibDDWAF::Error' do
-        expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /HandleBuilder has been finalized/)
-      end
+      expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /HandleBuilder has been finalized/)
     end
   end
 
@@ -125,16 +81,12 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
       end
     end
 
-    context 'when builder has been finalized' do
-      before do
-        builder.finalize!
-      end
+    it 'raises LibDDWAF::Error when builder has been finalized' do
+      builder.finalize!
 
-      it 'raises LibDDWAF::Error' do
-        expect do
-          builder.add_or_update_config(config: {}, path: 'some/path')
-        end.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /HandleBuilder has been finalized/)
-      end
+      expect do
+        builder.add_or_update_config(config: {}, path: 'some/path')
+      end.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /HandleBuilder has been finalized/)
     end
   end
 

@@ -7,7 +7,7 @@ module Datadog
       # Manages libddwaf configuration over the application's lifetime.
       class HandleBuilder
         def initialize(limits: {}, obfuscator: {})
-          handle_config_obj = LibDDWAF::HandleConfig.new
+          handle_config_obj = LibDDWAF::HandleBuilderConfig.new
           if handle_config_obj.null?
             raise LibDDWAF::Error, 'Could not create config struct'
           end
@@ -37,7 +37,6 @@ module Datadog
           ensure_pointer_presence!
 
           handle_obj = LibDDWAF.ddwaf_builder_build_instance(@builder_ptr)
-
           raise LibDDWAF::Error, 'Could not create handle' if handle_obj.null?
 
           Handle.new(handle_obj)
@@ -70,7 +69,7 @@ module Datadog
         def ensure_pointer_presence!
           return unless @builder_ptr.nil?
 
-          # TODO: do we want to raise in such case?
+          # TODO: change to a more distinct error
           raise LibDDWAF::Error, 'HandleBuilder has been finalized'
         end
       end

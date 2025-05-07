@@ -1,4 +1,5 @@
 require 'pry'
+require 'json'
 
 require 'datadog/appsec/waf'
 

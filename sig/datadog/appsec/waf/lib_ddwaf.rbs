@@ -100,7 +100,7 @@ module Datadog
 
         # handle builder
 
-        def self.ddwaf_builder_init: (HandleConfig) -> ::FFI::Pointer
+        def self.ddwaf_builder_init: (HandleBuilderConfig) -> ::FFI::Pointer
         def self.ddwaf_builder_destroy: (::FFI::Pointer) -> void
 
         def self.ddwaf_builder_add_or_update_config: (::FFI::Pointer, ::String, ::Integer, LibDDWAF::Object, LibDDWAF::Object) -> bool
@@ -110,7 +110,7 @@ module Datadog
 
         # main handle
 
-        class HandleConfig < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        class HandleBuilderConfig < ::FFI::Struct[::FFI::AbstractMemory, untyped]
           class Limits < ::FFI::Struct[::FFI::AbstractMemory, ::Integer]
           end
 

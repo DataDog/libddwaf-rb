@@ -14,19 +14,13 @@ module Datadog
           ddwaf_err_invalid_argument: :err_invalid_argument
         }.freeze
 
-        attr_reader :context_obj
-
-        def initialize(handle_obj)
-          retain(handle_obj)
-
-          @context_obj = LibDDWAF.ddwaf_context_init(handle_obj)
-          raise LibDDWAF::Error, 'Could not create context' if @context_obj.null?
-
-          validate!
+        def initialize(context_ptr)
+          @context_ptr = context_ptr
         end
 
-        def finalize
-          invalidate!
+        def finalize!
+          context_ptr_to_destroy = @context_ptr
+          @context_ptr = nil
 
           retained.each do |retained_obj|
             next unless retained_obj.is_a?(LibDDWAF::Object)
@@ -35,11 +29,11 @@ module Datadog
           end
 
           retained.clear
-          LibDDWAF.ddwaf_context_destroy(context_obj)
+          LibDDWAF.ddwaf_context_destroy(context_ptr_to_destroy)
         end
 
         def run(persistent_data, ephemeral_data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
-          valid!
+          ensure_pointer_presence!
 
           persistent_data_obj = Converter.ruby_to_object(
             persistent_data,
@@ -69,9 +63,9 @@ module Datadog
           result_obj = LibDDWAF::Result.new
           raise LibDDWAF::Error, 'Could not create result object' if result_obj.null?
 
-          code = LibDDWAF.ddwaf_run(@context_obj, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
+          code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
 
-          result = Result.new(
+          Result.new(
             RESULT_CODE[code],
             Converter.object_to_ruby(result_obj[:events]),
             result_obj[:total_runtime],
@@ -79,8 +73,6 @@ module Datadog
             Converter.object_to_ruby(result_obj[:actions]),
             Converter.object_to_ruby(result_obj[:derivatives])
           )
-
-          [RESULT_CODE[code], result]
         ensure
           LibDDWAF.ddwaf_result_free(result_obj) if result_obj
           LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
@@ -88,24 +80,10 @@ module Datadog
 
         private
 
-        # FIXME: Rename into something which reflect that it's impossible to run
-        #        libddwaf on finalized context (closed)
-        def validate!
-          @valid = true
-        end
+        def ensure_pointer_presence!
+          return unless @context_ptr.nil?
 
-        def invalidate!
-          @valid = false
-        end
-
-        def valid?
-          @valid
-        end
-
-        def valid!
-          return if valid?
-
-          raise LibDDWAF::Error, "Attempt to use an invalid instance: #{inspect}"
+          raise LibDDWAF::Error, 'Context has been finalized'
         end
 
         def retained
