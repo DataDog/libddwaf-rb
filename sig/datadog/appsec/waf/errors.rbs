@@ -1,0 +1,29 @@
+module Datadog
+  module AppSec
+    module WAF
+      class Error < StandardError
+      end
+
+      class InstanceFinalizedError < Error
+      end
+
+      class HandleBuilderFinalizedError < InstanceFinalizedError
+      end
+
+      class HandleFinalizedError < InstanceFinalizedError
+      end
+
+      class ContextFinalizedError < InstanceFinalizedError
+      end
+
+      class ConversionError < Error
+      end
+
+      class LibDDWAFError < Error
+        attr_reader diagnostics: WAF::data
+
+        def initialize: (::String msg, ?diagnostics: WAF::data?) -> void
+      end
+    end
+  end
+end

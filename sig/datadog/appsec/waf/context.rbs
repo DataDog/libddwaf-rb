@@ -2,31 +2,21 @@ module Datadog
   module AppSec
     module WAF
       class Context
-        @context_obj: ::FFI::Pointer
-
-        @valid: bool
+        @context_ptr: ::FFI::Pointer
 
         @retained: Array[untyped]
 
         RESULT_CODE: ::Hash[::Symbol, ::Symbol]
 
-        attr_reader context_obj: ::FFI::Pointer
+        def initialize: (::FFI::Pointer context_ptr) -> void
 
-        def initialize: (Handle handle) -> void
+        def finalize!: () -> void
 
-        def finalize: () -> void
-
-        def run: (WAF::data persistent_data, WAF::data ephemeral_data, ?::Integer timeout) -> ::Array[top]
+        def run: (WAF::data persistent_data, WAF::data ephemeral_data, ?::Integer timeout) -> Result
 
         private
 
-        def validate!: () -> void
-
-        def invalidate!: () -> void
-
-        def valid?: () -> bool?
-
-        def valid!: () -> void
+        def ensure_pointer_presence!: () -> void
 
         def retained: () -> Array[untyped]
 

@@ -2,11 +2,15 @@ module Datadog
   module AppSec
     module WAF
       module LibDDWAF
-        class Error < StandardError
-          attr_reader diagnostics: WAF::data
+        DEFAULT_MAX_CONTAINER_SIZE: ::Integer
+        DEFAULT_MAX_CONTAINER_DEPTH: ::Integer
+        DEFAULT_MAX_STRING_LENGTH: ::Integer
 
-          def initialize: (::String msg, ?diagnostics: WAF::data?) -> void
-        end
+        DDWAF_MAX_CONTAINER_SIZE: ::Integer
+        DDWAF_MAX_CONTAINER_DEPTH: ::Integer
+        DDWAF_MAX_STRING_LENGTH: ::Integer
+
+        DDWAF_RUN_TIMEOUT: ::Integer
 
         extend ::FFI::Library
 
@@ -148,16 +152,6 @@ module Datadog
         # type ddwaf_log_cb = ^(ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
         type ddwaf_log_cb = ::Method | ::Proc
         def self.ddwaf_set_log_cb: (ddwaf_log_cb, ddwaf_log_level) -> bool
-
-        DEFAULT_MAX_CONTAINER_SIZE: ::Integer
-        DEFAULT_MAX_CONTAINER_DEPTH: ::Integer
-        DEFAULT_MAX_STRING_LENGTH: ::Integer
-
-        DDWAF_MAX_CONTAINER_SIZE: ::Integer
-        DDWAF_MAX_CONTAINER_DEPTH: ::Integer
-        DDWAF_MAX_STRING_LENGTH: ::Integer
-
-        DDWAF_RUN_TIMEOUT: ::Integer
       end
     end
   end

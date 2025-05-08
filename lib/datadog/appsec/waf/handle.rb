@@ -21,7 +21,7 @@ module Datadog
           ensure_pointer_presence!
 
           context_obj = LibDDWAF.ddwaf_context_init(@handle_ptr)
-          raise LibDDWAF::Error, "Could not create context" if context_obj.null?
+          raise LibDDWAFError, "Could not create context" if context_obj.null?
 
           Context.new(context_obj)
         end

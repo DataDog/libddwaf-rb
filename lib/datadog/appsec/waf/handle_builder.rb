@@ -51,6 +51,7 @@ module Datadog
 
           LibDDWAF.ddwaf_builder_add_or_update_config(@builder_ptr, path, path.length, config_obj, diagnostics_obj)
 
+          # TODO: introduce a diagnostics object?
           Converter.object_to_ruby(diagnostics_obj)
         ensure
           LibDDWAF.ddwaf_object_free(config_obj) if config_obj

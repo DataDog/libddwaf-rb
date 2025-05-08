@@ -43,7 +43,7 @@ module Datadog
             coerce: false
           )
           if persistent_data_obj.null?
-            raise LibDDWAF::Error, "Could not convert persistent data: #{persistent_data.inspect}"
+            raise ConversionError, "Could not convert persistent data: #{persistent_data.inspect}"
           end
 
           # retain C objects in memory for subsequent calls to run
@@ -57,11 +57,11 @@ module Datadog
             coerce: false
           )
           if ephemeral_data_obj.null?
-            raise LibDDWAF::Error, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
+            raise ConversionError, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
           end
 
           result_obj = LibDDWAF::Result.new
-          raise LibDDWAF::Error, "Could not create result object" if result_obj.null?
+          raise LibDDWAFError, "Could not create result object" if result_obj.null?
 
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
 
