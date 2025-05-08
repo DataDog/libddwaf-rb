@@ -1,49 +1,49 @@
 # frozen_string_literal: true
 
-require 'spec_helper'
+require "spec_helper"
 
 RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
   let(:rule) do
     {
-      'version' => '2.2',
-      'metadata' => {
-        'rules_version' => '1.2.3'
+      "version" => "2.2",
+      "metadata" => {
+        "rules_version" => "1.2.3"
       },
-      'rules' => [
+      "rules" => [
         {
-          'id' => '1',
-          'name' => 'Rule 1',
-          'tags' => { 'type' => 'flow1' },
-          'conditions' => [
+          "id" => "1",
+          "name" => "Rule 1",
+          "tags" => {"type" => "flow1"},
+          "conditions" => [
             {
-              'operator' => 'match_regex',
-              'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule1' }
+              "operator" => "match_regex",
+              "parameters" => {"inputs" => [{"address" => "value2"}], "regex" => "rule1"}
             }
           ],
-          'action' => 'record'
+          "action" => "record"
         }
       ]
     }
   end
 
   let(:passing_input) do
-    { value1: [4242, 'randomString'], value2: ['nope'] }
+    {value1: [4242, "randomString"], value2: ["nope"]}
   end
 
   let(:matching_input) do
-    { value1: [4242, 'randomString'], value2: ['rule1'] }
+    {value1: [4242, "randomString"], value2: ["rule1"]}
   end
 
   let(:handle) { Datadog::AppSec::WAF::Handle.new(rule) }
 
-  context 'stress testing' do
+  context "stress testing" do
     let(:run_count) { 500 }
     let(:thread_count) { 200 }
 
-    it 'creates a context in each thread' do
+    it "creates a context in each thread" do
       handle
 
-      result = { timeout_ok: 0, timeout_match: 0, ok: 0, match: 0, err_internal: 0, err_invalid_object: 0, err_invalid_argument: 0 }
+      result = {timeout_ok: 0, timeout_match: 0, ok: 0, match: 0, err_internal: 0, err_invalid_object: 0, err_invalid_argument: 0}
       start_barrier = Barrier.new(thread_count)
       mutex = Mutex.new
 

@@ -9,14 +9,14 @@ module Datadog
         def initialize(limits: {}, obfuscator: {})
           handle_config_obj = LibDDWAF::HandleBuilderConfig.new
           if handle_config_obj.null?
-            raise LibDDWAF::Error, 'Could not create config struct'
+            raise LibDDWAF::Error, "Could not create config struct"
           end
 
-          handle_config_obj[:limits][:max_container_size]  = limits[:max_container_size]  || LibDDWAF::DEFAULT_MAX_CONTAINER_SIZE
+          handle_config_obj[:limits][:max_container_size] = limits[:max_container_size] || LibDDWAF::DEFAULT_MAX_CONTAINER_SIZE
           handle_config_obj[:limits][:max_container_depth] = limits[:max_container_depth] || LibDDWAF::DEFAULT_MAX_CONTAINER_DEPTH
-          handle_config_obj[:limits][:max_string_length]   = limits[:max_string_length]   || LibDDWAF::DEFAULT_MAX_STRING_LENGTH
+          handle_config_obj[:limits][:max_string_length] = limits[:max_string_length] || LibDDWAF::DEFAULT_MAX_STRING_LENGTH
 
-          handle_config_obj[:obfuscator][:key_regex]   = FFI::MemoryPointer.from_string(obfuscator[:key_regex])   if obfuscator[:key_regex]
+          handle_config_obj[:obfuscator][:key_regex] = FFI::MemoryPointer.from_string(obfuscator[:key_regex]) if obfuscator[:key_regex]
           handle_config_obj[:obfuscator][:value_regex] = FFI::MemoryPointer.from_string(obfuscator[:value_regex]) if obfuscator[:value_regex]
           handle_config_obj[:free_fn] = LibDDWAF::ObjectNoFree
 
@@ -37,7 +37,7 @@ module Datadog
           ensure_pointer_presence!
 
           handle_obj = LibDDWAF.ddwaf_builder_build_instance(@builder_ptr)
-          raise LibDDWAF::Error, 'Could not create handle' if handle_obj.null?
+          raise LibDDWAF::Error, "Could not create handle" if handle_obj.null?
 
           Handle.new(handle_obj)
         end
@@ -70,7 +70,7 @@ module Datadog
           return unless @builder_ptr.nil?
 
           # TODO: change to a more distinct error
-          raise LibDDWAF::Error, 'HandleBuilder has been finalized'
+          raise LibDDWAF::Error, "HandleBuilder has been finalized"
         end
       end
     end

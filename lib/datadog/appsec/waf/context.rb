@@ -61,7 +61,7 @@ module Datadog
           end
 
           result_obj = LibDDWAF::Result.new
-          raise LibDDWAF::Error, 'Could not create result object' if result_obj.null?
+          raise LibDDWAF::Error, "Could not create result object" if result_obj.null?
 
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
 
@@ -83,7 +83,7 @@ module Datadog
         def ensure_pointer_presence!
           return unless @context_ptr.nil?
 
-          raise LibDDWAF::Error, 'Context has been finalized'
+          raise LibDDWAF::Error, "Context has been finalized"
         end
 
         def retained

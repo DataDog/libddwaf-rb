@@ -1,27 +1,27 @@
 # frozen_string_literal: true
 
-require 'spec_helper'
+require "spec_helper"
 
 RSpec.describe Datadog::AppSec::WAF::Context do
-  describe '#run' do
+  describe "#run" do
     let(:config) do
       {
-        'version' => '2.2',
-        'metadata' => {
-          'rules_version' => '1.2.3'
+        "version" => "2.2",
+        "metadata" => {
+          "rules_version" => "1.2.3"
         },
-        'rules' => [
+        "rules" => [
           {
-            'id' => '1',
-            'name' => 'Rule 1',
-            'tags' => { 'type' => 'flow1' },
-            'conditions' => [
+            "id" => "1",
+            "name" => "Rule 1",
+            "tags" => {"type" => "flow1"},
+            "conditions" => [
               {
-                'operator' => 'match_regex',
-                'parameters' => { 'inputs' => [{ 'address' => 'value2' }], 'regex' => 'rule1' }
+                "operator" => "match_regex",
+                "parameters" => {"inputs" => [{"address" => "value2"}], "regex" => "rule1"}
               }
             ],
-            'on_match' => ['block']
+            "on_match" => ["block"]
           }
         ]
       }
@@ -29,17 +29,17 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
     let(:builder) do
       Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
-        builder.add_or_update_config(config: config, path: 'some/path')
+        builder.add_or_update_config(config: config, path: "some/path")
       end
     end
 
     let(:handle) { builder.build_handle }
     let(:context) { handle.build_context }
 
-    it 'passes non-matching persistent data' do
-      result = context.run({ value1: ['rule1'] }, {})
+    it "passes non-matching persistent data" do
+      result = context.run({value1: ["rule1"]}, {})
 
-      aggregate_failures('result') do
+      aggregate_failures("result") do
         expect(result.status).to eq(:ok)
         expect(result.events).to eq([])
         expect(result.total_runtime).to be_positive
@@ -49,10 +49,10 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
     end
 
-    it 'passes non-matching ephemeral data' do
-      result = context.run({}, { value1: ['rule1'] })
+    it "passes non-matching ephemeral data" do
+      result = context.run({}, {value1: ["rule1"]})
 
-      aggregate_failures('result') do
+      aggregate_failures("result") do
         expect(result.status).to eq(:ok)
         expect(result.events).to eq([])
         expect(result.total_runtime).to be_positive
@@ -62,121 +62,121 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
     end
 
-    it 'catches a match on persistent data' do
-      result = context.run({ value2: ['rule1'] }, {})
+    it "catches a match on persistent data" do
+      result = context.run({value2: ["rule1"]}, {})
 
-      aggregate_failures('result') do
+      aggregate_failures("result") do
         expect(result.status).to eq(:match)
-        expect(result.events).to match_array([{ 'rule' => anything, 'rule_matches' => anything }])
+        expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
         expect(result.total_runtime).to be_positive
         expect(result.timeout).to eq(false)
-        expect(result.actions).to eq({ 'block_request' => { 'grpc_status_code' => '10', 'status_code' => '403', 'type' => 'auto' } })
+        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
         expect(result.derivatives).to eq({})
       end
     end
 
-    it 'catches a match on ephemeral data' do
-      result = context.run({}, { value2: ['rule1'] })
+    it "catches a match on ephemeral data" do
+      result = context.run({}, {value2: ["rule1"]})
 
-      aggregate_failures('result') do
+      aggregate_failures("result") do
         expect(result.status).to eq(:match)
-        expect(result.events).to match_array([{ 'rule' => anything, 'rule_matches' => anything }])
+        expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
         expect(result.total_runtime).to be_positive
         expect(result.timeout).to eq(false)
-        expect(result.actions).to eq({ 'block_request' => { 'grpc_status_code' => '10', 'status_code' => '403', 'type' => 'auto' } })
+        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
         expect(result.derivatives).to eq({})
       end
     end
 
-    it 'raises LibDDWAF::Error when context has been finalized' do
+    it "raises LibDDWAF::Error when context has been finalized" do
       context.finalize!
 
       expect do
-        context.run({}, { value2: ['rule1'] })
+        context.run({}, {value2: ["rule1"]})
       end.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /Context has been finalized/)
     end
 
-    context 'with processors' do
+    context "with processors" do
       let(:config) do
         {
-          'version' => '2.2',
-          'metadata' => {
-            'rules_version' => '1.2.3'
+          "version" => "2.2",
+          "metadata" => {
+            "rules_version" => "1.2.3"
           },
-          'processors' => [
+          "processors" => [
             {
-              'id' => 'processor-001',
-              'generator' => 'extract_schema',
-              'conditions' => [
+              "id" => "processor-001",
+              "generator" => "extract_schema",
+              "conditions" => [
                 {
-                  'operator' => 'equals',
-                  'parameters' => {
-                    'inputs' => [
+                  "operator" => "equals",
+                  "parameters" => {
+                    "inputs" => [
                       {
-                        'address' => 'waf.context.processor',
-                        'key_path' => [
-                          'extract-schema'
+                        "address" => "waf.context.processor",
+                        "key_path" => [
+                          "extract-schema"
                         ]
                       }
                     ],
-                    'type' => 'boolean',
-                    'value' => true
+                    "type" => "boolean",
+                    "value" => true
                   }
                 }
               ],
-              'parameters' => {
-                'mappings' => [
+              "parameters" => {
+                "mappings" => [
                   {
-                    'inputs' => [
+                    "inputs" => [
                       {
-                        'address' => 'server.request.query'
+                        "address" => "server.request.query"
                       }
                     ],
-                    'output' => '_dd.appsec.s.req.query'
+                    "output" => "_dd.appsec.s.req.query"
                   }
                 ]
               },
-              'evaluate' => false,
-              'output' => true
+              "evaluate" => false,
+              "output" => true
             }
           ]
         }
       end
 
-      context 'with schema extraction' do
-        it 'populates derivatives' do
+      context "with schema extraction" do
+        it "populates derivatives" do
           waf_args = {
-            'server.request.query' => {
-              'hello' => 'EMBED'
+            "server.request.query" => {
+              "hello" => "EMBED"
             },
-            'waf.context.processor' => {
-              'extract-schema' => true
+            "waf.context.processor" => {
+              "extract-schema" => true
             }
           }
 
           result = context.run(waf_args, {})
 
-          aggregate_failures('result') do
+          aggregate_failures("result") do
             expect(result.status).to eq :ok
-            expect(result.derivatives).to eq({ '_dd.appsec.s.req.query' => [{ 'hello' => [8] }] })
+            expect(result.derivatives).to eq({"_dd.appsec.s.req.query" => [{"hello" => [8]}]})
           end
         end
       end
 
-      context 'without schema extraction' do
-        it 'populates derivatives' do
+      context "without schema extraction" do
+        it "populates derivatives" do
           waf_args = {
-            'server.request.query' => {
-              'hello' => 'EMBED'
+            "server.request.query" => {
+              "hello" => "EMBED"
             },
-            'waf.context.processor' => {
-              'extract-schema' => false
+            "waf.context.processor" => {
+              "extract-schema" => false
             }
           }
 
           result = context.run(waf_args, {})
 
-          aggregate_failures('result') do
+          aggregate_failures("result") do
             expect(result.status).to eq :ok
             expect(result.derivatives).to be_empty
           end
