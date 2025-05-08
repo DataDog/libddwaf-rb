@@ -93,7 +93,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
       expect do
         context.run({}, {value2: ["rule1"]})
-      end.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /Context has been finalized/)
+      end.to raise_error(Datadog::AppSec::WAF::ContextFinalizedError, /Cannot use WAF context after it has been finalized/)
     end
 
     context "with processors" do

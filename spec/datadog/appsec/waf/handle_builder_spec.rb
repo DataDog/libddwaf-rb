@@ -25,13 +25,15 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
     end
 
     it "raises LibDDWAF::Error when no valid rule has been loaded" do
-      expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /Could not create handle/)
+      expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /Could not create handle/)
     end
 
     it "raises LibDDWAF::Error when builder has been finalized" do
       builder.finalize!
 
-      expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /HandleBuilder has been finalized/)
+      expect do
+        builder.build_handle
+      end.to raise_error(Datadog::AppSec::WAF::HandleBuilderFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
     end
   end
 
@@ -86,7 +88,7 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
 
       expect do
         builder.add_or_update_config(config: {}, path: "some/path")
-      end.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /HandleBuilder has been finalized/)
+      end.to raise_error(Datadog::AppSec::WAF::HandleBuilderFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
     end
   end
 
@@ -106,7 +108,7 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
 
       expect do
         builder.remove_config(path: "any/path")
-      end.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /HandleBuilder has been finalized/)
+      end.to raise_error(Datadog::AppSec::WAF::HandleBuilderFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
     end
   end
 end

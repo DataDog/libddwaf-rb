@@ -43,8 +43,7 @@ module Datadog
         def ensure_pointer_presence!
           return unless @handle_ptr.nil?
 
-          # TODO: change to a more distinct error
-          raise LibDDWAF::Error, "Handle has been finalized"
+          raise HandleFinalizedError, "Cannot use WAF handle after it has been finalized"
         end
       end
     end

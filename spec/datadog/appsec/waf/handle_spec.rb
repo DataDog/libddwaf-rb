@@ -21,7 +21,9 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
     it "raises LibDDWAF::Error when handle has been finalized" do
       handle.finalize!
 
-      expect { handle.build_context }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /Handle has been finalized/)
+      expect do
+        handle.build_context
+      end.to raise_error(Datadog::AppSec::WAF::HandleFinalizedError, /Cannot use WAF handle after it has been finalized/)
     end
   end
 
@@ -33,7 +35,9 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
     it "raises LibDDWAF::Error when handle has been finalized" do
       handle.finalize!
 
-      expect { handle.known_addresses }.to raise_error(Datadog::AppSec::WAF::LibDDWAF::Error, /Handle has been finalized/)
+      expect do
+        handle.known_addresses
+      end.to raise_error(Datadog::AppSec::WAF::HandleFinalizedError, /Cannot use WAF handle after it has been finalized/)
     end
   end
 end

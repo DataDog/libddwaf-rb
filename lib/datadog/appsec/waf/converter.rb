@@ -13,7 +13,7 @@ module Datadog
           when Array
             obj = LibDDWAF::Object.new
             res = LibDDWAF.ddwaf_object_array(obj)
-            raise LibDDWAF::Error, "Could not convert into object: #{val}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val}" if res.null?
 
             max_index = max_container_size - 1 if max_container_size
             unless max_container_depth == 0
@@ -26,7 +26,7 @@ module Datadog
                   coerce: coerce
                 )
                 e_res = LibDDWAF.ddwaf_object_array_add(obj, member)
-                raise LibDDWAF::Error, "Could not add to array object: #{e.inspect}" unless e_res
+                raise ConversionError, "Could not add to array object: #{e.inspect}" unless e_res
 
                 break val if max_index && i >= max_index
               end
@@ -36,7 +36,7 @@ module Datadog
           when Hash
             obj = LibDDWAF::Object.new
             res = LibDDWAF.ddwaf_object_map(obj)
-            raise LibDDWAF::Error, "Could not convert into object: #{val}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val}" if res.null?
 
             max_index = max_container_size - 1 if max_container_size
             unless max_container_depth == 0
@@ -54,7 +54,7 @@ module Datadog
                   coerce: coerce
                 )
                 kv_res = LibDDWAF.ddwaf_object_map_addl(obj, k.to_s, k.to_s.bytesize, member)
-                raise LibDDWAF::Error, "Could not add to map object: #{k.inspect} => #{v.inspect}" unless kv_res
+                raise ConversionError, "Could not add to map object: #{k.inspect} => #{v.inspect}" unless kv_res
 
                 break val if max_index && i >= max_index
               end
@@ -67,7 +67,7 @@ module Datadog
             val = encoded_val[0, max_string_length] if max_string_length
             str = val.to_s
             res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
-            raise LibDDWAF::Error, "Could not convert into object: #{val.inspect}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
             obj
           when Symbol
@@ -75,7 +75,7 @@ module Datadog
             val = val.to_s[0, max_string_length] if max_string_length
             str = val.to_s
             res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
-            raise LibDDWAF::Error, "Could not convert into object: #{val.inspect}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
             obj
           when Integer
@@ -87,7 +87,7 @@ module Datadog
             else
               LibDDWAF.ddwaf_object_unsigned(obj, val)
             end
-            raise LibDDWAF::Error, "Could not convert into object: #{val.inspect}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
             obj
           when Float
@@ -97,7 +97,7 @@ module Datadog
             else
               LibDDWAF.ddwaf_object_float(obj, val)
             end
-            raise LibDDWAF::Error, "Could not convert into object: #{val.inspect}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
             obj
           when TrueClass, FalseClass
@@ -107,7 +107,7 @@ module Datadog
             else
               LibDDWAF.ddwaf_object_bool(obj, val)
             end
-            raise LibDDWAF::Error, "Could not convert into object: #{val.inspect}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
             obj
           when NilClass
@@ -117,7 +117,7 @@ module Datadog
             else
               LibDDWAF.ddwaf_object_null(obj)
             end
-            raise LibDDWAF::Error, "Could not convert into object: #{val.inspect}" if res.null?
+            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
             obj
           else

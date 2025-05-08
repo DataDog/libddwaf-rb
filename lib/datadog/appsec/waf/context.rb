@@ -83,7 +83,7 @@ module Datadog
         def ensure_pointer_presence!
           return unless @context_ptr.nil?
 
-          raise LibDDWAF::Error, "Context has been finalized"
+          raise ContextFinalizedError, "Cannot use WAF context after it has been finalized"
         end
 
         def retained

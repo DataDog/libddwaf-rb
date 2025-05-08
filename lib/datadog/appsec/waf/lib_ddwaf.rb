@@ -9,16 +9,15 @@ module Datadog
       # FFI-binding for C-libddwaf
       # See https://github.com/DataDog/libddwaf
       module LibDDWAF
-        # An exception binding raises in most of the cases
-        class Error < StandardError
-          attr_reader :diagnostics
+        DEFAULT_MAX_CONTAINER_SIZE = 256
+        DEFAULT_MAX_CONTAINER_DEPTH = 20
+        DEFAULT_MAX_STRING_LENGTH = 16_384 # in bytes, UTF-8 worst case being 4x size in terms of code point
 
-          def initialize(msg, diagnostics: nil)
-            @diagnostics = diagnostics
+        DDWAF_MAX_CONTAINER_SIZE = 256
+        DDWAF_MAX_CONTAINER_DEPTH = 20
+        DDWAF_MAX_STRING_LENGTH = 4096
 
-            super(msg)
-          end
-        end
+        DDWAF_RUN_TIMEOUT = 5000
 
         extend ::FFI::Library
 
@@ -308,16 +307,6 @@ module Datadog
         callback :ddwaf_log_cb, [:ddwaf_log_level, :string, :string, :uint, :charptr, :uint64], :void
 
         attach_function :ddwaf_set_log_cb, [:ddwaf_log_cb, :ddwaf_log_level], :bool
-
-        DEFAULT_MAX_CONTAINER_SIZE = 256
-        DEFAULT_MAX_CONTAINER_DEPTH = 20
-        DEFAULT_MAX_STRING_LENGTH = 16_384 # in bytes, UTF-8 worst case being 4x size in terms of code point)
-
-        DDWAF_MAX_CONTAINER_SIZE = 256
-        DDWAF_MAX_CONTAINER_DEPTH = 20
-        DDWAF_MAX_STRING_LENGTH = 4096
-
-        DDWAF_RUN_TIMEOUT = 5000
       end
     end
   end
