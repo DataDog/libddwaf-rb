@@ -34,7 +34,13 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
     {value1: [4242, "randomString"], value2: ["rule1"]}
   end
 
-  let(:handle) { Datadog::AppSec::WAF::Handle.new(rule) }
+  let(:builder) do
+    Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
+      builder.add_or_update_config(config: rule, path: "some/path")
+    end
+  end
+
+  let(:handle) { builder.build_handle }
 
   context "stress testing" do
     let(:run_count) { 500 }
@@ -49,12 +55,12 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
 
       threads = thread_count.times.map do
         Thread.new do
-          context = described_class.new(handle)
+          context = handle.build_context
           start_barrier.sync
           run_count.times do |i|
             ephemeral_data = i.even? ? matching_input : passing_input
             ephemeral_data[:value3] = [i]
-            code, waf_result = context.run({}, ephemeral_data, 10_000_000)
+            waf_result = context.run({}, ephemeral_data, 10_000_000)
             mutex.synchronize do
               if waf_result.timeout
                 if i.even?
@@ -63,7 +69,7 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
                   result[:timeout_ok] += 1
                 end
               else
-                result[code] += 1
+                result[waf_result.status] += 1
               end
             end
           end
