@@ -96,6 +96,29 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end.to raise_error(Datadog::AppSec::WAF::ContextFinalizedError, /Cannot use WAF context after it has been finalized/)
     end
 
+    it "catches a match with a non UTF-8 string" do
+      result = context.run({value2: ["rule1".dup.force_encoding('ASCII-8BIT')]}, {})
+
+      expect(result.status).to eq(:match)
+    end
+
+    context "with incorrectly encoded string" do
+      it "returns valid UTF-8" do
+        result = context.run({value2: ["rule1\xE2".dup.force_encoding('ASCII-8BIT')]}, {})
+
+        first_match_parameters = result.events.dig(0, "rule_matches", 0, "parameters", 0)
+
+        expect(first_match_parameters.fetch("value")).to be_valid_encoding
+        expect(first_match_parameters.dig("highlight", 0)).to be_valid_encoding
+      end
+
+      it "catches a match" do
+        result = context.run({value2: ["rule1\xE2".dup.force_encoding('ASCII-8BIT')]}, {})
+
+        expect(result.status).to eq(:match)
+      end
+    end
+
     context "with processors" do
       let(:config) do
         {
