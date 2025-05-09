@@ -2,40 +2,19 @@ module Datadog
   module AppSec
     module WAF
       class Handle
-        @config: LibDDWAF::Config
+        @handle_ptr: ::FFI::Pointer
 
-        @handle_obj: ::FFI::Pointer
+        def initialize: (::FFI::Pointer handle_ptr) -> void
 
-        @diagnostics: WAF::data
+        def finalize!: () -> void
 
-        @valid: bool
+        def build_context: () -> Context
 
-        attr_reader handle_obj: ::FFI::Pointer
-
-        attr_reader diagnostics: WAF::data
-
-        attr_reader config: LibDDWAF::Config
-
-        def initialize: (data rule, ?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
-
-        def finalize: () -> void
-
-        def required_addresses: () -> ::Array[::String?]
-
-        # TODO: WAF::data
-        def merge: (untyped data) -> Handle?
+        def known_addresses: () -> ::Array[::String?]
 
         private
 
-        def new_from_handle: (::FFI::Pointer handle_object, data diagnostics, WAF::LibDDWAF::Config config) -> Handle
-
-        def validate!: () -> void
-
-        def invalidate!: () -> void
-
-        def valid?: () -> bool?
-
-        def valid!: () -> void
+        def ensure_pointer_presence!: () -> void
       end
     end
   end
