@@ -3,8 +3,9 @@
 module Datadog
   module AppSec
     module WAF
-      ##
-      # Manages libddwaf configuration over the application's lifetime.
+      # This class represents the libddwaf WAF builder, which is used to generate WAF handles.
+      #
+      # It handles merging of potentially overlapping configurations.
       class HandleBuilder
         def initialize(limits: {}, obfuscator: {})
           handle_config_obj = LibDDWAF::HandleBuilderConfig.new
@@ -23,6 +24,9 @@ module Datadog
           @builder_ptr = LibDDWAF.ddwaf_builder_init(handle_config_obj)
         end
 
+        # Destroys the WAF builder and sets the pointer to nil.
+        #
+        # The instance becomes unusable after this method is called.
         def finalize!
           builder_ptr_to_destroy = @builder_ptr
           @builder_ptr = nil
@@ -30,9 +34,10 @@ module Datadog
           LibDDWAF.ddwaf_builder_destroy(builder_ptr_to_destroy)
         end
 
-        # NOTE: libddwaf will return a null handle if no configuration has been loaded
+        # Builds a WAF handle from the current state of the builder.
         #
-        # Not thread-safe
+        # @raise [LibDDWAFError] if no rules were added to the builder before building the handle
+        # @return [Handle] the WAF handle
         def build_handle
           ensure_pointer_presence!
 
@@ -42,7 +47,14 @@ module Datadog
           Handle.new(handle_obj)
         end
 
-        # Not thread-safe
+        # :section: Configuration management methods
+        # methods for adding, updating, and removing configurations from the WAF handle builder.
+
+        # Adds or updates a configuration in the WAF handle builder for the given path.
+        #
+        # @return [Hash] diagnostics object
+        # NOTE: default config that was read from file at application startup
+        # has to be removed before adding configurations obtained through Remote Configuration.
         def add_or_update_config(config:, path:)
           ensure_pointer_presence!
 
@@ -51,14 +63,15 @@ module Datadog
 
           LibDDWAF.ddwaf_builder_add_or_update_config(@builder_ptr, path, path.length, config_obj, diagnostics_obj)
 
-          # TODO: introduce a diagnostics object?
           Converter.object_to_ruby(diagnostics_obj)
         ensure
           LibDDWAF.ddwaf_object_free(config_obj) if config_obj
           LibDDWAF.ddwaf_object_free(diagnostics_obj) if diagnostics_obj
         end
 
-        # Not thread-safe
+        # Removes a configuration from the WAF handle builder for the given path.
+        #
+        # @return [Boolean] true if the configuration was removed, false otherwise
         def remove_config(path:)
           ensure_pointer_presence!
 

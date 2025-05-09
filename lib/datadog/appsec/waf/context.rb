@@ -18,6 +18,9 @@ module Datadog
           @context_ptr = context_ptr
         end
 
+        # Destroys the WAF context and sets the pointer to nil.
+        #
+        # The instance becomes unusable after this method is called.
         def finalize!
           context_ptr_to_destroy = @context_ptr
           @context_ptr = nil
@@ -32,6 +35,12 @@ module Datadog
           LibDDWAF.ddwaf_context_destroy(context_ptr_to_destroy)
         end
 
+        # Runs the WAF context with the given persistent and ephemeral data.
+        #
+        # @raise [ConversionError] if the conversion of persistent or ephemeral data fails
+        # @raise [LibDDWAFError] if libddwaf could not create the result object
+        #
+        # @return [Result] the result of the WAF run
         def run(persistent_data, ephemeral_data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           ensure_pointer_presence!
 

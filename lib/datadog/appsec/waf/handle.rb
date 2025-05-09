@@ -10,6 +10,9 @@ module Datadog
           @handle_ptr = handle_ptr
         end
 
+        # Destroys the WAF handle and sets the pointer to nil.
+        #
+        # The instance becomes unusable after this method is called.
         def finalize!
           handle_ptr_to_destroy = @handle_ptr
           @handle_ptr = nil
@@ -17,6 +20,10 @@ module Datadog
           LibDDWAF.ddwaf_destroy(handle_ptr_to_destroy)
         end
 
+        # Builds a WAF context.
+        #
+        # @raise [LibDDWAFError] if libddwaf could not create the context.
+        # @return [Handle] the WAF handle
         def build_context
           ensure_pointer_presence!
 
@@ -26,6 +33,9 @@ module Datadog
           Context.new(context_obj)
         end
 
+        # Returns the list of known addresses in the WAF handle.
+        #
+        # @return [Array<String>] the list of known addresses
         def known_addresses
           ensure_pointer_presence!
 
