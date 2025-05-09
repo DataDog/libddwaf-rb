@@ -4,16 +4,17 @@
 
 - HandleBuilder class for managing libddwaf configuration and building WAF handles
 - Error classes:
-  - WAF::LibDDWAFError for libddwaf errors
-  - WAF::ConversionError for conversion errors
-  - WAF::HandleBuilderFinalizedError, WAF::HandleFinalizedError, WAF::ContextFinalizedError that are raised when attempting to run methods on finalized instances
+  - LibDDWAFError for libddwaf errors
+  - ConversionError for conversion errors
+  - HandleBuilderFinalizedError, HandleFinalizedError, ContextFinalizedError that are raised when attempting to run methods on finalized instances
 
 ## Changed
 
 - Handle instantiation is now done using HandleBuilder#build_handle method
 - Context instantiation is now done using Handle#build_context method
 - Limits and obfuscation configuration is now done when initializing HandleBuilder
-- WAF::Context#run now returns a WAF::Result object
+- Context#run now returns a Result object
+- Handle is not finalized automatically anymore when Context is finalized
 
 ## Removed
 
