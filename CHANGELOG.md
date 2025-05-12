@@ -13,8 +13,7 @@
 - Handle instantiation is now done using HandleBuilder#build_handle method
 - Context instantiation is now done using Handle#build_context method
 - Limits and obfuscation configuration is now done when initializing HandleBuilder
-- Context#run now returns a Result object
-- Handle is not finalized automatically anymore when Context is finalized
+- Context#run now returns a Result object instead of an tuple with code and result
 
 ## Removed
 
