@@ -80,5 +80,28 @@ RSpec.describe "WAF configuration" do
   end
 
   context "obfuscator" do
+    it "matches and obfuscates keys" do
+      builder = Datadog::AppSec::WAF::HandleBuilder.new(obfuscator: {key_regex: "user-agent"})
+      builder.add_or_update_config(config: waf_config, path: "some/path")
+      handle = builder.build_handle
+      context = handle.build_context
+
+      result = context.run({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, {})
+
+      expect(result.status).to eq(:match)
+      expect(result.events.dig(0, "rule_matches", 0, "parameters", 0, "value")).to eq("<Redacted>")
+    end
+
+    it "matches and obfuscates values" do
+      builder = Datadog::AppSec::WAF::HandleBuilder.new(obfuscator: {value_regex: "SOAP"})
+      builder.add_or_update_config(config: waf_config, path: "some/path")
+      handle = builder.build_handle
+      context = handle.build_context
+
+      result = context.run({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, {})
+
+      expect(result.status).to eq(:match)
+      expect(result.events.dig(0, "rule_matches", 0, "parameters", 0, "value")).to eq("<Redacted>")
+    end
   end
 end
