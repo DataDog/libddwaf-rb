@@ -7,11 +7,13 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
     JSON.parse(File.read("spec/fixtures/valid_config.json"))
   end
 
-  subject(:handle) do
-    builder = Datadog::AppSec::WAF::HandleBuilder.new
-    builder.add_or_update_config(config: valid_config, path: "some/path")
-    builder.build_handle
+  let(:builder) do
+    Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
+      builder.add_or_update_config(config: valid_config, path: "some/path")
+    end
   end
+
+  subject(:handle) { builder.build_handle }
 
   describe "#build_context" do
     it "returns a Datadog::AppSec::WAF::Context instance" do

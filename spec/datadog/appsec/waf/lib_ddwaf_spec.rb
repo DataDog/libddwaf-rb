@@ -750,6 +750,10 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       end
     end
 
+    after do
+      described_class.ddwaf_set_log_cb(nil, :ddwaf_log_off)
+    end
+
     it "logs via the log callback" do
       expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
     end
