@@ -97,14 +97,14 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
 
     it "catches a match with a non UTF-8 string" do
-      result = context.run({value2: ["rule1".dup.force_encoding('ASCII-8BIT')]}, {})
+      result = context.run({value2: ["rule1".dup.force_encoding("ASCII-8BIT")]}, {})
 
       expect(result.status).to eq(:match)
     end
 
     context "with incorrectly encoded string" do
       it "returns valid UTF-8" do
-        result = context.run({value2: ["rule1\xE2".dup.force_encoding('ASCII-8BIT')]}, {})
+        result = context.run({value2: ["rule1\xE2".dup.force_encoding("ASCII-8BIT")]}, {})
 
         first_match_parameters = result.events.dig(0, "rule_matches", 0, "parameters", 0)
 
@@ -113,7 +113,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
 
       it "catches a match" do
-        result = context.run({value2: ["rule1\xE2".dup.force_encoding('ASCII-8BIT')]}, {})
+        result = context.run({value2: ["rule1\xE2".dup.force_encoding("ASCII-8BIT")]}, {})
 
         expect(result.status).to eq(:match)
       end
