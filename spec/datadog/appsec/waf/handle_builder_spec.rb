@@ -10,6 +10,18 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
   end
 
   describe "#build_handle" do
+    it "raises LibDDWAF::Error when no valid rule has been loaded" do
+      expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /Could not create handle/)
+    end
+
+    it "raises LibDDWAF::Error when builder has been finalized" do
+      builder.finalize!
+
+      expect do
+        builder.build_handle
+      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
+    end
+
     context "when at least one valid rule has been loaded" do
       before do
         builder.add_or_update_config(valid_config, path: "some/path")
@@ -23,63 +35,34 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
         expect(builder.build_handle).to be_a(Datadog::AppSec::WAF::Handle)
       end
     end
-
-    it "raises LibDDWAF::Error when no valid rule has been loaded" do
-      expect { builder.build_handle }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /Could not create handle/)
-    end
-
-    it "raises LibDDWAF::Error when builder has been finalized" do
-      builder.finalize!
-
-      expect do
-        builder.build_handle
-      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
-    end
   end
 
   describe "#add_or_update_configuration" do
-    context "adding valid config" do
-      it "returns diagnostics hash" do
-        diagnostics = builder.add_or_update_config(valid_config, path: "some/path")
+    it "returns diagnostics hash when adding valid config" do
+      diagnostics = builder.add_or_update_config(valid_config, path: "some/path")
 
-        expect(diagnostics).to be_a(Hash)
+      aggregate_failures("diagnostics data") do
+        expect(diagnostics.fetch("ruleset_version")).to eq("1.13.0")
 
-        aggregate_failures("diagnostics data") do
-          expect(diagnostics.fetch("ruleset_version")).to eq("1.13.0")
+        expect(diagnostics).to have_key("rules")
+        expect(diagnostics.dig("rules", "loaded")).to eq(["rasp-003-001"])
+        expect(diagnostics.dig("rules", "errors")).to be_empty
 
-          expect(diagnostics).to have_key("rules")
-          expect(diagnostics.dig("rules", "loaded")).to eq(["rasp-003-001"])
-          expect(diagnostics.dig("rules", "errors")).to be_empty
-
-          expect(diagnostics).to have_key("actions")
-          expect(diagnostics.dig("actions", "loaded")).to eq(["block-sqli"])
-          expect(diagnostics.dig("actions", "errors")).to be_empty
-        end
+        expect(diagnostics).to have_key("actions")
+        expect(diagnostics.dig("actions", "loaded")).to eq(["block-sqli"])
+        expect(diagnostics.dig("actions", "errors")).to be_empty
       end
     end
 
-    context "adding invalid config" do
-      let(:invalid_config) do
-        {
-          "rules" => [
-            {
-              "id" => "foo",
-              "name" => "Banana"
-            }
-          ]
-        }
-      end
+    it "returns diagnostics hash with errors when adding invalid config" do
+      diagnostics = builder.add_or_update_config({"rules" => [{"id" => "foo", "name" => "Banana"}]}, path: "some/path")
 
-      it "returns diagnostics hash with errors" do
-        diagnostics = builder.add_or_update_config(invalid_config, path: "some/path")
+      expect(diagnostics).to be_a(Hash)
 
-        expect(diagnostics).to be_a(Hash)
-
-        aggregate_failures("diagnostics data") do
-          expect(diagnostics).to have_key("rules")
-          expect(diagnostics.dig("rules", "loaded")).to be_empty
-          expect(diagnostics.dig("rules", "failed")).to eq(["foo"])
-        end
+      aggregate_failures("diagnostics data") do
+        expect(diagnostics).to have_key("rules")
+        expect(diagnostics.dig("rules", "loaded")).to be_empty
+        expect(diagnostics.dig("rules", "failed")).to eq(["foo"])
       end
     end
 
