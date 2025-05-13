@@ -1,3 +1,24 @@
+# Unreleased v1.23.0.0.0
+
+## Added
+
+- Add `HandleBuilder` class for managing libddwaf configuration and building WAF handles
+- Add Error classes:
+  - `LibDDWAFError` for libddwaf errors
+  - `ConversionError` for conversion errors
+  - `InstanceFinalizedError` that is raised when attempting to run methods on finalized instances
+
+## Changed
+
+- Change `Handle` instantiation - now it should be done using `HandleBuilder#build_handle` method
+- Change `Context` instantiation - now is should be done using `Handle#build_context` method
+- Change configuration of Limits and obfuscation - it is now done when initializing `HandleBuilder`
+- Change `Context#run` to return a `Result` object instead of an tuple with code and result
+
+## Removed
+
+- Remove `WAF::Handle#merge` method - the configuration is now handled by `HandleBuilder`
+
 # 2025-02-20 v.1.18.0.0.1
 
 - Fixed memory-leak in `Datadog::AppSec::WAF::Context#run` when non-empty ephemeral data passed
@@ -12,7 +33,6 @@
 - Update to libddwaf 1.14.0
 - Add support for `Float` and `Nil` scalar values when converting from ruby to WAF Object and vice versa.
 
-
 # 2023-08-29 v.1.11.0.0.0
 
 - Update to libddwaf 1.11.0
@@ -20,7 +40,6 @@
   The schema of the diagnostics variable can be found [here](https://github.com/DataDog/libddwaf/blob/master/schema/diagnostics.json)
 - Changed `Datadog::AppSec::WAF::Result#data` to `Datadog::AppSec::WAF::Result#events`. (Breaking change)
   The schema of the events variable can be found [here](https://github.com/DataDog/libddwaf/blob/master/schema/events.json)
-
 
 # 2023-08-28 v.1.10.0.0.0
 

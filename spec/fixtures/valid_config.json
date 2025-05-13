@@ -1,0 +1,39 @@
+{
+  "version": "2.2",
+  "metadata": {
+    "rules_version": "1.13.0"
+  },
+  "rules": [
+    {
+      "id": "rasp-003-001",
+      "name": "SQL Injection",
+      "tags": {
+        "type": "sql_injection",
+        "category": "exploit",
+        "module": "rasp"
+      },
+      "conditions": [
+        {
+          "operator": "sqli_detector",
+          "parameters": {
+            "resource": [{ "address": "server.db.statement" }],
+            "params": [{ "address": "server.request.query" }],
+            "db_type": [{ "address": "server.db.system" }]
+          }
+        }
+      ],
+      "on_match": ["block-sqli"]
+    }
+  ],
+  "actions": [
+    {
+      "id": "block-sqli",
+      "type": "block",
+      "parameters": {
+        "status_code": "418",
+        "grpc_status_code": "42",
+        "type": "auto"
+      }
+    }
+  ]
+}

@@ -15,8 +15,8 @@ jobs:
       - name: Bundle
         run: bundle install
 
-      - name: Run Rubocop
-        run: bundle exec rubocop -D
+      - name: Run standardrb
+        run: standardrb
 
   type-check:
     name: Type check
