@@ -12,11 +12,11 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
   describe "#build_handle" do
     context "when at least one valid rule has been loaded" do
       before do
-        builder.add_or_update_config(config: valid_config, path: "some/path")
+        builder.add_or_update_config(valid_config, path: "some/path")
       end
 
       after do
-        builder.remove_config(path: "some/path")
+        builder.remove_config_at_path("some/path")
       end
 
       it "returns a Datadog::AppSec::WAF::Handle instance" do
@@ -33,14 +33,14 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
 
       expect do
         builder.build_handle
-      end.to raise_error(Datadog::AppSec::WAF::HandleBuilderFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
+      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
     end
   end
 
   describe "#add_or_update_configuration" do
     context "adding valid config" do
       it "returns diagnostics hash" do
-        diagnostics = builder.add_or_update_config(config: valid_config, path: "some/path")
+        diagnostics = builder.add_or_update_config(valid_config, path: "some/path")
 
         expect(diagnostics).to be_a(Hash)
 
@@ -71,7 +71,7 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
       end
 
       it "returns diagnostics hash with errors" do
-        diagnostics = builder.add_or_update_config(config: invalid_config, path: "some/path")
+        diagnostics = builder.add_or_update_config(invalid_config, path: "some/path")
 
         expect(diagnostics).to be_a(Hash)
 
@@ -87,28 +87,28 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
       builder.finalize!
 
       expect do
-        builder.add_or_update_config(config: {}, path: "some/path")
-      end.to raise_error(Datadog::AppSec::WAF::HandleBuilderFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
+        builder.add_or_update_config({}, path: "some/path")
+      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
     end
   end
 
-  describe "#remove_config" do
+  describe "#remove_config_at_path" do
     it "returns true when removing previously added config" do
-      builder.add_or_update_config(config: valid_config, path: "some/path")
+      builder.add_or_update_config(valid_config, path: "some/path")
 
-      expect(builder.remove_config(path: "some/path")).to eq(true)
+      expect(builder.remove_config_at_path("some/path")).to eq(true)
     end
 
     it "returns false when attempting to remove config that was not added before" do
-      expect(builder.remove_config(path: "another/path")).to eq(false)
+      expect(builder.remove_config_at_path("another/path")).to eq(false)
     end
 
     it "raises LibDDWAF::Error when builder has been finalized" do
       builder.finalize!
 
       expect do
-        builder.remove_config(path: "any/path")
-      end.to raise_error(Datadog::AppSec::WAF::HandleBuilderFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
+        builder.remove_config_at_path("any/path")
+      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF handle builder after it has been finalized/)
     end
   end
 end

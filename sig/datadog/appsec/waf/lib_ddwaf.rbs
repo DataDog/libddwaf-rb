@@ -108,7 +108,7 @@ module Datadog
         def self.ddwaf_builder_destroy: (::FFI::Pointer) -> void
 
         def self.ddwaf_builder_add_or_update_config: (::FFI::Pointer, ::String, ::Integer, LibDDWAF::Object, LibDDWAF::Object) -> bool
-        def self.ddwaf_builder_remove_config: (::FFI::Pointer, ::String, ::Integer) -> void
+        def self.ddwaf_builder_remove_config: (::FFI::Pointer, ::String, ::Integer) -> bool
 
         def self.ddwaf_builder_build_instance: (::FFI::Pointer) -> ::FFI::Pointer
 

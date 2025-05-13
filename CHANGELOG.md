@@ -6,7 +6,7 @@
 - Add Error classes:
   - `LibDDWAFError` for libddwaf errors
   - `ConversionError` for conversion errors
-  - `HandleBuilderFinalizedError`, `HandleFinalizedError`, `ContextFinalizedError` that are raised when attempting to run methods on finalized instances
+  - `InstanceFinalizedError` that is raised when attempting to run methods on finalized instances
 
 ## Changed
 

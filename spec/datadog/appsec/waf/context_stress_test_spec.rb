@@ -36,7 +36,7 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
 
   let(:builder) do
     Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
-      builder.add_or_update_config(config: rule, path: "some/path")
+      builder.add_or_update_config(rule, path: "some/path")
     end
   end
 

@@ -10,7 +10,9 @@ module Datadog
 
         def build_handle: () -> Handle
 
-        def add_or_update_config: (config: data, path: ::String) -> data
+        def add_or_update_config: (data config, path: ::String) -> data
+
+        def remove_config_at_path: (::String path) -> bool
 
         private
 

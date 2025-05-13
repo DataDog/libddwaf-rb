@@ -55,7 +55,7 @@ module Datadog
         # @return [Hash] diagnostics object
         # NOTE: default config that was read from file at application startup
         # has to be removed before adding configurations obtained through Remote Configuration.
-        def add_or_update_config(config:, path:)
+        def add_or_update_config(config, path:)
           ensure_pointer_presence!
 
           config_obj = Converter.ruby_to_object(config)
@@ -72,7 +72,7 @@ module Datadog
         # Removes a configuration from the WAF handle builder for the given path.
         #
         # @return [Boolean] true if the configuration was removed, false otherwise
-        def remove_config(path:)
+        def remove_config_at_path(path)
           ensure_pointer_presence!
 
           LibDDWAF.ddwaf_builder_remove_config(@builder_ptr, path, path.length)
@@ -81,9 +81,9 @@ module Datadog
         private
 
         def ensure_pointer_presence!
-          return unless @builder_ptr.nil?
+          return if @builder_ptr
 
-          raise HandleBuilderFinalizedError, "Cannot use WAF handle builder after it has been finalized"
+          raise InstanceFinalizedError, "Cannot use WAF handle builder after it has been finalized"
         end
       end
     end

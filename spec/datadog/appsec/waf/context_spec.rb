@@ -29,7 +29,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
     let(:builder) do
       Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
-        builder.add_or_update_config(config: config, path: "some/path")
+        builder.add_or_update_config(config, path: "some/path")
       end
     end
 
@@ -93,7 +93,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
       expect do
         context.run({}, {value2: ["rule1"]})
-      end.to raise_error(Datadog::AppSec::WAF::ContextFinalizedError, /Cannot use WAF context after it has been finalized/)
+      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF context after it has been finalized/)
     end
 
     it "catches a match with a non UTF-8 string" do

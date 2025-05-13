@@ -90,9 +90,9 @@ module Datadog
         private
 
         def ensure_pointer_presence!
-          return unless @context_ptr.nil?
+          return if @context_ptr
 
-          raise ContextFinalizedError, "Cannot use WAF context after it has been finalized"
+          raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized"
         end
 
         def retained

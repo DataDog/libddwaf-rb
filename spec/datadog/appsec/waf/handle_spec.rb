@@ -9,7 +9,7 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
 
   let(:builder) do
     Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
-      builder.add_or_update_config(config: valid_config, path: "some/path")
+      builder.add_or_update_config(valid_config, path: "some/path")
     end
   end
 
@@ -25,7 +25,7 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
 
       expect do
         handle.build_context
-      end.to raise_error(Datadog::AppSec::WAF::HandleFinalizedError, /Cannot use WAF handle after it has been finalized/)
+      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF handle after it has been finalized/)
     end
   end
 
@@ -39,7 +39,7 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
 
       expect do
         handle.known_addresses
-      end.to raise_error(Datadog::AppSec::WAF::HandleFinalizedError, /Cannot use WAF handle after it has been finalized/)
+      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF handle after it has been finalized/)
     end
   end
 end

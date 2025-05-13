@@ -51,9 +51,9 @@ module Datadog
         private
 
         def ensure_pointer_presence!
-          return unless @handle_ptr.nil?
+          return if @handle_ptr
 
-          raise HandleFinalizedError, "Cannot use WAF handle after it has been finalized"
+          raise InstanceFinalizedError, "Cannot use WAF handle after it has been finalized"
         end
       end
     end

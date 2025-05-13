@@ -63,7 +63,7 @@ module Datadog
             obj
           when String
             obj = LibDDWAF::Object.new
-            encoded_val = val.to_s.encode("utf-8", invalid: :replace, undef: :replace)
+            encoded_val = val.to_s.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
             val = encoded_val[0, max_string_length] if max_string_length
             str = val.to_s
             res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
