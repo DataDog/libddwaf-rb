@@ -1,8 +1,0 @@
-# We are ignoring possible leaks in ffi gem for now
-{
-  ffi-call-function-memory
-  Memcheck:Leak
-  ...
-  fun:rbffi_CallFunction
-  ...
-}
