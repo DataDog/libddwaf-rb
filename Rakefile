@@ -20,6 +20,20 @@ RSpec::Core::RakeTask.new(:spec) do |t, args|
   t.rspec_opts = args.to_a.join(" ")
 end
 
+if Gem.loaded_specs.key? "ruby_memcheck"
+  require "ruby_memcheck"
+  require "ruby_memcheck/rspec/rake_task"
+
+  RubyMemcheck.config(
+    valgrind_generate_suppressions: true,
+    use_only_ruby_free_at_exit: true
+  )
+
+  namespace :spec do
+    RubyMemcheck::RSpec::RakeTask.new(valgrind: :binary)
+  end
+end
+
 module Helpers
   require "uri"
   require "json"
