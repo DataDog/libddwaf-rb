@@ -31,7 +31,7 @@ module Datadog
             LibDDWAF.ddwaf_object_free(retained_obj)
           end
 
-          retained.clear
+          # retained.clear
           LibDDWAF.ddwaf_context_destroy(context_ptr_to_destroy)
         end
 
@@ -84,7 +84,7 @@ module Datadog
           )
         ensure
           LibDDWAF.ddwaf_result_free(result_obj) if result_obj
-          LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
+          # LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
         end
 
         private
