@@ -25,8 +25,7 @@ if Gem.loaded_specs.key? "ruby_memcheck"
   require "ruby_memcheck/rspec/rake_task"
 
   RubyMemcheck.config(
-    valgrind_generate_suppressions: true,
-    use_only_ruby_free_at_exit: true
+    valgrind_generate_suppressions: true
   )
 
   namespace :spec do
