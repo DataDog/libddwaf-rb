@@ -1,0 +1,7 @@
+---
+services:
+  libddwaf-rb:
+    build:
+      dockerfile: Dockerfile
+    volumes:
+      - .:/libddwaf-rb

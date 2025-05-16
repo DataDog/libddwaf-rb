@@ -188,6 +188,11 @@ namespace :spec do
     t.pattern = "spec/**/*_spec.rb"
     t.rspec_opts = "--tag stress_tests"
   end
+
+  RSpec::Core::RakeTask.new(:memory_leaks) do |t, _args|
+    t.pattern = "spec/**/*_spec.rb"
+    t.rspec_opts = "--tag memory_leaks"
+  end
 end
 
 namespace :coverage do

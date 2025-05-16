@@ -7,5 +7,5 @@ require_relative "support/barrier"
 
 RSpec.configure do |config|
   config.default_formatter = "doc"
-  config.filter_run_excluding stress_tests: true
+  config.filter_run_excluding stress_tests: true, memory_leaks: true
 end
