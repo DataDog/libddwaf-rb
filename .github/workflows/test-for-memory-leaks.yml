@@ -12,4 +12,4 @@ jobs:
           bundler: latest
           cache-version: v1 # bump this to invalidate cache
       - run: sudo apt-get update && (sudo apt-get install -y valgrind || sleep 5 && sudo apt-get install -y valgrind --no-install-recommends --no-install-suggests) && valgrind --version
-      - run: bundle exec rake binary spec:memory_leaks
+      - run: bundle exec rake binary spec:memory_leaks:all

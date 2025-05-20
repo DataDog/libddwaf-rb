@@ -189,9 +189,18 @@ namespace :spec do
     t.rspec_opts = "--tag stress_tests"
   end
 
-  RSpec::Core::RakeTask.new(:memory_leaks) do |t, _args|
-    t.pattern = "spec/**/*_spec.rb"
-    t.rspec_opts = "--tag memory_leaks"
+  namespace :memory_leaks do
+    desc "Run all tests for memory leaks"
+    RSpec::Core::RakeTask.new(:all) do |t, _args|
+      t.rspec_opts = "--tag memory_leaks"
+    end
+
+    Dir.glob("spec/memory_leaks/*").select { |dir| File.directory?(dir) }.map { |dir| dir.sub("spec/memory_leaks/", "") }.each do |subdir|
+      desc "Run #{subdir} related tests for memory leaks"
+      RSpec::Core::RakeTask.new(subdir) do |t, _args|
+        t.rspec_opts = "--tag memory_leaks --example_matches /#{subdir}/"
+      end
+    end
   end
 end
 

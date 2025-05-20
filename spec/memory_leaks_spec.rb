@@ -4,7 +4,7 @@ require "spec_helper"
 require "open3"
 
 RSpec.describe "Memory leaks", memory_leaks: true do
-  Dir.glob("spec/memory_leaks/*_scenario.rb").each do |scenario_file|
+  Dir.glob("spec/memory_leaks/**/*_scenario.rb").each do |scenario_file|
     it "does not detect memory leaks in #{scenario_file}" do
       _, stderr, status = Open3.capture3("ruby_memcheck -I lib #{scenario_file}")
 
