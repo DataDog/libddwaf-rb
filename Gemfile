@@ -13,6 +13,7 @@ gem "rspec_junit_formatter", ">= 0.4.1"
 
 if RUBY_VERSION >= "3.0.0"
   gem "standard"
+  gem "ruby_memcheck", ">= 3"
 end
 
 if RUBY_VERSION >= "2.5.0"

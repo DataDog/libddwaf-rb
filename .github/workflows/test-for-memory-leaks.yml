@@ -1,0 +1,15 @@
+name: Test for memory leaks
+on: [push]
+jobs:
+  test-memcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ruby/setup-ruby@f41e084df884422b269f4c01c3748a9df4431a75 # v1.236.0
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+          bundler: latest
+          cache-version: v1 # bump this to invalidate cache
+      - run: sudo apt-get update && (sudo apt-get install -y valgrind || sleep 5 && sudo apt-get install -y valgrind --no-install-recommends --no-install-suggests) && valgrind --version
+      - run: bundle exec rake binary spec:memory_leaks:all
