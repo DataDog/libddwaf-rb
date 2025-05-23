@@ -45,7 +45,6 @@ module Datadog
           return [] if count == 0 # list is null
 
           list.get_array_of_string(0, count[:value])
-          # TODO: garbage collect the count?
         end
 
         private
