@@ -455,19 +455,27 @@ task(:extract, [:platform]) { |_, args| Rake::Task["libddwaf:extract"].execute(a
 task(:binary, [:platform]) { |_, args| Rake::Task["libddwaf:binary"].execute(args) }
 
 desc "Release gem for variaty of platforms"
-task release_multi: :release do
-  platforms = %w[
-    x86_64-linux
-    x86_64-darwin
-    arm64-darwin
-    aarch64-linux
-    java
-  ]
+task :release_multi do
+  platforms = %w[x86_64-linux-musl]
+
+  # platforms = %w[
+  #   x86_64-linux
+  #   x86_64-linux-gnu
+  #   x86_64-linux-musl
+  #   x86_64-darwin
+  #   arm64-darwin
+  #   aarch64-linux
+  #   aarch64-linux-gnu
+  #   aarch64-linux-musl
+  #   java
+  # ]
 
   platforms.each do |platform|
     Rake::Task["libddwaf:binary"].execute(platform: platform)
 
     gem_path = "pkg/#{Helpers.binary_gemspec(platform: platform).file_name}"
-    Kernel.system("gem push #{gem_path}", exception: true)
+    puts "Platform: " + platform
+    puts "Gem path: " + gem_path
+    # Kernel.system("gem push #{gem_path}", exception: true)
   end
 end
