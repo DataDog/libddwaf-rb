@@ -509,4 +509,30 @@ namespace :steep do
   end
 end
 
-task default: 'spec'
+task test: :spec
+task default: :spec
+
+# NOTE: Left for compatibility and should be removed after pipelines are migrated
+task(:fetch, [:platform]) { |_, args| Rake::Task["libddwaf:fetch"].execute(args) }
+task(:extract, [:platform]) { |_, args| Rake::Task["libddwaf:extract"].execute(args) }
+task(:binary, [:platform]) { |_, args| Rake::Task["libddwaf:binary"].execute(args) }
+
+desc "Release gem for variaty of platforms"
+task release_multi: :release do
+  platforms = %w[
+    x86_64-linux-gnu
+    x86_64-linux-musl
+    x86_64-darwin
+    arm64-darwin
+    aarch64-linux-gnu
+    aarch64-linux-musl
+    java
+  ]
+
+  platforms.each do |platform|
+    Rake::Task["libddwaf:binary"].execute(platform: platform)
+
+    gem_path = "pkg/#{Helpers.binary_gemspec(platform: platform).file_name}"
+    Kernel.system("gem push #{gem_path}", exception: true)
+  end
+end
