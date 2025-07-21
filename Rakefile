@@ -318,9 +318,9 @@ namespace :libddwaf do
     subplatform_for = {
       # lean gems
       "x86_64-linux-gnu" => ["x86_64-linux"],
-      "x86_64-linux-musl" => ["x86_64-linux-musl"],
+      "x86_64-linux-musl" => ["x86_64-linux"],
       "aarch64-linux-gnu" => ["aarch64-linux"],
-      "aarch64-linux-musl" => ["aarch64-linux-musl"],
+      "aarch64-linux-musl" => ["aarch64-linux"],
       "x86_64-darwin" => ["x86_64-darwin"],
       "arm64-darwin" => ["arm64-darwin"],
 
@@ -457,10 +457,12 @@ task(:binary, [:platform]) { |_, args| Rake::Task["libddwaf:binary"].execute(arg
 desc "Release gem for variaty of platforms"
 task release_multi: :release do
   platforms = %w[
-    x86_64-linux
+    x86_64-linux-gnu
+    x86_64-linux-musl
     x86_64-darwin
     arm64-darwin
-    aarch64-linux
+    aarch64-linux-gnu
+    aarch64-linux-musl
     java
   ]
 
