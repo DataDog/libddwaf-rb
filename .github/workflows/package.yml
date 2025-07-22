@@ -85,7 +85,7 @@ jobs:
         run: ${{ steps.build-image.outputs.run-cmd }} bundle install
 
       - name: Build binary gem
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake binary[${{ matrix.platform }}]
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake libddwaf:build
 
       - name: List artifact files
         run: find .
@@ -121,7 +121,7 @@ jobs:
         run: bundle install
 
       - name: Build binary gem
-        run: bundle exec rake binary[${{ matrix.platform }}]
+        run: bundle exec rake libddwaf:build
 
       - name: Install gem
         run: gem install --verbose pkg/*.gem
