@@ -37,15 +37,6 @@ module Datadog
           Gem::Platform.local.os
         end
 
-        def self.local_version
-          return nil unless local_os == "linux"
-
-          # Old rubygems don't handle non-gnu linux correctly
-          return ::Regexp.last_match(1) if RUBY_PLATFORM =~ /linux-(.+)$/
-
-          "gnu"
-        end
-
         def self.local_cpu
           if RUBY_ENGINE == "jruby"
             os_arch = java.lang.System.get_property("os.arch")
@@ -66,33 +57,6 @@ module Datadog
           __dir__ || raise("__dir__ is nil: eval?")
         end
 
-        def self.vendor_dir
-          File.join(source_dir, "../../../../vendor")
-        end
-
-        def self.libddwaf_vendor_dir
-          File.join(vendor_dir, "libddwaf")
-        end
-
-        def self.shared_lib_triplet(version: local_version)
-          version ? "#{local_os}-#{version}-#{local_cpu}" : "#{local_os}-#{local_cpu}"
-        end
-
-        def self.libddwaf_dir
-          default = File.join(libddwaf_vendor_dir,
-            "libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{shared_lib_triplet}")
-          candidates = [
-            default
-          ]
-
-          if local_os == "linux"
-            candidates << File.join(libddwaf_vendor_dir,
-              "libddwaf-#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{shared_lib_triplet(version: nil)}")
-          end
-
-          candidates.find { |d| Dir.exist?(d) } || default
-        end
-
         def self.shared_lib_extname
           if Gem::Platform.local.os == "darwin"
             ".dylib"
@@ -104,6 +68,9 @@ module Datadog
         end
 
         def self.shared_lib_path
+          variant = "#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}"
+          libddwaf_dir = File.join(source_dir, "../../../../vendor/libddwaf/libddwaf-#{variant}")
+
           File.join(libddwaf_dir, "lib", "libddwaf#{shared_lib_extname}")
         end
 
