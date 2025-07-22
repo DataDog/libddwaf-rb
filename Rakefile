@@ -407,6 +407,21 @@ namespace :libddwaf do
 
     puts Helpers.format("%green[complete] pkg/#{package}")
   end
+
+  task :release do
+    platforms = [
+      "x86_64-linux",
+      "x86_64-darwin",
+      "arm64-darwin",
+      "aarch64-linux",
+    ]
+
+    platforms.each do |platform|
+      Rake::Task["libddwaf:binary"].execute(platform: platform)
+    end
+
+    Rake::Task["release"].execute
+  end
 end
 
 namespace :steep do
@@ -453,25 +468,3 @@ task default: :spec
 task(:fetch, [:platform]) { |_, args| Rake::Task["libddwaf:fetch"].execute(args) }
 task(:extract, [:platform]) { |_, args| Rake::Task["libddwaf:extract"].execute(args) }
 task(:binary, [:platform]) { |_, args| Rake::Task["libddwaf:binary"].execute(args) }
-
-desc "Release gem for variaty of platforms"
-task release_multi: :release do
-  platforms = %w[
-    x86_64-linux
-    x86_64-linux-gnu
-    x86_64-linux-musl
-    x86_64-darwin
-    arm64-darwin
-    aarch64-linux
-    aarch64-linux-gnu
-    aarch64-linux-musl
-    java
-  ]
-
-  platforms.each do |platform|
-    Rake::Task["libddwaf:binary"].execute(platform: platform)
-
-    gem_path = "pkg/#{Helpers.binary_gemspec(platform: platform).file_name}"
-    Kernel.system("gem push #{gem_path}", exception: true)
-  end
-end
