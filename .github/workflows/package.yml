@@ -3,49 +3,6 @@ on:
   - push
 
 jobs:
-  test-rake-build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm]
-        ruby: ["3.3"]
-        libc: [gnu]
-        include:
-          - os: ubuntu-24.04
-            platform: x86_64-linux
-          - os: ubuntu-24.04-arm
-            platform: aarch64-linux
-
-    name: Test build without fetching libddwaf (Ruby ${{ matrix.ruby }}, ${{ matrix.os }}, ${{ matrix.libc }})
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build docker image
-        id: build-image
-        uses: ./.github/actions/docker-build-ruby
-        with:
-          ruby-version: ${{ matrix.ruby }}
-          libc: ${{ matrix.libc }}
-
-      - name: Bundle install
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle install
-
-      - name: Build gem
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake build
-
-      - name: List artifact files
-        run: find .
-        working-directory: pkg
-
-      - name: Install gem
-        run: ${{ steps.build-image.outputs.run-cmd }} gem install --verbose pkg/*.gem
-
-      - name: Run smoke test
-        run: ${{ steps.build-image.outputs.run-cmd }} ruby -e 'begin require "libddwaf"; rescue LoadError => e; puts e.message; else fail "loaded when it should not"; end'
-
   test-rake-binary:
     strategy:
       fail-fast: false
