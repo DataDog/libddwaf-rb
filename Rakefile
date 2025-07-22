@@ -313,7 +313,7 @@ namespace :libddwaf do
     puts Helpers.format("%green[complete] #{binary_path}")
   end
 
-  desc "Build `libddwaf` gem binary"
+  desc "Download and extract pre-packaged `libddwaf` binary"
   task :binary, [:platform] do |_, args|
     subplatform_for = {
       # lean gems
@@ -366,49 +366,23 @@ namespace :libddwaf do
       end
     end
 
-    platform_string, _opts = platform_arg.split(":")
-    platform = Helpers.parse_platform(platform_string)
-
     subplatforms = subplatform_for[platform_arg]
-
     raise "target platform not found: #{platform_arg.inspect}" if subplatforms.nil?
 
     # loop for multiple deps on a single target, accumulating each shared lib path
-    libddwaf_library_paths = subplatforms.map do |subplatform_string|
+    subplatforms.each do |subplatform_string|
       subplatform = Helpers.parse_platform(subplatform_string)
 
       Rake::Task["extract"].execute(Rake::TaskArguments.new([:platform], [subplatform]))
-
-      Helpers.libddwaf_library_path(platform: subplatform).to_s
     end
-
-    gemspec = Helpers.binary_gemspec(platform: platform)
-    gemspec.extensions.clear
-
-    gemspec.files = []
-    gemspec.files += Dir["lib/**/*.rb"]
-    gemspec.files += ["NOTICE", "CHANGELOG.md"] + Dir["LICENSE*"]
-
-    gemspec.files += libddwaf_library_paths
-
-    FileUtils.chmod(0o0644, gemspec.files)
-    FileUtils.mkdir_p("pkg")
-
-    puts Helpers.format("   %blue[build] libddwaf-#{gemspec.version}-#{gemspec.platform}")
-
-    package = if Gem::VERSION < "2.0.0"
-      Gem::Builder.new(gemspec).build
-    else
-      require "rubygems/package"
-      Gem::Package.build(gemspec)
-    end
-
-    FileUtils.mv(package, "pkg")
-
-    puts Helpers.format("%green[complete] pkg/#{package}")
   end
 
-  task :release do
+  desc "Release bundled gem with all supported platforms"
+  task release: :build do
+    Rake::Task["release"].invoke
+  end
+
+  task :build do
     platforms = [
       "x86_64-linux",
       "x86_64-darwin",
@@ -420,7 +394,7 @@ namespace :libddwaf do
       Rake::Task["libddwaf:binary"].execute(platform: platform)
     end
 
-    Rake::Task["release"].execute
+    Rake::Task["build"].invoke
   end
 end
 
