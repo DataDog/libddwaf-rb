@@ -239,6 +239,43 @@ namespace :coverage do
   end
 end
 
+namespace :steep do
+  task :check do
+    require "open3"
+
+    stdout, status = Open3.capture2("bundle exec steep check")
+    puts stdout
+
+    ignore_rules = File.readlines(".steepignore", chomp: true)
+    unexpected_errors = []
+    error_lines = stdout.lines.select { |line| line.include?("[error]") }
+    error_lines.each do |line|
+      location, error = line.split(": [error]").map(&:strip)
+
+      should_ignore = ignore_rules.any? do |ignore_rule|
+        ignored_loc, ignored_error = ignore_rule.scan(/(.+)\s+"(.+)"/).first
+        location.end_with?(ignored_loc) && error.include?(ignored_error)
+      end
+
+      unexpected_errors << [location, error] unless should_ignore
+    end
+
+    if unexpected_errors.any?
+      puts "Unexpected problems found:"
+      puts(unexpected_errors.map { |location, error| "#{location}: #{error}" })
+      exit status.exitstatus
+    else
+      puts
+      puts "Ignored #{error_lines.size} problems according to .steepignore."
+      puts <<~MSG
+        Gem ffi v1.17.0 was shipped with incorrect RBS types and is causing Steep to fail.
+        https://github.com/ffi/ffi/issues/1107
+      MSG
+      exit 0
+    end
+  end
+end
+
 namespace :libddwaf do
   desc "Extract pre-packaged `libddwaf` tarball into shared libs"
   task :extract, [:platform] do |_, args|
@@ -249,7 +286,7 @@ namespace :libddwaf do
       next puts Helpers.format("    %yellow[skip] #{path} (exist)")
     end
 
-    Rake::Task["fetch"].execute(args)
+    Rake::Task["libddwaf:fetch"].execute(args)
 
     require "rubygems/package"
 
@@ -373,16 +410,12 @@ namespace :libddwaf do
     subplatforms.each do |subplatform_string|
       subplatform = Helpers.parse_platform(subplatform_string)
 
-      Rake::Task["extract"].execute(Rake::TaskArguments.new([:platform], [subplatform]))
+      Rake::Task["libddwaf:extract"].execute(Rake::TaskArguments.new([:platform], [subplatform]))
     end
   end
 
   desc "Release bundled gem with all supported platforms"
-  task release: :build do
-    Rake::Task["release"].invoke
-  end
-
-  task :build do
+  task :release do
     platforms = [
       "x86_64-linux",
       "x86_64-darwin",
@@ -390,55 +423,75 @@ namespace :libddwaf do
       "aarch64-linux",
     ]
 
-    platforms.each do |platform|
-      Rake::Task["libddwaf:binary"].execute(platform: platform)
+    platforms.each { |platform| Rake::Task["libddwaf:build"].execute(platform: platform) }
+    Rake::Task["build"].invoke
+
+    Rake::Task["release"].invoke
+    platforms.each { |platform| Rake::Task["libddwaf:push"].execute(platform: platform) }
+  end
+
+  task :build, [:platform] do |_, args|
+    Rake::Task["libddwaf:binary"].execute(args)
+
+    platform_arg = args.to_h[:platform]
+    platform_arg ||= if RUBY_PLATFORM.match?(/-linux$/)
+      # no arg + -linux$ should build linux-gnu only
+      RUBY_PLATFORM + '-gnu'
+    elsif RUBY_PLATFORM =~ /^(.+-darwin)/
+      # no arg + darwin should build darwin$
+      $1
+    elsif RUBY_PLATFORM.match?(/-linux-musl$/)
+      # no arg + -linux-musl$ should build linux-musl on old rubygems
+      RUBY_PLATFORM
+    else
+      RUBY_PLATFORM
     end
 
+    platform_string, _opts = platform_arg.split(':')
+    platform = Helpers.parse_platform(platform_string)
+
+    vendor_dir = Helpers.libddwaf_vendor_dir.to_s
+    platform_binary = Helpers.libddwaf_library_path(platform: platform).to_s
+
+    gemspec = Helpers.binary_gemspec(platform: platform)
+    gemspec.files.reject! do |file|
+      file.start_with?(vendor_dir) && file != platform_binary
+    end
+
+    FileUtils.chmod(0o0644, gemspec.files)
+    FileUtils.mkdir_p('pkg')
+
+    puts Helpers.format("   %blue[build] libddwaf-#{gemspec.version}-#{gemspec.platform}")
+
+    package = if Gem::VERSION < '2.0.0'
+      Gem::Builder.new(gemspec).build
+    else
+      require 'rubygems/package'
+      Gem::Package.build(gemspec)
+    end
+
+    FileUtils.mv(package, 'pkg')
+    puts Helpers.format("%green[libddwaf #{Helpers.libddwaf_version} built to pkg/#{package}.]")
+  end
+
+  # NOTE: This is used in CI only
+  task :buildx do
+    platforms = [
+      "x86_64-linux",
+      "x86_64-darwin",
+      "arm64-darwin",
+      "aarch64-linux",
+    ]
+
+    platforms.each { |platform| Rake::Task["libddwaf:binary"].execute(platform: platform) }
     Rake::Task["build"].invoke
   end
-end
 
-namespace :steep do
-  task :check do
-    require "open3"
-
-    stdout, status = Open3.capture2("bundle exec steep check")
-    puts stdout
-
-    ignore_rules = File.readlines(".steepignore", chomp: true)
-    unexpected_errors = []
-    error_lines = stdout.lines.select { |line| line.include?("[error]") }
-    error_lines.each do |line|
-      location, error = line.split(": [error]").map(&:strip)
-
-      should_ignore = ignore_rules.any? do |ignore_rule|
-        ignored_loc, ignored_error = ignore_rule.scan(/(.+)\s+"(.+)"/).first
-        location.end_with?(ignored_loc) && error.include?(ignored_error)
-      end
-
-      unexpected_errors << [location, error] unless should_ignore
-    end
-
-    if unexpected_errors.any?
-      puts "Unexpected problems found:"
-      puts(unexpected_errors.map { |location, error| "#{location}: #{error}" })
-      exit status.exitstatus
-    else
-      puts
-      puts "Ignored #{error_lines.size} problems according to .steepignore."
-      puts <<~MSG
-        Gem ffi v1.17.0 was shipped with incorrect RBS types and is causing Steep to fail.
-        https://github.com/ffi/ffi/issues/1107
-      MSG
-      exit 0
-    end
+  task :push, [:platform] do |_, args|
+    gem_path = "pkg/#{Helpers.binary_gemspec(platform: args[:platform]).file_name}"
+    Kernel.system("gem push #{gem_path}", exception: true)
   end
 end
 
 task test: :spec
 task default: :spec
-
-# NOTE: Left for compatibility and should be removed after pipelines are migrated
-task(:fetch, [:platform]) { |_, args| Rake::Task["libddwaf:fetch"].execute(args) }
-task(:extract, [:platform]) { |_, args| Rake::Task["libddwaf:extract"].execute(args) }
-task(:binary, [:platform]) { |_, args| Rake::Task["libddwaf:binary"].execute(args) }

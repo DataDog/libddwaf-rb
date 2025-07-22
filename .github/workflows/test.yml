@@ -33,11 +33,8 @@ jobs:
       - name: Bundle install
         run: ${{ steps.build-image.outputs.run-cmd }} bundle install
 
-      - name: Fetch binary library
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake fetch[${{ matrix.platform }}]
-
-      - name: Extract binary library
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake extract[${{ matrix.platform }}]
+      - name: Fetch and extract binary library
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake libddwaf:binary[${{ matrix.platform }}]
 
       - name: Run specs
         run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
@@ -75,11 +72,8 @@ jobs:
       - name: Bundle install
         run: ${{ steps.build-image.outputs.run-cmd }} bundle install
 
-      - name: Fetch binary library
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake fetch[${{ matrix.platform }}]
-
-      - name: Extract binary library
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake extract[${{ matrix.platform }}]
+      - name: Fetch and extract binary library
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake libddwaf:binary[${{ matrix.platform }}]
 
       - name: Run specs
         run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
@@ -110,11 +104,8 @@ jobs:
       - name: Bundle
         run: bundle install
 
-      - name: Fetch binary library
-        run: bundle exec rake fetch[${{ matrix.platform }}]
-
-      - name: Extract binary library
-        run: bundle exec rake extract[${{ matrix.platform }}]
+      - name: Fetch and extract binary library
+        run: bundle exec rake libddwaf:binary[${{ matrix.platform }}]
 
       - name: Run specs
         run: bundle exec rake spec
