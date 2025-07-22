@@ -105,6 +105,9 @@ module Datadog
         end
 
         def self.shared_lib_path
+          variant = "#{Datadog::AppSec::WAF::VERSION::BASE_STRING}-#{local_os}-#{local_cpu}"
+          libddwaf_dir = File.join(source_dir, "../../../../vendor/libddwaf/libddwaf-#{variant}")
+
           File.join(libddwaf_dir, 'lib', "libddwaf#{shared_lib_extname}")
         end
 
