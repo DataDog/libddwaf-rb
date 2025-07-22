@@ -313,7 +313,7 @@ namespace :libddwaf do
     puts Helpers.format("%green[complete] #{binary_path}")
   end
 
-  desc "Build `libddwaf` gem binary"
+  desc "Download and extract pre-packaged `libddwaf` binary"
   task :binary, [:platform] do |_, args|
     subplatform_for = {
       # lean gems
@@ -366,46 +366,35 @@ namespace :libddwaf do
       end
     end
 
-    platform_string, _opts = platform_arg.split(":")
-    platform = Helpers.parse_platform(platform_string)
-
     subplatforms = subplatform_for[platform_arg]
-
     raise "target platform not found: #{platform_arg.inspect}" if subplatforms.nil?
 
     # loop for multiple deps on a single target, accumulating each shared lib path
-    libddwaf_library_paths = subplatforms.map do |subplatform_string|
+    subplatforms.each do |subplatform_string|
       subplatform = Helpers.parse_platform(subplatform_string)
 
       Rake::Task["extract"].execute(Rake::TaskArguments.new([:platform], [subplatform]))
+    end
+  end
 
-      Helpers.libddwaf_library_path(platform: subplatform).to_s
+  desc "Release bundled gem with all supported platforms"
+  task release: :build do
+    Rake::Task["release"].invoke
+  end
+
+  task :build do
+    platforms = [
+      "x86_64-linux",
+      "x86_64-darwin",
+      "arm64-darwin",
+      "aarch64-linux",
+    ]
+
+    platforms.each do |platform|
+      Rake::Task["libddwaf:binary"].execute(platform: platform)
     end
 
-    gemspec = Helpers.binary_gemspec(platform: platform)
-    gemspec.extensions.clear
-
-    gemspec.files = []
-    gemspec.files += Dir["lib/**/*.rb"]
-    gemspec.files += ["NOTICE", "CHANGELOG.md"] + Dir["LICENSE*"]
-
-    gemspec.files += libddwaf_library_paths
-
-    FileUtils.chmod(0o0644, gemspec.files)
-    FileUtils.mkdir_p("pkg")
-
-    puts Helpers.format("   %blue[build] libddwaf-#{gemspec.version}-#{gemspec.platform}")
-
-    package = if Gem::VERSION < "2.0.0"
-      Gem::Builder.new(gemspec).build
-    else
-      require "rubygems/package"
-      Gem::Package.build(gemspec)
-    end
-
-    FileUtils.mv(package, "pkg")
-
-    puts Helpers.format("%green[complete] pkg/#{package}")
+    Rake::Task["build"].invoke
   end
 end
 
@@ -453,25 +442,3 @@ task default: :spec
 task(:fetch, [:platform]) { |_, args| Rake::Task["libddwaf:fetch"].execute(args) }
 task(:extract, [:platform]) { |_, args| Rake::Task["libddwaf:extract"].execute(args) }
 task(:binary, [:platform]) { |_, args| Rake::Task["libddwaf:binary"].execute(args) }
-
-desc "Release gem for variaty of platforms"
-task release_multi: :release do
-  platforms = %w[
-    x86_64-linux
-    x86_64-linux-gnu
-    x86_64-linux-musl
-    x86_64-darwin
-    arm64-darwin
-    aarch64-linux
-    aarch64-linux-gnu
-    aarch64-linux-musl
-    java
-  ]
-
-  platforms.each do |platform|
-    Rake::Task["libddwaf:binary"].execute(platform: platform)
-
-    gem_path = "pkg/#{Helpers.binary_gemspec(platform: platform).file_name}"
-    Kernel.system("gem push #{gem_path}", exception: true)
-  end
-end

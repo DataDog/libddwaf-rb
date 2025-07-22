@@ -24,14 +24,19 @@ Gem::Specification.new do |spec|
     raise "RubyGems 2.0 or newer is required to protect against public gem pushes."
   end
 
-  spec.files =
-    `git ls-files -z`
-      .split("\x0")
-      .reject { |f| f.match(%r{^(spec|[.]circleci)/}) }
-      .reject do |f|
-      [".dockerignore", ".env", ".rspec", ".rubocop.yml", ".rubocop_todo.yml",
-        ".simplecov", "Gemfile", "Rakefile", "docker-compose.yml"].include?(f)
-    end
+  libddwaf_version = Datadog::AppSec::WAF::VERSION::BASE_STRING
+
+  spec.files = ["libddwaf.gemspec"]
+  spec.files.concat(Dir.glob("lib/**/*.rb"))
+  spec.files.concat(Dir.glob("{vendor/rbs,sig}/**/*.rbs"))
+  spec.files.concat(Dir.glob("{README,CHANGELOG,LICENSE,NOTICE}*"))
+  spec.files.concat(%W[
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-darwin-arm64/lib/libddwaf.dylib
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-darwin-x86_64/lib/libddwaf.dylib
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-linux-aarch64/lib/libddwaf.so
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-linux-x86_64/lib/libddwaf.so
+  ])
+
   spec.require_paths = ["lib"]
 
   spec.add_dependency "ffi", "~> 1.0"
