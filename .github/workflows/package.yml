@@ -41,14 +41,33 @@ jobs:
       - name: Bundle install
         run: ${{ steps.build-image.outputs.run-cmd }} bundle install
 
-      - name: Build binary gem
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake libddwaf:build
+      - name: Build platform-specific binary gem
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake libddwaf:build[${{ matrix.platform }}]
 
       - name: List artifact files
         run: find .
         working-directory: pkg
 
-      - name: Install gem
+      - name: Install platform-specific gem
+        run: ${{ steps.build-image.outputs.run-cmd }} gem install --verbose pkg/*.gem
+
+      - name: Run smoke test
+        run: ${{ steps.build-image.outputs.run-cmd }} ruby -r 'libddwaf' -e 'p Datadog::AppSec::WAF::LibDDWAF.ddwaf_get_version'
+
+      - name: Uninstall platform-specific gem
+        run: ${{ steps.build-image.outputs.run-cmd }} gem uninstall --all --force --verbose libddwaf
+
+      - name: Remove artifact files
+        run: ${{ steps.build-image.outputs.run-cmd }} rm -f pkg/*.gem
+
+      - name: Build generic gem
+        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake libddwaf:buildx
+
+      - name: List artifact files
+        run: find .
+        working-directory: pkg
+
+      - name: Install generic gem
         run: ${{ steps.build-image.outputs.run-cmd }} gem install --verbose pkg/*.gem
 
       - name: Run smoke test
@@ -78,9 +97,28 @@ jobs:
         run: bundle install
 
       - name: Build binary gem
-        run: bundle exec rake libddwaf:build
+        run: bundle exec rake libddwaf:build[${{ matrix.platform }}]
 
       - name: Install gem
+        run: gem install --verbose pkg/*.gem
+
+      - name: Run smoke test
+        run: ruby -r 'libddwaf' -e 'p Datadog::AppSec::WAF::LibDDWAF.ddwaf_get_version'
+
+      - name: Uninstall platform-specific gem
+        run: gem uninstall --all --force --verbose libddwaf
+
+      - name: Remove artifact files
+        run: rm -f pkg/*.gem
+
+      - name: Build generic gem
+        run: bundle exec rake libddwaf:buildx
+
+      - name: List artifact files
+        run: find .
+        working-directory: pkg
+
+      - name: Install generic gem
         run: gem install --verbose pkg/*.gem
 
       - name: Run smoke test
