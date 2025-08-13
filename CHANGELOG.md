@@ -1,4 +1,10 @@
-# Unreleased v1.23.0.0.0
+# Unreleased
+
+## Added
+
+- Add `LibDDWAF::Object#input_truncated?` method that returns true if the input object was truncated during conversion to libddwaf object
+
+# 2025-05-20 v1.24.1.0.0
 
 ## Added
 
