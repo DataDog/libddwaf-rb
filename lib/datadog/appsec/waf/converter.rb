@@ -16,7 +16,6 @@ module Datadog
             raise ConversionError, "Could not convert into object: #{val}" if res.null?
 
             max_index = max_container_size - 1 if max_container_size
-            # TODO: we must pass top object to be able to mark is as truncated
             if max_container_depth == 0
               top_obj&.mark_as_input_truncated!
             else
@@ -33,7 +32,7 @@ module Datadog
                 raise ConversionError, "Could not add to array object: #{e.inspect}" unless e_res
 
                 if max_index && i >= max_index
-                  obj.mark_as_input_truncated!
+                  (top_obj || obj).mark_as_input_truncated!
                   break val
                 end
               end
@@ -56,7 +55,7 @@ module Datadog
 
                 if max_string_length && k.length > max_string_length
                   k = k.to_s[0, max_string_length]
-                  obj.mark_as_input_truncated!
+                  (top_obj || obj).mark_as_input_truncated!
                 end
                 member = Converter.ruby_to_object(
                   v,
@@ -70,7 +69,7 @@ module Datadog
                 raise ConversionError, "Could not add to map object: #{k.inspect} => #{v.inspect}" unless kv_res
 
                 if max_index && i >= max_index
-                  obj.mark_as_input_truncated!
+                  (top_obj || obj).mark_as_input_truncated!
                   break val
                 end
               end
@@ -82,7 +81,7 @@ module Datadog
             encoded_val = val.to_s.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
             if max_string_length && encoded_val.length > max_string_length
               encoded_val = encoded_val[0, max_string_length]
-              obj.mark_as_input_truncated!
+              (top_obj || obj).mark_as_input_truncated!
             end
             str = encoded_val.to_s
             res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
@@ -93,7 +92,7 @@ module Datadog
             obj = LibDDWAF::Object.new
             if max_string_length
               val = val.to_s[0, max_string_length]
-              obj.mark_as_input_truncated!
+              (top_obj || obj).mark_as_input_truncated!
             end
             str = val.to_s
             res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
