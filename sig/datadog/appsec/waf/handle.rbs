@@ -10,7 +10,7 @@ module Datadog
 
         def build_context: () -> Context
 
-        def known_addresses: () -> ::Array[::String?]
+        def known_addresses: () -> known_addresses
 
         private
 
