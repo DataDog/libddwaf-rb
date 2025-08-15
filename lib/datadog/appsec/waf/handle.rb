@@ -46,7 +46,7 @@ module Datadog
 
           return [] if count == 0 # list is null
 
-          @known_addresses = list.get_array_of_string(0, count[:value])
+          @known_addresses = list.get_array_of_string(0, count[:value]).compact
         end
 
         private
