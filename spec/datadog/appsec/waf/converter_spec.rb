@@ -12,6 +12,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 0
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ""
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts an unhandled object" do
@@ -19,6 +20,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 0
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq ""
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a boolean" do
@@ -30,6 +32,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 5
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "false"
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a string" do
@@ -37,6 +40,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 3
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo"
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a binary string" do
@@ -44,6 +48,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 7
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00bar"
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a symbol" do
@@ -51,6 +56,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 3
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo"
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a positive integer" do
@@ -58,6 +64,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 2
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "42"
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a negative integer" do
@@ -65,6 +72,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 3
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "-42"
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a float" do
@@ -72,6 +80,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 17
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "3.141592653589793"
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts an empty array" do
@@ -79,12 +88,14 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_array
         expect(obj[:nbEntries]).to eq 0
         expect(obj[:valueUnion][:array].null?).to be true
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a non-empty array" do
         obj = described_class.ruby_to_object((1..6).to_a)
         expect(obj[:type]).to eq :ddwaf_obj_array
         expect(obj[:nbEntries]).to eq 6
+        expect(obj.input_truncated?).to eq(false)
         array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
           ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
           o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
@@ -100,12 +111,14 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_map
         expect(obj[:nbEntries]).to eq 0
         expect(obj[:valueUnion][:array].null?).to be true
+        expect(obj.input_truncated?).to eq(false)
       end
 
       it "converts a non-empty hash" do
         obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3})
         expect(obj[:type]).to eq :ddwaf_obj_map
         expect(obj[:nbEntries]).to eq 3
+        expect(obj.input_truncated?).to eq(false)
         hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
           ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
           o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
@@ -135,6 +148,8 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             obj = described_class.ruby_to_object((1..6).to_a, max_container_size: max_container_size)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 3
+            expect(obj.input_truncated?).to eq(true)
+
             array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
               ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
               o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
@@ -149,6 +164,8 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 3
+            expect(obj.input_truncated?).to eq(true)
+
             hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
               ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
               o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
@@ -167,6 +184,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             obj = described_class.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: max_container_depth)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 2
+            expect(obj.input_truncated?).to eq(true)
 
             ptr1 = obj[:valueUnion][:array] + 0 * Datadog::AppSec::WAF::LibDDWAF::Object.size
             ptr2 = obj[:valueUnion][:array] + 1 * Datadog::AppSec::WAF::LibDDWAF::Object.size
@@ -212,6 +230,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             obj = described_class.ruby_to_object({foo: {bar: {baz: {qux: 4}}}}, max_container_depth: max_container_depth)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
+            expect(obj.input_truncated?).to eq(true)
 
             ptr = obj[:valueUnion][:array] + 0 * Datadog::AppSec::WAF::LibDDWAF::Object.size
             o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
@@ -251,6 +270,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "fooooooooo"
+            expect(obj.input_truncated?).to eq(true)
           end
 
           it "converts a binary string up to the limit" do
@@ -258,6 +278,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00barrrr"
+            expect(obj.input_truncated?).to eq(true)
           end
 
           it "converts a symbol up to the limit" do
@@ -265,6 +286,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "fooooooooo"
+            expect(obj.input_truncated?).to eq(true)
           end
 
           it "converts hash keys up to the limit" do
@@ -279,6 +301,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             k = o[:parameterName].read_bytes(l)
             expect(l).to eq 10
             expect(k).to eq "fooooooooo"
+            expect(obj.input_truncated?).to eq(true)
           end
         end
       end
@@ -406,6 +429,8 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             obj = described_class.ruby_to_object((1..6).to_a, max_container_size: max_container_size, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 3
+            expect(obj.input_truncated?).to eq(true)
+
             array = (0...obj[:nbEntries]).each.with_object([]) do |i, a|
               ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
               o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
@@ -415,10 +440,18 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(array).to eq (1..3).to_a
           end
 
+          it "marks nested arrays exceeding limit as input truncated" do
+            obj = described_class.ruby_to_object([(1..6).to_a], max_container_size: max_container_size, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_array
+            expect(obj.input_truncated?).to eq(true)
+          end
+
           it "converts a hash up to the limit" do
             obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 3
+            expect(obj.input_truncated?).to eq(true)
+
             hash = (0...obj[:nbEntries]).each.with_object({}) do |i, h|
               ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
               o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
@@ -428,6 +461,39 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
               h[k] = v
             end
             expect(hash).to eq({"foo" => 1, "bar" => 2, "baz" => 3})
+          end
+
+          it "marks nested hashes exceeding limit as input truncated" do
+            obj = described_class.ruby_to_object({some_key: {foo: 1, bar: 2, baz: 3, qux: 4}}, max_container_size: max_container_size, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj.input_truncated?).to eq(true)
+          end
+
+          it "marks hash with symbol keys exceeding length limit as input truncated" do
+            hash = { foo: { ("a" * 20).to_sym => :bar } }
+            obj = described_class.ruby_to_object(hash, max_string_length: max_string_length)
+
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 1
+            expect(obj.input_truncated?).to eq(true)
+          end
+
+          it "marks hash with string values exceeding length limit as input truncated" do
+            hash = { foo: "a" * 20 }
+            obj = described_class.ruby_to_object(hash, max_string_length: max_string_length)
+
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 1
+            expect(obj.input_truncated?).to eq(true)
+          end
+
+          it "marks hash symbol values exceeding length limit as input truncated" do
+            hash = { foo: ("a" * 20).to_sym }
+            obj = described_class.ruby_to_object(hash, max_string_length: max_string_length)
+
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 1
+            expect(obj.input_truncated?).to eq(true)
           end
         end
 
@@ -535,6 +601,14 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "fooooooooo"
+          end
+
+          it "marks arrays with string values exceeding length limit as input truncated" do
+            arr = ["a" * 20, "b"]
+            obj = described_class.ruby_to_object(arr, max_string_length: max_string_length)
+
+            expect(obj[:type]).to eq :ddwaf_obj_array
+            expect(obj[:nbEntries]).to eq 2
           end
 
           it "converts hash keys up to the limit" do

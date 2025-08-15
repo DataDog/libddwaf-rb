@@ -136,6 +136,14 @@ module Datadog
             :valueUnion, ObjectValueUnion,
             :nbEntries, :uint64,
             :type, :ddwaf_obj_type
+
+          def input_truncated?
+            @input_truncated == true
+          end
+
+          def mark_as_input_truncated!
+            @input_truncated = true
+          end
         end
 
         typedef Object.by_ref, :ddwaf_object
