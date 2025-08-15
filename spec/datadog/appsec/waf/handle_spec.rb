@@ -34,6 +34,13 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
       expect(handle.known_addresses).to match_array(["server.request.query", "server.db.statement", "server.db.system"])
     end
 
+    it "calls libddwaf once and memoizes the result" do
+      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_known_addresses).once.and_call_original
+
+      results = 3.times.map { handle.known_addresses }
+      expect(results.uniq.size).to eq(1)
+    end
+
     it "raises LibDDWAF::Error when handle has been finalized" do
       handle.finalize!
 

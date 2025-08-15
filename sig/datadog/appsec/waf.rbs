@@ -2,6 +2,8 @@ module Datadog
   module AppSec
     module WAF
       type data = String | Symbol | Integer | Float | TrueClass | FalseClass | Array[data] | Hash[(String | Symbol | nil), data] | nil
+      type known_addresses = ::Array[::String]
+      type diagnostics = ::Hash[::String, untyped]
 
       def self.version: () -> ::String
 

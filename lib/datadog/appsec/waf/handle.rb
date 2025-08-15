@@ -37,6 +37,8 @@ module Datadog
         #
         # @return [Array<String>] the list of known addresses
         def known_addresses
+          return @known_addresses if defined?(@known_addresses)
+
           ensure_pointer_presence!
 
           count = LibDDWAF::UInt32Ptr.new
@@ -44,7 +46,7 @@ module Datadog
 
           return [] if count == 0 # list is null
 
-          list.get_array_of_string(0, count[:value])
+          @known_addresses = list.get_array_of_string(0, count[:value]).compact
         end
 
         private
