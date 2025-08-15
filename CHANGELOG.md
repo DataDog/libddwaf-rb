@@ -8,7 +8,7 @@
 
 ## Changed
 
-- Change Handle#known_addresses to cache the result
+- Change `Handle#known_addresses` to cache the result
 
 # 2025-05-20 v1.24.1.0.0
 
