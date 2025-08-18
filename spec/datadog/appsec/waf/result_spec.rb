@@ -43,4 +43,20 @@ RSpec.describe Datadog::AppSec::WAF::Result do
       })
     end
   end
+
+  describe "#input_truncated?" do
+    subject(:result) { described_class.new(:ok, [], 0, false, {}, {}) }
+
+    it "returns false when not marked as truncated" do
+      expect(result.input_truncated?).to be false
+    end
+
+    context "when input was marked as truncated" do
+      it "returns true" do
+        result.mark_as_input_truncated!
+
+        expect(result.input_truncated?).to be true
+      end
+    end
+  end
 end
