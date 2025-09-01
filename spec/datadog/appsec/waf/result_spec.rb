@@ -8,6 +8,7 @@ RSpec.describe Datadog::AppSec::WAF::Result do
     let(:actions) do
       {"block_request" => {"status_code" => "403", "type" => "auto", "grpc_status_code" => "10"}}
     end
+
     let(:events) do
       [
         {
@@ -47,16 +48,14 @@ RSpec.describe Datadog::AppSec::WAF::Result do
   describe "#input_truncated?" do
     subject(:result) { described_class.new(:ok, [], 0, false, {}, {}) }
 
-    it "returns false when not marked as truncated" do
-      expect(result.input_truncated?).to be false
+    context "when input was not truncated" do
+      it { expect(result).not_to be_input_truncated }
     end
 
-    context "when input was marked as truncated" do
-      it "returns true" do
-        result.mark_as_input_truncated!
+    context "when input was truncated" do
+      before { result.mark_input_truncated! }
 
-        expect(result.input_truncated?).to be true
-      end
+      it { expect(result).to be_input_truncated }
     end
   end
 end

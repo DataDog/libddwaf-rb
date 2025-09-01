@@ -83,7 +83,9 @@ module Datadog
             Converter.object_to_ruby(result_obj[:derivatives])
           )
 
-          result.mark_as_input_truncated! if persistent_data_obj.input_truncated? || ephemeral_data_obj.input_truncated?
+          if persistent_data_obj.input_truncated? || ephemeral_data_obj.input_truncated?
+            result.mark_input_truncated!
+          end
 
           result
         ensure
