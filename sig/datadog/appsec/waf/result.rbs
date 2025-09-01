@@ -30,7 +30,7 @@ module Datadog
 
         def initialize: (::Symbol status, WAF::data events, ::Float total_runtime, bool timeout, WAF::data actions, WAF::data derivatives) -> void
 
-        def mark_as_input_truncated!: () -> bool
+        def mark_input_truncated!: () -> bool
 
         def input_truncated?: () -> bool
       end

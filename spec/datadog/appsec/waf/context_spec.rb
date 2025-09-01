@@ -88,9 +88,9 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
     end
 
-    it "sets input_truncated? to false" do
+    it "defines result input as non-truncated" do
       result = context.run({value2: ["rule1"]}, {value2: ["rule1"]})
-      expect(result.input_truncated?).to eq(false)
+      expect(result).not_to be_input_truncated
     end
 
     it "raises LibDDWAF::Error when context has been finalized" do
@@ -122,19 +122,21 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
         expect(result.status).to eq(:match)
       end
+    end
 
-      it "sets input_truncated? to true when persistent data was truncated" do
-        stub_const("Datadog::AppSec::WAF::LibDDWAF::DDWAF_MAX_STRING_LENGTH", 10)
+    context "when input was marked as truncated" do
+      before { stub_const("Datadog::AppSec::WAF::LibDDWAF::DDWAF_MAX_STRING_LENGTH", 10) }
+
+      it "sets result input as truncated when persistent data is truncated" do
         result = context.run({value2: "a" * 11}, {})
 
-        expect(result.input_truncated?).to eq(true)
+        expect(result).to be_input_truncated
       end
 
-      it "sets input_truncated? to true when ephemeral data was truncated" do
-        stub_const("Datadog::AppSec::WAF::LibDDWAF::DDWAF_MAX_STRING_LENGTH", 10)
+      it "sets result input as truncated when ephemeral data is truncated" do
         result = context.run({}, {value2: "a" * 11})
 
-        expect(result.input_truncated?).to eq(true)
+        expect(result).to be_input_truncated
       end
     end
 

@@ -2,7 +2,7 @@
 
 ## Added
 
-- Add `WAF::Result#input_truncated?` method that returns true if one of input objects was truncated during conversion to libddwaf object
+- Add `WAF::Result#input_truncated?` method that indicates that result is based on truncated input objects (see `LibDDWAF::Object#input_truncated?`)
 
 # 2025-08-15 v1.24.1.1.0
 
