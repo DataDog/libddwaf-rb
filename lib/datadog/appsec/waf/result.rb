@@ -15,6 +15,15 @@ module Datadog
           @timeout = timeout
           @actions = actions
           @derivatives = derivatives
+          @input_truncated = false
+        end
+
+        def mark_input_truncated!
+          @input_truncated = true
+        end
+
+        def input_truncated?
+          @input_truncated
         end
 
         def to_h
