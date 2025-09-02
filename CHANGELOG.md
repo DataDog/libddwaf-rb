@@ -1,5 +1,7 @@
 # Unreleased
 
+# 2025-09-02 v1.24.1.2.0
+
 ## Added
 
 - Add `WAF::Result#input_truncated?` method that indicates that result is based on truncated input objects (see `LibDDWAF::Object#input_truncated?`)
