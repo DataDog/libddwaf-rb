@@ -74,7 +74,7 @@ module Datadog
 
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
 
-          Result.new(
+          result = Result.new(
             RESULT_CODE[code],
             Converter.object_to_ruby(result_obj[:events]),
             result_obj[:total_runtime],
@@ -82,6 +82,12 @@ module Datadog
             Converter.object_to_ruby(result_obj[:actions]),
             Converter.object_to_ruby(result_obj[:derivatives])
           )
+
+          if persistent_data_obj.input_truncated? || ephemeral_data_obj.input_truncated?
+            result.mark_input_truncated!
+          end
+
+          result
         ensure
           LibDDWAF.ddwaf_result_free(result_obj) if result_obj
           LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
