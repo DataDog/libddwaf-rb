@@ -69,10 +69,12 @@ module Datadog
             raise ConversionError, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
           end
 
-          result_obj = LibDDWAF::Result.new
+          result_obj = LibDDWAF::Object.new
           raise LibDDWAFError, "Could not create result object" if result_obj.null?
 
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
+
+          binding.irb
 
           result = Result.new(
             RESULT_CODE[code],
@@ -89,7 +91,7 @@ module Datadog
 
           result
         ensure
-          LibDDWAF.ddwaf_result_free(result_obj) if result_obj
+          LibDDWAF.ddwaf_object_free(result_obj) if result_obj
           LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
         end
 
