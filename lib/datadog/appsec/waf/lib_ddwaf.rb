@@ -137,12 +137,12 @@ module Datadog
             :nbEntries, :uint64,
             :type, :ddwaf_obj_type
 
-          def input_truncated?
-            @input_truncated == true
+          def truncated?
+            @truncated == true
           end
 
-          def mark_as_input_truncated!
-            @input_truncated = true
+          def mark_truncated!
+            @truncated = true
           end
         end
 
