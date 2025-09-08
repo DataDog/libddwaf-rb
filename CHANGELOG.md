@@ -1,5 +1,10 @@
 # Unreleased
 
+## Changed
+
+- Change `LibDDWAF::Object#input_truncated?` to `LibDDWAF::Object#truncated?`
+- Change `LibDDWAF::Object#mark_as_input_truncated?` to `LibDDWAF::Object#mark_truncated?`
+
 # 2025-09-02 v1.24.1.2.0
 
 ## Added
