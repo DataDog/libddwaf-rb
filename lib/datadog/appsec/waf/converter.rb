@@ -170,7 +170,7 @@ module Datadog
               a << e # steep:ignore
             end
           when :ddwaf_obj_map
-            (0...obj[:nbEntries]).each.with_object({}) do |i, h|
+            (0...obj[:nbEntries]).each.with_object({}) do |i, h| #$ ::Hash[::String, WAF::data]
               ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
               o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
               l = o[:parameterNameLength]
