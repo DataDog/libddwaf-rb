@@ -1,9 +1,15 @@
 # Unreleased
 
+## Added
+
+- Add `Result#keep?` method
+
 ## Changed
 
-- Change `LibDDWAF::Object#input_truncated?` to `LibDDWAF::Object#truncated?`
-- Change `LibDDWAF::Object#mark_as_input_truncated?` to `LibDDWAF::Object#mark_truncated?`
+- Change `LibDDWAF::Object#input_truncated?` to `LibDDWAF::Object#truncated?` method
+- Change `LibDDWAF::Object#mark_as_input_truncated?` to `LibDDWAF::Object#mark_truncated?` method
+- Change `Result` class initialization interface
+- Change `Result#timeout` to `Result#timeout?` method
 
 # 2025-09-02 v1.24.1.2.0
 

@@ -87,19 +87,9 @@ module Datadog
             result["actions"],
             result["attributes"],
             result["duration"],
-            result["timeout"]
+            result["timeout"],
+            result["keep"]
           )
-
-          # TODO: Add missing fields
-          #       * keep
-          #
-          # TODO: Re-order fields into that order (also `intinialize`)
-          #       * events
-          #       * actions
-          #       * attributes
-          #       * duration
-          #       * timeout
-          #       * keep
 
           if persistent_data_obj.input_truncated? || ephemeral_data_obj.input_truncated?
             result.mark_input_truncated!

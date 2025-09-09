@@ -31,7 +31,7 @@ RSpec.describe Datadog::AppSec::WAF::Result do
       ]
     end
 
-    let(:result) { described_class.new(:match, events, actions, {}, 286_125, false) }
+    let(:result) { described_class.new(:match, events, actions, {}, 286_125, false, true) }
 
     it "converts to Hash" do
       expect(result.to_h).to eq({
@@ -41,13 +41,14 @@ RSpec.describe Datadog::AppSec::WAF::Result do
         derivatives: {},
         total_runtime: 286_125,
         timeout: false,
+        keep: true,
         input_truncated: false
       })
     end
   end
 
   describe "#input_truncated?" do
-    subject(:result) { described_class.new(:ok, [], 0, false, {}, {}) }
+    subject(:result) { described_class.new(:ok, [], {}, {}, 0, false, false) }
 
     context "when input was not truncated" do
       it { expect(result).not_to be_input_truncated }

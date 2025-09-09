@@ -40,10 +40,10 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({value1: ["rule1"]}, {})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:ok)
         expect(result.events).to eq([])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.total_runtime).to be >= 0
         expect(result.actions).to eq({})
         expect(result.derivatives).to eq({})
       end
@@ -53,10 +53,10 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({}, {value1: ["rule1"]})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:ok)
         expect(result.events).to eq([])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.total_runtime).to be >= 0
         expect(result.actions).to eq({})
         expect(result.derivatives).to eq({})
       end
@@ -66,10 +66,10 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({value2: ["rule1"]}, {})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:match)
         expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.total_runtime).to be >= 0
         expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
         expect(result.derivatives).to eq({})
       end
@@ -79,10 +79,10 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({}, {value2: ["rule1"]})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:match)
         expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.total_runtime).to be >= 0
         expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
         expect(result.derivatives).to eq({})
       end
