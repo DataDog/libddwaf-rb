@@ -84,10 +84,10 @@ module Datadog
           result = Result.new(
             RESULT_CODE[code],
             result["events"],
-            result["duration"],
-            result["timeout"],
             result["actions"],
-            result["attributes"]
+            result["attributes"],
+            result["duration"],
+            result["timeout"]
           )
 
           # TODO: Add missing fields

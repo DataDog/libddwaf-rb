@@ -31,16 +31,17 @@ RSpec.describe Datadog::AppSec::WAF::Result do
       ]
     end
 
-    let(:result) { described_class.new(:match, events, 286_125, false, actions, {}) }
+    let(:result) { described_class.new(:match, events, actions, {}, 286_125, false) }
 
     it "converts to Hash" do
       expect(result.to_h).to eq({
         status: :match,
         events: events,
-        timeout: false,
-        total_runtime: 286_125,
         actions: actions,
-        derivatives: {}
+        derivatives: {},
+        total_runtime: 286_125,
+        timeout: false,
+        input_truncated: false
       })
     end
   end
