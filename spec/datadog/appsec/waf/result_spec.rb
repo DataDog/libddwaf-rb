@@ -38,8 +38,8 @@ RSpec.describe Datadog::AppSec::WAF::Result do
         status: :match,
         events: events,
         actions: actions,
-        derivatives: {},
-        total_runtime: 286_125,
+        attributes: {},
+        duration: 286_125,
         timeout: false,
         keep: true,
         input_truncated: false
