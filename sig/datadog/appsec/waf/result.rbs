@@ -28,7 +28,7 @@ module Datadog
 
         attr_reader duration: ::Integer
 
-        def initialize: (::Symbol status, WAF::data events, WAF::data actions, WAF::data derivatives, ::Integer total_runtime, bool timeout, bool keep) -> void
+        def initialize: (::Symbol status, WAF::data events, WAF::data actions, WAF::data attributes, ::Integer duration, bool timeout, bool keep) -> void
 
         def mark_input_truncated!: () -> bool
 
