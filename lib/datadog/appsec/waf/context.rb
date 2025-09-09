@@ -73,22 +73,21 @@ module Datadog
           raise LibDDWAFError, "Could not create result object" if result_obj.null?
 
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
-          result = Converter.object_to_ruby(result_obj)
+          result = Converter.object_to_ruby(result_obj) #: ::Hash[::String, WAF::data]
 
           # TODO: Write test
           if result.nil?
             raise ConversionError, "Could not convert result into object: #{code}"
           end
 
-          # TODO: Rewrite tests in lib_ddwaf.rb
           result = Result.new(
             RESULT_CODE[code],
             result["events"],
             result["actions"],
             result["attributes"],
-            result["duration"],
-            result["timeout"],
-            result["keep"]
+            result["duration"],   #: ::Integer
+            result["timeout"],    #: bool
+            result["keep"]        #: bool
           )
 
           if persistent_data_obj.input_truncated? || ephemeral_data_obj.input_truncated?

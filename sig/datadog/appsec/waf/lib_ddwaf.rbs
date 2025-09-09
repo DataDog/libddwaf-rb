@@ -139,11 +139,7 @@ module Datadog
         def self.ddwaf_context_init: (::FFI::Pointer) -> ::FFI::Pointer
         def self.ddwaf_context_destroy: (::FFI::Pointer) -> void
 
-        class Result < ::FFI::Struct[::FFI::AbstractMemory, untyped]
-        end
-
-        def self.ddwaf_run: (::FFI::Pointer, Object, Object, Result, ::Integer) -> ::Symbol
-        def self.ddwaf_result_free: (Result) -> void
+        def self.ddwaf_run: (::FFI::Pointer, Object, Object, Object, ::Integer) -> ::Symbol
 
         # logging
 
