@@ -96,9 +96,9 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     it "raises LibDDWAF::Error when context has been finalized" do
       context.finalize!
 
-      expect do
-        context.run({}, {value2: ["rule1"]})
-      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF context after it has been finalized/)
+      expect { context.run({}, {value2: ["rule1"]}) }.to raise_error(
+        Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF context after it has been finalized/
+      )
     end
 
     it "catches a match with a non UTF-8 string" do
@@ -225,6 +225,19 @@ RSpec.describe Datadog::AppSec::WAF::Context do
             expect(result.attributes).to be_empty
           end
         end
+      end
+    end
+
+    context "when result conversion failed" do
+      before do
+        allow(Datadog::AppSec::WAF::Converter).to receive(:object_to_ruby)
+          .and_return(nil)
+      end
+
+      it "raises exception" do
+        expect { context.run({}, {}) }.to raise_error(
+          Datadog::AppSec::WAF::ConversionError, /Could not convert result into object/
+        )
       end
     end
   end

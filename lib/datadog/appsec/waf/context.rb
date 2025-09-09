@@ -75,7 +75,6 @@ module Datadog
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
           result = Converter.object_to_ruby(result_obj) #: ::Hash[::String, WAF::data]
 
-          # TODO: Write test
           if result.nil?
             raise ConversionError, "Could not convert result into object: #{code}"
           end
