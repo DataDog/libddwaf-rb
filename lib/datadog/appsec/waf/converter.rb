@@ -53,7 +53,7 @@ module Datadog
                 k = e[0]
                 v = e[1]
 
-                if max_string_length && k.length > max_string_length
+                if max_string_length && k && k.length > max_string_length
                   k = k.to_s[0, max_string_length]
                   (top_obj || obj).mark_truncated!
                 end

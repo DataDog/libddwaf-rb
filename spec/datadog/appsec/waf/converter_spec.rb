@@ -303,6 +303,12 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(k).to eq "fooooooooo"
             expect(obj).to be_truncated
           end
+
+          it "converts hash with a nil key" do
+            obj = described_class.ruby_to_object({nil => :foo}, max_string_length: max_string_length)
+            expect(obj[:type]).to eq(:ddwaf_obj_map)
+            expect(obj[:nbEntries]).to eq(1)
+          end
         end
       end
     end
