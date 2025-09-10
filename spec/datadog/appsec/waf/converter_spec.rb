@@ -52,7 +52,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       it "converts a symbol" do
-        obj = described_class.ruby_to_object(:foo)
+        obj = described_class.ruby_to_object(:foo, max_string_length: 10)
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 3
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo"
@@ -308,6 +308,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             obj = described_class.ruby_to_object({nil => :foo}, max_string_length: max_string_length)
             expect(obj[:type]).to eq(:ddwaf_obj_map)
             expect(obj[:nbEntries]).to eq(1)
+            expect(obj).not_to be_truncated
           end
         end
       end
