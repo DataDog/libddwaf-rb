@@ -15,11 +15,15 @@ module Datadog
             res = LibDDWAF.ddwaf_object_array(obj)
             raise ConversionError, "Could not convert into object: #{val}" if res.null?
 
-            max_index = max_container_size - 1 if max_container_size
             if max_container_depth == 0
               top_obj&.mark_truncated!
             else
               val.each.with_index do |e, i|
+                if max_container_size && i >= max_container_size
+                  (top_obj || obj).mark_truncated!
+                  break val
+                end
+
                 member = Converter.ruby_to_object(
                   e,
                   max_container_size: max_container_size,
@@ -30,11 +34,6 @@ module Datadog
                 )
                 e_res = LibDDWAF.ddwaf_object_array_add(obj, member)
                 raise ConversionError, "Could not add to array object: #{e.inspect}" unless e_res
-
-                if max_index && i >= max_index
-                  (top_obj || obj).mark_truncated!
-                  break val
-                end
               end
             end
 
@@ -44,11 +43,15 @@ module Datadog
             res = LibDDWAF.ddwaf_object_map(obj)
             raise ConversionError, "Could not convert into object: #{val}" if res.null?
 
-            max_index = max_container_size - 1 if max_container_size
             if max_container_depth == 0
               top_obj&.mark_truncated!
             else
               val.each.with_index do |e, i|
+                if max_container_size && i >= max_container_size
+                  (top_obj || obj).mark_truncated!
+                  break val
+                end
+
                 # for Steep, which doesn't handle |(k, v), i|
                 k = e[0].to_s
                 v = e[1]
@@ -67,11 +70,6 @@ module Datadog
                 )
                 kv_res = LibDDWAF.ddwaf_object_map_addl(obj, k, k.bytesize, member)
                 raise ConversionError, "Could not add to map object: #{e[0].inspect} => #{v.inspect}" unless kv_res
-
-                if max_index && i >= max_index
-                  (top_obj || obj).mark_truncated!
-                  break val
-                end
               end
             end
 
@@ -80,11 +78,10 @@ module Datadog
             obj = LibDDWAF::Object.new
             encoded_val = val.to_s.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
             if max_string_length && encoded_val.length > max_string_length
-              encoded_val = encoded_val[0, max_string_length]
+              encoded_val = encoded_val[0, max_string_length].to_s
               (top_obj || obj).mark_truncated!
             end
-            str = encoded_val.to_s
-            res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
+            res = LibDDWAF.ddwaf_object_stringl(obj, encoded_val, encoded_val.bytesize)
             raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
             obj

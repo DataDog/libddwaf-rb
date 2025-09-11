@@ -52,7 +52,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       it "converts a symbol" do
-        obj = described_class.ruby_to_object(:foo, max_string_length: 10)
+        obj = described_class.ruby_to_object(:foo)
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 3
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo"
@@ -139,13 +139,9 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       context "with limits" do
-        let(:max_container_size) { 3 }
-        let(:max_container_depth) { 3 }
-        let(:max_string_length) { 10 }
-
         context "with container size limit" do
           it "converts an array up to the limit" do
-            obj = described_class.ruby_to_object((1..6).to_a, max_container_size: max_container_size)
+            obj = described_class.ruby_to_object((1..6).to_a, max_container_size: 3)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 3
             expect(obj).to be_truncated
@@ -160,8 +156,15 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(array).to eq ("1".."3").to_a
           end
 
+          it "does not mark arrays within the limit as truncated" do
+            obj = described_class.ruby_to_object((1..3).to_a, max_container_size: 3)
+            expect(obj[:type]).to eq(:ddwaf_obj_array)
+            expect(obj[:nbEntries]).to eq(3)
+            expect(obj).not_to be_truncated
+          end
+
           it "converts a hash up to the limit" do
-            obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size)
+            obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: 3)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 3
             expect(obj).to be_truncated
@@ -177,11 +180,18 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             end
             expect(hash).to eq({"foo" => "1", "bar" => "2", "baz" => "3"})
           end
+
+          it "does not mark hashes within the limit as truncated" do
+            obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3}, max_container_size: 3)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 3
+            expect(obj).not_to be_truncated
+          end
         end
 
         context "with container depth limit" do
           it "converts nested arrays up to the limit" do
-            obj = described_class.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: max_container_depth)
+            obj = described_class.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: 3)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 2
             expect(obj).to be_truncated
@@ -226,8 +236,14 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(o2[:nbEntries]).to eq 0
           end
 
+          it "does not mark nested arrays within limit as truncated" do
+            obj = described_class.ruby_to_object([1, [2, [3]]], max_container_depth: 3)
+            expect(obj[:type]).to eq(:ddwaf_obj_array)
+            expect(obj).not_to be_truncated
+          end
+
           it "converts nested hashes up to the limit" do
-            obj = described_class.ruby_to_object({foo: {bar: {baz: {qux: 4}}}}, max_container_depth: max_container_depth)
+            obj = described_class.ruby_to_object({foo: {bar: {baz: {qux: 4}}}}, max_container_depth: 3)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
             expect(obj).to be_truncated
@@ -262,19 +278,32 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(o[:type]).to eq :ddwaf_obj_map
             expect(o[:nbEntries]).to eq 0
           end
+
+          it "does not mark nested hashes within limit as truncated" do
+            obj = described_class.ruby_to_object({foo: {bar: {baz: :qux}}}, max_container_depth: 3)
+            expect(obj[:type]).to eq(:ddwaf_obj_map)
+            expect(obj).not_to be_truncated
+          end
         end
 
         context "with string length limit" do
           it "converts a string up to the limit" do
-            obj = described_class.ruby_to_object(+"foo" << "o" * 80, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object(+"foo" << "o" * 80, max_string_length: 10)
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "fooooooooo"
             expect(obj).to be_truncated
           end
 
+          it "does not mark a string as truncated if it is withing the length limit" do
+            obj = described_class.ruby_to_object("a" * 10, max_string_length: 10)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj).not_to be_truncated
+          end
+
           it "converts a binary string up to the limit" do
-            obj = described_class.ruby_to_object(+"foo\x00bar" << "r" * 80, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object(+"foo\x00bar" << "r" * 80, max_string_length: 10)
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00barrrr"
@@ -282,7 +311,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
           it "converts a symbol up to the limit" do
-            obj = described_class.ruby_to_object((+"foo" << "o" * 80).to_sym, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object((+"foo" << "o" * 80).to_sym, max_string_length: 10)
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "fooooooooo"
@@ -290,7 +319,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
           it "converts hash keys up to the limit" do
-            obj = described_class.ruby_to_object({(+"foo" << "o" * 80) => 42}, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object({(+"foo" << "o" * 80) => 42}, max_string_length: 10)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
@@ -305,7 +334,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
           it "converts hash with a nil key" do
-            obj = described_class.ruby_to_object({nil => :foo}, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object({nil => :foo}, max_string_length: 10)
             expect(obj[:type]).to eq(:ddwaf_obj_map)
             expect(obj[:nbEntries]).to eq(1)
             expect(obj).not_to be_truncated
@@ -427,13 +456,9 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       context "with limits" do
-        let(:max_container_size) { 3 }
-        let(:max_container_depth) { 3 }
-        let(:max_string_length) { 10 }
-
         context "with container size limit" do
           it "converts an array up to the limit" do
-            obj = described_class.ruby_to_object((1..6).to_a, max_container_size: max_container_size, coerce: false)
+            obj = described_class.ruby_to_object((1..6).to_a, max_container_size: 3, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 3
             expect(obj).to be_truncated
@@ -448,13 +473,20 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
           it "marks nested arrays exceeding limit as input truncated" do
-            obj = described_class.ruby_to_object([(1..6).to_a], max_container_size: max_container_size, coerce: false)
+            obj = described_class.ruby_to_object([(1..6).to_a], max_container_size: 3, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj).to be_truncated
           end
 
+          it "does not mark arrays within the limit as truncated" do
+            obj = described_class.ruby_to_object((1..3).to_a, max_container_size: 3, coerce: false)
+            expect(obj[:type]).to eq(:ddwaf_obj_array)
+            expect(obj[:nbEntries]).to eq(3)
+            expect(obj).not_to be_truncated
+          end
+
           it "converts a hash up to the limit" do
-            obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: max_container_size, coerce: false)
+            obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3, qux: 4}, max_container_size: 3, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 3
             expect(obj).to be_truncated
@@ -471,14 +503,21 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
           it "marks nested hashes exceeding limit as input truncated" do
-            obj = described_class.ruby_to_object({some_key: {foo: 1, bar: 2, baz: 3, qux: 4}}, max_container_size: max_container_size, coerce: false)
+            obj = described_class.ruby_to_object({some_key: {foo: 1, bar: 2, baz: 3, qux: 4}}, max_container_size: 3, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj).to be_truncated
           end
 
+          it "does not mark hashes within the limit as truncated" do
+            obj = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3}, max_container_size: 3, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_map
+            expect(obj[:nbEntries]).to eq 3
+            expect(obj).not_to be_truncated
+          end
+
           it "marks hash with symbol keys exceeding length limit as input truncated" do
             hash = { foo: { ("a" * 20).to_sym => :bar } }
-            obj = described_class.ruby_to_object(hash, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object(hash, max_string_length: 10)
 
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
@@ -487,7 +526,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
           it "marks hash with string values exceeding length limit as input truncated" do
             hash = { foo: "a" * 20 }
-            obj = described_class.ruby_to_object(hash, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object(hash, max_string_length: 10)
 
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
@@ -496,7 +535,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
           it "marks hash symbol values exceeding length limit as input truncated" do
             hash = { foo: ("a" * 20).to_sym }
-            obj = described_class.ruby_to_object(hash, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object(hash, max_string_length: 10)
 
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
@@ -506,7 +545,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
         context "with container depth limit" do
           it "converts nested arrays up to the limit" do
-            obj = described_class.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: max_container_depth, coerce: false)
+            obj = described_class.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: 3, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 2
 
@@ -547,12 +586,14 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(o2[:nbEntries]).to eq 0
           end
 
+          it "does not mark nested arrays within limit as truncated" do
+            obj = described_class.ruby_to_object([1, [2, [3]]], max_container_depth: 3, coerce: false)
+            expect(obj[:type]).to eq(:ddwaf_obj_array)
+            expect(obj).not_to be_truncated
+          end
+
           it "converts nested hashes up to the limit" do
-            obj = described_class.ruby_to_object(
-              {foo: {bar: {baz: {qux: 4}}}},
-              max_container_depth: max_container_depth,
-              coerce: false
-            )
+            obj = described_class.ruby_to_object({foo: {bar: {baz: {qux: 4}}}}, max_container_depth: 3, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
@@ -586,25 +627,38 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
             expect(o[:type]).to eq :ddwaf_obj_map
             expect(o[:nbEntries]).to eq 0
           end
+
+          it "does not mark nested hashes within limit as truncated" do
+            obj = described_class.ruby_to_object({foo: {bar: {baz: :qux}}}, max_container_depth: 3, coerce: false)
+            expect(obj[:type]).to eq(:ddwaf_obj_map)
+            expect(obj).not_to be_truncated
+          end
         end
 
         context "with string length limit" do
           it "converts a string up to the limit" do
-            obj = described_class.ruby_to_object(+"foo" << "o" * 80, max_string_length: max_string_length, coerce: false)
+            obj = described_class.ruby_to_object(+"foo" << "o" * 80, max_string_length: 10, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "fooooooooo"
           end
 
+          it "does not mark a string as truncated if it is withing the length limit" do
+            obj = described_class.ruby_to_object("a" * 10, max_string_length: 10, coerce: false)
+            expect(obj[:type]).to eq :ddwaf_obj_string
+            expect(obj[:nbEntries]).to eq 10
+            expect(obj).not_to be_truncated
+          end
+
           it "converts a binary string up to the limit" do
-            obj = described_class.ruby_to_object(+"foo\x00bar" << "r" * 80, max_string_length: max_string_length, coerce: false)
+            obj = described_class.ruby_to_object(+"foo\x00bar" << "r" * 80, max_string_length: 10, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo\x00barrrr"
           end
 
           it "converts a symbol up to the limit" do
-            obj = described_class.ruby_to_object((+"foo" << "o" * 80).to_sym, max_string_length: max_string_length, coerce: false)
+            obj = described_class.ruby_to_object((+"foo" << "o" * 80).to_sym, max_string_length: 10, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_string
             expect(obj[:nbEntries]).to eq 10
             expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "fooooooooo"
@@ -612,14 +666,14 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
           it "marks arrays with string values exceeding length limit as input truncated" do
             arr = ["a" * 20, "b"]
-            obj = described_class.ruby_to_object(arr, max_string_length: max_string_length)
+            obj = described_class.ruby_to_object(arr, max_string_length: 10)
 
             expect(obj[:type]).to eq :ddwaf_obj_array
             expect(obj[:nbEntries]).to eq 2
           end
 
           it "converts hash keys up to the limit" do
-            obj = described_class.ruby_to_object({(+"foo" << "o" * 80) => 42}, max_string_length: max_string_length, coerce: false)
+            obj = described_class.ruby_to_object({(+"foo" << "o" * 80) => 42}, max_string_length: 10, coerce: false)
             expect(obj[:type]).to eq :ddwaf_obj_map
             expect(obj[:nbEntries]).to eq 1
 
