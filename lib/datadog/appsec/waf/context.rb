@@ -80,13 +80,13 @@ module Datadog
           end
 
           result = Result.new(
-            RESULT_CODE[code],
-            result["events"],
-            result["actions"],
-            result["attributes"],
-            result["duration"],   #: ::Integer
-            result["timeout"],    #: bool
-            result["keep"]        #: bool
+            status: RESULT_CODE[code],
+            events: result["events"],
+            actions: result["actions"],
+            attributes: result["attributes"],
+            duration: result["duration"], #: ::Integer
+            timeout: result["timeout"],   #: bool
+            keep: result["keep"]          #: bool
           )
 
           if persistent_data_obj.input_truncated? || ephemeral_data_obj.input_truncated?
