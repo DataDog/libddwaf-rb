@@ -157,7 +157,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
           it "does not mark arrays within the limit as truncated" do
-            obj = described_class.ruby_to_object((1..3).to_a, max_container_size: 3)
+            obj = described_class.ruby_to_object([1, 2, 3].to_a, max_container_size: 3)
             expect(obj[:type]).to eq(:ddwaf_obj_array)
             expect(obj[:nbEntries]).to eq(3)
             expect(obj).not_to be_truncated
