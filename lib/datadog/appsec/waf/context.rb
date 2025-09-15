@@ -89,7 +89,7 @@ module Datadog
             keep: result["keep"]          #: bool
           )
 
-          if persistent_data_obj.input_truncated? || ephemeral_data_obj.input_truncated?
+          if persistent_data_obj.truncated? || ephemeral_data_obj.truncated?
             result.mark_input_truncated!
           end
 
