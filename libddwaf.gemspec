@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
   spec.email = ["dev@datadoghq.com"]
 
   spec.summary = "Datadog WAF"
-  spec.description = <<-EOS.gsub(/^[\s]+/, "")
+  spec.description = <<-EOS.gsub(/^\s+/, "")
     libddwaf packages a WAF implementation in C++, exposed to Ruby
   EOS
 
