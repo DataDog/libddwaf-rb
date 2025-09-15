@@ -1,5 +1,11 @@
 # Unreleased
 
+# 2025-09-15 v1.24.1.2.1
+
+## Fixed
+
+- Fix conversion of non-string Hash keys with potential size truncation
+
 # 2025-09-02 v1.24.1.2.0
 
 ## Added
