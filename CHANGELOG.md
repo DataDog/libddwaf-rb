@@ -1,5 +1,7 @@
 # Unreleased
 
+# 2025-09-16 v1.25.1.0.0
+
 ## Added
 
 - Add `Result#keep?` method
