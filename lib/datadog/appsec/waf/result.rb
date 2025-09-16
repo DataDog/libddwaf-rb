@@ -4,22 +4,31 @@ module Datadog
   module AppSec
     module WAF
       # Ruby representation of the ddwaf_result of a libddwaf run.
-      # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L159-L173
+      # See https://github.com/DataDog/libddwaf/blob/8dbee187ff74a0aa25e1bcbdde51677f77930e1b/include/ddwaf.h#L277-L290
       class Result
-        attr_reader :status, :events, :total_runtime, :timeout, :actions, :derivatives
+        attr_reader :status, :events, :actions, :attributes, :duration
 
-        def initialize(status, events, total_runtime, timeout, actions, derivatives)
+        def initialize(status:, events:, actions:, attributes:, duration:, timeout:, keep:)
           @status = status
           @events = events
-          @total_runtime = total_runtime
-          @timeout = timeout
           @actions = actions
-          @derivatives = derivatives
+          @attributes = attributes
+          @duration = duration
+          @timeout = timeout
+          @keep = keep
           @input_truncated = false
         end
 
         def mark_input_truncated!
           @input_truncated = true
+        end
+
+        def timeout?
+          @timeout
+        end
+
+        def keep?
+          @keep
         end
 
         def input_truncated?
@@ -30,10 +39,12 @@ module Datadog
           {
             status: @status,
             events: @events,
-            total_runtime: @total_runtime,
-            timeout: @timeout,
             actions: @actions,
-            derivatives: @derivatives
+            attributes: @attributes,
+            duration: @duration,
+            timeout: @timeout,
+            keep: @keep,
+            input_truncated: @input_truncated
           }
         end
       end

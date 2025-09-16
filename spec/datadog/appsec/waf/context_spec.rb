@@ -40,12 +40,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({value1: ["rule1"]}, {})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:ok)
         expect(result.events).to eq([])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.duration).to be >= 0
         expect(result.actions).to eq({})
-        expect(result.derivatives).to eq({})
+        expect(result.attributes).to eq({})
       end
     end
 
@@ -53,12 +53,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({}, {value1: ["rule1"]})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:ok)
         expect(result.events).to eq([])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.duration).to be >= 0
         expect(result.actions).to eq({})
-        expect(result.derivatives).to eq({})
+        expect(result.attributes).to eq({})
       end
     end
 
@@ -66,12 +66,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({value2: ["rule1"]}, {})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:match)
         expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.duration).to be >= 0
         expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
-        expect(result.derivatives).to eq({})
+        expect(result.attributes).to eq({})
       end
     end
 
@@ -79,12 +79,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       result = context.run({}, {value2: ["rule1"]})
 
       aggregate_failures("result") do
+        expect(result).not_to be_timeout
         expect(result.status).to eq(:match)
         expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
-        expect(result.total_runtime).to be_positive
-        expect(result.timeout).to eq(false)
+        expect(result.duration).to be >= 0
         expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
-        expect(result.derivatives).to eq({})
+        expect(result.attributes).to eq({})
       end
     end
 
@@ -96,9 +96,9 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     it "raises LibDDWAF::Error when context has been finalized" do
       context.finalize!
 
-      expect do
-        context.run({}, {value2: ["rule1"]})
-      end.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF context after it has been finalized/)
+      expect { context.run({}, {value2: ["rule1"]}) }.to raise_error(
+        Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF context after it has been finalized/
+      )
     end
 
     it "catches a match with a non UTF-8 string" do
@@ -188,7 +188,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
 
       context "with schema extraction" do
-        it "populates derivatives" do
+        it "populates attributes" do
           waf_args = {
             "server.request.query" => {
               "hello" => "EMBED"
@@ -202,13 +202,13 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
           aggregate_failures("result") do
             expect(result.status).to eq :ok
-            expect(result.derivatives).to eq({"_dd.appsec.s.req.query" => [{"hello" => [8]}]})
+            expect(result.attributes).to eq({"_dd.appsec.s.req.query" => [{"hello" => [8]}]})
           end
         end
       end
 
       context "without schema extraction" do
-        it "populates derivatives" do
+        it "populates attributes" do
           waf_args = {
             "server.request.query" => {
               "hello" => "EMBED"
@@ -222,9 +222,22 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
           aggregate_failures("result") do
             expect(result.status).to eq :ok
-            expect(result.derivatives).to be_empty
+            expect(result.attributes).to be_empty
           end
         end
+      end
+    end
+
+    context "when result conversion failed" do
+      before do
+        allow(Datadog::AppSec::WAF::Converter).to receive(:object_to_ruby)
+          .and_return(nil)
+      end
+
+      it "raises exception" do
+        expect { context.run({}, {}) }.to raise_error(
+          Datadog::AppSec::WAF::ConversionError, /Could not convert result into object/
+        )
       end
     end
   end

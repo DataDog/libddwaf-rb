@@ -1,18 +1,18 @@
 module Datadog
   module AppSec
     module WAF
-      type data = String | Symbol | Integer | Float | TrueClass | FalseClass | Array[data] | Hash[(String | Symbol | nil), data] | nil
+      type data = nil | bool | ::String | ::Symbol | ::Integer | ::Float | ::Array[data] | ::Hash[(::String | ::Symbol | nil), data]
       type known_addresses = ::Array[::String]
       type diagnostics = ::Hash[::String, untyped]
 
-      def self.version: () -> ::String
+      def self?.version: () -> ::String
 
       self.@logger: ::Logger
       self.@log_callback: LibDDWAF::ddwaf_log_cb
 
-      def self.log_callback: (LibDDWAF::ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
-      def self.logger: () -> ::Logger
-      def self.logger=: (::Logger logger) -> void
+      def self?.log_callback: (LibDDWAF::ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
+      def self?.logger: () -> ::Logger
+      def self?.logger=: (::Logger logger) -> void
     end
   end
 end

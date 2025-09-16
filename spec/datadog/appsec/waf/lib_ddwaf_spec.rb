@@ -810,104 +810,132 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     it "triggers a monitoring rule" do
       described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
+
       handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
+      expect(handle).not_to be_null
 
       context = described_class.ddwaf_context_init(handle)
-      expect(context.null?).to be false
+      expect(context).not_to be_null
 
-      result = described_class::Result.new
+      result = described_class::Object.new
       code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
 
       expect(code).to eq :ddwaf_match
-      expect(result[:timeout]).to eq false
-      expect(result[:events]).to be_a described_class::Object
-      expect(result[:actions]).to be_a described_class::Object
-      expect(described_class.ddwaf_object_size(result[:actions])).to eq 0
+      expect(result).to be_a(described_class::Object)
+
+      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
+      expect(result["events"]).to be_a(Array)
+      expect(result["actions"]).to be_a(Hash)
+      expect(result["timeout"]).to eq(false)
+
+      expect(result["actions"].size).to be_zero
     end
 
     it "does not trigger" do
       described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule2, diagnostics_obj)
       handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
+      expect(handle).not_to be_null
 
       context = described_class.ddwaf_context_init(handle)
-      result = described_class::Result.new
+      expect(context).not_to be_null
+
+      result = described_class::Object.new
       code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
+
       expect(code).to eq :ddwaf_ok
-      expect(result[:timeout]).to eq false
-      expect(result[:events]).to be_a described_class::Object
-      expect(result[:actions]).to be_a described_class::Object
-      expect(described_class.ddwaf_object_size(result[:actions])).to eq 0
+      expect(result).to be_a(described_class::Object)
+
+      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
+      expect(result["events"]).to be_a(Array)
+      expect(result["actions"]).to be_a(Hash)
+      expect(result["timeout"]).to eq(false)
+      expect(result["actions"].size).to be_zero
     end
 
     it "does not trigger a monitoring rule due to timeout" do
       described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
       handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
+      expect(handle).not_to be_null
 
       context = described_class.ddwaf_context_init(handle)
-      expect(context.null?).to be false
+      expect(context).not_to be_null
 
-      result = described_class::Result.new
+      result = described_class::Object.new
       code = described_class.ddwaf_run(context, input, empty_input, result, 1)
 
       expect(code).to eq :ddwaf_ok
-      expect(result[:timeout]).to eq true
-      expect(result[:events]).to be_a described_class::Object
-      expect(result[:actions]).to be_a described_class::Object
-      expect(described_class.ddwaf_object_size(result[:actions])).to eq 0
+      expect(result).to be_a(described_class::Object)
+
+      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
+      expect(result["events"]).to be_a(Array)
+      expect(result["actions"]).to be_a(Hash)
+      expect(result["timeout"]).to eq(true)
+      expect(result["actions"].size).to be_zero
     end
 
     it "triggers a known attack" do
       described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule3, diagnostics_obj)
       handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
+      expect(handle).not_to be_null
 
       context = described_class.ddwaf_context_init(handle)
-      result = described_class::Result.new
+      expect(context).not_to be_null
+
+      result = described_class::Object.new
       code = described_class.ddwaf_run(context, attack, empty_input, result, timeout_usec)
+
       expect(code).to eq :ddwaf_match
-      expect(result[:timeout]).to eq false
-      expect(result[:events]).to be_a described_class::Object
-      expect(result[:actions]).to be_a described_class::Object
-      expect(described_class.ddwaf_object_size(result[:actions])).to eq 0
+      expect(result).to be_a(described_class::Object)
+
+      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
+      expect(result["events"]).to be_a(Array)
+      expect(result["actions"]).to be_a(Hash)
+      expect(result["timeout"]).to eq(false)
+      expect(result["actions"].size).to be_zero
     end
 
     it "triggers a known actionable attack" do
       described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule5, diagnostics_obj)
       handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
+      expect(handle).not_to be_null
 
       context = described_class.ddwaf_context_init(handle)
-      result = described_class::Result.new
+      expect(context).not_to be_null
+
+      result = described_class::Object.new
       code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
+
       expect(code).to eq :ddwaf_match
-      expect(result[:timeout]).to eq false
-      expect(result[:events]).to be_a described_class::Object
-      expect(result[:actions]).to be_a described_class::Object
-      expect(described_class.ddwaf_object_size(result[:actions])).to eq 4
-      # TODO: not sure why libddwaf reverses actions
-      actions = Datadog::AppSec::WAF::Converter.object_to_ruby(result[:actions]).keys
-      expect(actions).to eq ["block", "extract_schema", "stacktrace", "unblock"].reverse
+      expect(result).to be_a(described_class::Object)
+
+      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
+      expect(result["events"]).to be_a(Array)
+      expect(result["actions"]).to be_a(Hash)
+      expect(result["timeout"]).to eq(false)
+      expect(result["actions"].size).to eq(4)
+      expect(result["actions"].keys).to eq(["unblock", "stacktrace", "extract_schema", "block"])
     end
 
     it "silently drops invalid or unknown actions on actionable attack" do
       described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, invalid_action_rule, diagnostics_obj)
       handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
+      expect(handle).not_to be_null
 
       context = described_class.ddwaf_context_init(handle)
-      result = described_class::Result.new
-      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
-      expect(code).to eq :ddwaf_match
-      expect(result[:timeout]).to eq false
-      expect(result[:events]).to be_a described_class::Object
-      expect(result[:actions]).to be_a described_class::Object
-      expect(described_class.ddwaf_object_size(result[:actions])).to eq 2
+      expect(context).not_to be_null
 
-      actions = Datadog::AppSec::WAF::Converter.object_to_ruby(result[:actions]).keys
-      expect(actions).to eq ["unblock", "block"]
+      result = described_class::Object.new
+      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
+
+      expect(code).to eq :ddwaf_match
+      expect(result).to be_a(described_class::Object)
+
+      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
+      expect(result["events"]).to be_a(Array)
+      expect(result["actions"]).to be_a(Hash)
+      expect(result["timeout"]).to eq(false)
+      expect(result["actions"].size).to eq(2)
+      expect(result["actions"].keys).to eq(["unblock", "block"])
     end
   end
 end

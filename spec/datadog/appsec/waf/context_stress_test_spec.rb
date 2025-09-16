@@ -62,7 +62,7 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
             ephemeral_data[:value3] = [i]
             waf_result = context.run({}, ephemeral_data, 10_000_000)
             mutex.synchronize do
-              if waf_result.timeout
+              if waf_result.timeout?
                 if i.even?
                   result[:timeout_match] += 1
                 else

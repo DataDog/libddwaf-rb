@@ -69,18 +69,24 @@ module Datadog
             raise ConversionError, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
           end
 
-          result_obj = LibDDWAF::Result.new
+          result_obj = LibDDWAF::Object.new
           raise LibDDWAFError, "Could not create result object" if result_obj.null?
 
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
+          result = Converter.object_to_ruby(result_obj) #: ::Hash[::String, WAF::data]
+
+          if result.nil?
+            raise ConversionError, "Could not convert result into object: #{code}"
+          end
 
           result = Result.new(
-            RESULT_CODE[code],
-            Converter.object_to_ruby(result_obj[:events]),
-            result_obj[:total_runtime],
-            result_obj[:timeout],
-            Converter.object_to_ruby(result_obj[:actions]),
-            Converter.object_to_ruby(result_obj[:derivatives])
+            status: RESULT_CODE[code],
+            events: result["events"],
+            actions: result["actions"],
+            attributes: result["attributes"],
+            duration: result["duration"], #: ::Integer
+            timeout: result["timeout"],   #: bool
+            keep: result["keep"]          #: bool
           )
 
           if persistent_data_obj.truncated? || ephemeral_data_obj.truncated?
@@ -89,7 +95,7 @@ module Datadog
 
           result
         ensure
-          LibDDWAF.ddwaf_result_free(result_obj) if result_obj
+          LibDDWAF.ddwaf_object_free(result_obj) if result_obj
           LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
         end
 

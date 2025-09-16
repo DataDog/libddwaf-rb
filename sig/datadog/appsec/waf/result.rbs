@@ -6,13 +6,15 @@ module Datadog
 
         @events: WAF::data
 
-        @total_runtime: ::Float
+        @actions: WAF::data
+
+        @attributes: WAF::data
+
+        @duration: ::Integer
 
         @timeout: bool
 
-        @actions: WAF::data
-
-        @derivatives: WAF::data
+        @keep: bool
 
         @input_truncated: bool
 
@@ -20,19 +22,31 @@ module Datadog
 
         attr_reader events: WAF::data
 
-        attr_reader total_runtime: ::Float
-
-        attr_reader timeout: bool
-
         attr_reader actions: WAF::data
 
-        attr_reader derivatives: WAF::data
+        attr_reader attributes: WAF::data
 
-        def initialize: (::Symbol status, WAF::data events, ::Float total_runtime, bool timeout, WAF::data actions, WAF::data derivatives) -> void
+        attr_reader duration: ::Integer
+
+        def initialize: (
+          status: ::Symbol,
+          events: WAF::data,
+          actions: WAF::data,
+          attributes: WAF::data,
+          duration: ::Integer,
+          timeout: bool,
+          keep: bool
+        ) -> void
 
         def mark_input_truncated!: () -> bool
 
+        def timeout?: () -> bool
+
+        def keep?: () -> bool
+
         def input_truncated?: () -> bool
+
+        def to_h: () -> ::Hash[::Symbol, WAF::data]
       end
     end
   end

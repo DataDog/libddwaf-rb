@@ -253,21 +253,9 @@ module Datadog
         attach_function :ddwaf_context_init, [:ddwaf_handle], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
-        # Ruby representation of ddwaf_result
-        # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L154-L173
-        class Result < ::FFI::Struct
-          layout :timeout, :bool,
-            :events, Object,
-            :actions, Object,
-            :derivatives, Object,
-            :total_runtime, :uint64
-        end
-
-        typedef Result.by_ref, :ddwaf_result
         typedef :uint64, :timeout_us
 
-        attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_object, :ddwaf_result, :timeout_us], :ddwaf_ret_code, blocking: true
-        attach_function :ddwaf_result_free, [:ddwaf_result], :void
+        attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_object, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
 
         # logging
 
