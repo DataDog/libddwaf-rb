@@ -58,6 +58,8 @@ module Datadog
         end
 
         class Object < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+          @truncated: bool
+
           def truncated?: () -> bool
 
           def mark_truncated!: () -> bool
