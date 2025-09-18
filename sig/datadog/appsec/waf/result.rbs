@@ -2,13 +2,16 @@ module Datadog
   module AppSec
     module WAF
       class Result
+        type list = ::Array[WAF::output]
+        type map = ::Hash[::String, WAF::output]
+
         @status: ::Symbol
 
-        @events: WAF::data
+        @events: list
 
-        @actions: WAF::data
+        @actions: map
 
-        @attributes: WAF::data
+        @attributes: map
 
         @duration: ::Integer
 
@@ -20,19 +23,19 @@ module Datadog
 
         attr_reader status: ::Symbol
 
-        attr_reader events: WAF::data
+        attr_reader events: list
 
-        attr_reader actions: WAF::data
+        attr_reader actions: map
 
-        attr_reader attributes: WAF::data
+        attr_reader attributes: map
 
         attr_reader duration: ::Integer
 
         def initialize: (
           status: ::Symbol,
-          events: WAF::data,
-          actions: WAF::data,
-          attributes: WAF::data,
+          events: list,
+          actions: map,
+          attributes: map,
           duration: ::Integer,
           timeout: bool,
           keep: bool
@@ -46,7 +49,7 @@ module Datadog
 
         def input_truncated?: () -> bool
 
-        def to_h: () -> ::Hash[::Symbol, WAF::data]
+        def to_h: () -> ::Hash[::Symbol, (::Symbol | WAF::output)]
       end
     end
   end

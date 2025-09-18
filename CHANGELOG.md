@@ -1,5 +1,11 @@
 # Unreleased
 
+# 2025-09-18 v1.25.1.0.1
+
+## Fixed
+
+- Fix handling of unsuccessful `ddwaf_run` call and result conversion
+
 # 2025-09-16 v1.25.1.0.0
 
 ## Added

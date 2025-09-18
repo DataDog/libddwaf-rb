@@ -4,15 +4,26 @@ module Datadog
       class Context
         @context_ptr: ::FFI::Pointer
 
-        @retained: Array[untyped]
+        @retained: Array[top]
 
-        RESULT_CODE: ::Hash[::Symbol, ::Symbol]
+        EMPTY_RESULT: {
+          "events" => ::Array[WAF::output],
+          "actions" => ::Hash[::String, WAF::output],
+          "attributes" => ::Hash[::String, WAF::output],
+          "duration" => ::Integer,
+          "timeout" => bool,
+          "keep" => bool
+        }
+
+        SUCCESS_RESULT_CODES: ::Array[::Symbol]
+
+        RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
 
         def initialize: (::FFI::Pointer context_ptr) -> void
 
         def finalize!: () -> void
 
-        def run: (WAF::data persistent_data, WAF::data ephemeral_data, ?::Integer timeout) -> Result
+        def run: (WAF::input persistent_data, WAF::input ephemeral_data, ?::Integer timeout) -> Result
 
         private
 

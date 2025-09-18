@@ -11,9 +11,9 @@ module Datadog
       end
 
       class LibDDWAFError < Error
-        attr_reader diagnostics: WAF::data
+        attr_reader diagnostics: WAF::output
 
-        def initialize: (::String msg, ?diagnostics: WAF::data?) -> void
+        def initialize: (::String msg, ?diagnostics: WAF::output?) -> void
       end
     end
   end
