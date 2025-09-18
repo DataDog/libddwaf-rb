@@ -6,7 +6,16 @@ module Datadog
       # Ruby representation of the ddwaf_context in libddwaf
       # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/BINDING_IMPL_NOTES.md?plain=1#L125-L158
       class Context
-        RESULT_CODE = {
+        EMPTY_RESULT = {
+          "events" => [],     #: ::Array[WAF::output]
+          "actions" => {},    #: ::Hash[::String, WAF::output]
+          "attributes" => {}, #: ::Hash[::String, WAF::output]
+          "duration" => 0,
+          "timeout" => false,
+          "keep" => false
+        }.freeze
+        SUCCESS_RESULT_CODES = %i[ddwaf_ok ddwaf_match].freeze
+        RESULT_CODE_TO_STATUS = {
           ddwaf_ok: :ok,
           ddwaf_match: :match,
           ddwaf_err_internal: :err_internal,
@@ -73,20 +82,24 @@ module Datadog
           raise LibDDWAFError, "Could not create result object" if result_obj.null?
 
           code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
-          result = Converter.object_to_ruby(result_obj) #: ::Hash[::String, WAF::data]
+          result = Converter.object_to_ruby(result_obj)
 
-          if result.nil?
+          # NOTE: In case of the error, `libddwaf` will not "fill" the result
+          #       object, so it will be empty and the conversion of it will return
+          #       `nil`, but that is not a conversion issue.
+          if SUCCESS_RESULT_CODES.include?(code) && result.nil?
             raise ConversionError, "Could not convert result into object: #{code}"
           end
 
+          result ||= EMPTY_RESULT
           result = Result.new(
-            status: RESULT_CODE[code],
+            status: RESULT_CODE_TO_STATUS[code],
             events: result["events"],
             actions: result["actions"],
             attributes: result["attributes"],
-            duration: result["duration"], #: ::Integer
-            timeout: result["timeout"],   #: bool
-            keep: result["keep"]          #: bool
+            duration: result["duration"],
+            timeout: result["timeout"],
+            keep: result["keep"]
           )
 
           if persistent_data_obj.truncated? || ephemeral_data_obj.truncated?

@@ -164,19 +164,19 @@ module Datadog
           when :ddwaf_obj_float
             obj[:valueUnion][:f64]
           when :ddwaf_obj_array
-            (0...obj[:nbEntries]).each.with_object([]) do |i, a|
+            (0...obj[:nbEntries]).each.with_object([]) do |i, a| #$ ::Array[WAF::output]
               ptr = obj[:valueUnion][:array] + i * LibDDWAF::Object.size
               e = Converter.object_to_ruby(LibDDWAF::Object.new(ptr))
-              a << e # steep:ignore
+              a << e
             end
           when :ddwaf_obj_map
-            (0...obj[:nbEntries]).each.with_object({}) do |i, h| #$ ::Hash[::String, WAF::data]
+            (0...obj[:nbEntries]).each.with_object({}) do |i, h| #$ ::Hash[::String, WAF::output]
               ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
               o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
               l = o[:parameterNameLength]
               k = o[:parameterName].read_bytes(l)
               v = Converter.object_to_ruby(LibDDWAF::Object.new(ptr))
-              h[k] = v # steep:ignore
+              h[k] = v
             end
           end
         end

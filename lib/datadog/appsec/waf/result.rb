@@ -14,8 +14,9 @@ module Datadog
           @actions = actions
           @attributes = attributes
           @duration = duration
-          @timeout = timeout
-          @keep = keep
+
+          @keep = !!keep
+          @timeout = !!timeout
           @input_truncated = false
         end
 
@@ -42,8 +43,8 @@ module Datadog
             actions: @actions,
             attributes: @attributes,
             duration: @duration,
-            timeout: @timeout,
             keep: @keep,
+            timeout: @timeout,
             input_truncated: @input_truncated
           }
         end

@@ -240,5 +240,28 @@ RSpec.describe Datadog::AppSec::WAF::Context do
         )
       end
     end
+
+    context "when result is an error" do
+      before do
+        allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_run)
+          .and_return(:ddwaf_err_internal)
+      end
+
+      let(:result) { context.run({}, {}) }
+
+      it "returns empty result with an error status code" do
+        aggregate_failures("result") do
+          expect(result).not_to be_timeout
+          expect(result).not_to be_keep
+          expect(result).not_to be_input_truncated
+
+          expect(result.status).to eq(:err_internal)
+          expect(result.events).to eq([])
+          expect(result.actions).to eq({})
+          expect(result.attributes).to eq({})
+          expect(result.duration).to be_zero
+        end
+      end
+    end
   end
 end
