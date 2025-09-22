@@ -2,8 +2,45 @@ module Datadog
   module AppSec
     module WAF
       type input = nil | bool | ::String | ::Symbol | ::Integer | ::Float | ::Array[input] | ::Hash[input, input]
-      type output = nil | bool | ::String | ::Integer | ::Float | ::Array[output] | ::Hash[::String, output]
       type known_addresses = ::Array[::String]
+      type result = {
+        "keep" => bool,
+        "events" => events,
+        "actions" => actions,
+        "attributes" => attributes,
+        "timeout" => bool,
+        # NOTE: Schema defines it as a `number`, but we alway get it as `Integer`
+        #       That will be fixed in the libddwaf specs
+        "duration" => ::Integer
+      }
+      type events = ::Array[event]
+      type event = {"rule" => rule, "rule_matches" => ::Array[rule_match]}
+      type rule = {
+        "id" => ::String,
+        "name" => ::String,
+        "tags" => {
+          "type" => ::String,
+          # optional key
+          "category" => ::String?
+        },
+        # optional key
+        "on_match" => ::Array[::String]?
+      }
+      type rule_match = {
+        "operator" => ::String,
+        "operator_value" => ::String,
+        "parameters" => ::Array[rule_match_parameter]
+      }
+      type rule_match_parameter = {
+        "address" => ::String,
+        "key_path" => ::Array[::String | ::Integer],
+        "value" => ::String,
+        "highlight" => ::Array[::String]
+      }
+      type actions = ::Hash[::String, action]
+      type action = ::Hash[::String, ::String]
+      type attributes = ::Hash[::String, opaque]
+      type opaque = nil | bool | ::String | ::Integer | ::Float | ::Array[opaque] | ::Hash[::String, opaque]
 
       self.@logger: ::Logger
 

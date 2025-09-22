@@ -4,12 +4,12 @@ module Datadog
       class Context
         @context_ptr: ::FFI::Pointer
 
-        @retained: Array[top]
+        @retained: Array[untyped]
 
         EMPTY_RESULT: {
-          "events" => ::Array[WAF::output],
-          "actions" => ::Hash[::String, WAF::output],
-          "attributes" => ::Hash[::String, WAF::output],
+          "events" => WAF::events,
+          "actions" => WAF::actions,
+          "attributes" => WAF::attributes,
           "duration" => ::Integer,
           "timeout" => bool,
           "keep" => bool

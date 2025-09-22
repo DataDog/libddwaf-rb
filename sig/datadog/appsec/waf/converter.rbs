@@ -11,7 +11,7 @@ module Datadog
           ?coerce: bool?
         ) -> LibDDWAF::Object
 
-        def self?.object_to_ruby: (LibDDWAF::Object obj) -> WAF::output
+        def self?.object_to_ruby: (LibDDWAF::Object obj) -> WAF::opaque
       end
     end
   end
