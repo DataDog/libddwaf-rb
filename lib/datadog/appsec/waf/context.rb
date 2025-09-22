@@ -7,9 +7,9 @@ module Datadog
       # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/BINDING_IMPL_NOTES.md?plain=1#L125-L158
       class Context
         EMPTY_RESULT = {
-          "events" => [],     #: ::Array[WAF::output]
-          "actions" => {},    #: ::Hash[::String, WAF::output]
-          "attributes" => {}, #: ::Hash[::String, WAF::output]
+          "events" => [],     #: WAF::events
+          "actions" => {},    #: WAF::actions
+          "attributes" => {}, #: WAF::attributes
           "duration" => 0,
           "timeout" => false,
           "keep" => false
