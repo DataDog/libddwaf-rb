@@ -48,6 +48,10 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
         expect(diagnostics.dig("rules", "loaded")).to eq(["rasp-003-001"])
         expect(diagnostics.dig("rules", "errors")).to be_empty
 
+        expect(diagnostics).to have_key("rules_compat")
+        expect(diagnostics.dig("rules_compat", "loaded")).to eq(["ttr-000-001"])
+        expect(diagnostics.dig("rules_compat", "errors")).to be_empty
+
         expect(diagnostics).to have_key("actions")
         expect(diagnostics.dig("actions", "loaded")).to eq(["block-sqli"])
         expect(diagnostics.dig("actions", "errors")).to be_empty

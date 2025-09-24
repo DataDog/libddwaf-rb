@@ -23,13 +23,44 @@ RSpec.describe Datadog::AppSec::WAF::Context do
             ],
             "on_match" => ["block"]
           }
+        ],
+        "rules_compat" => [
+          {
+            "id" => "2",
+            "name" => "Rule 2",
+            "tags" => {"type" => "flow2"},
+            "conditions" => [
+              {
+                "operator" => "match_regex",
+                "parameters" => {
+                  "inputs" => [{"address" => "headers", "key_path" => ["user"]}],
+                  "regex" => "^Attack"
+                }
+              }
+            ],
+            "output" => {
+              "event" => false,
+              "keep" => true,
+              "attributes" => {
+                "out.integer" => {"value" => 42},
+                "out.string" => {"value" => "forty two"},
+                "out.by_path" => {"address" => "headers", "key_path" => ["user"]}
+              }
+            },
+            "on_match" => []
+          }
         ]
       }
     end
 
     let(:builder) do
       Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
-        builder.add_or_update_config(config, path: "some/path")
+        diagnostics = builder.add_or_update_config(config, path: "some/path")
+
+        aggregate_failures("config") do
+          expect(diagnostics&.dig("rules", "failed").to_a).to be_empty
+          expect(diagnostics&.dig("rules_compat", "failed").to_a).to be_empty
+        end
       end
     end
 
@@ -85,6 +116,21 @@ RSpec.describe Datadog::AppSec::WAF::Context do
         expect(result.duration).to be >= 0
         expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
         expect(result.attributes).to eq({})
+      end
+    end
+
+    it "returns output of a rule with correct types" do
+      result = context.run({headers: {user: "Attack"}}, {})
+
+      aggregate_failures("result") do
+        expect(result).not_to be_timeout
+        expect(result.status).to eq(:match)
+        expect(result.events).to eq([])
+        expect(result.duration).to be >= 0
+        expect(result.actions).to eq({})
+        expect(result.attributes).to eq({
+          "out.integer" => 42, "out.string" => "forty two", "out.by_path" => "Attack"
+        })
       end
     end
 
