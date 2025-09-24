@@ -1,5 +1,11 @@
 # Unreleased
 
+# 2025-09-24 v1.25.1.1.0
+
+## Changed
+
+- Change coersion of the values in WAF rules to use `libddwaf` primitives
+
 # 2025-09-18 v1.25.1.0.1
 
 ## Fixed

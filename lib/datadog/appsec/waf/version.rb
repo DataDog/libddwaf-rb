@@ -5,7 +5,7 @@ module Datadog
         BASE_STRING = "1.25.1"
         # NOTE: Every change to the `BASE_STRING` should be accompanied
         #       by a reset of the patch version in the `STRING` below.
-        STRING = "#{BASE_STRING}.0.1"
+        STRING = "#{BASE_STRING}.1.0"
         MINIMUM_RUBY_VERSION = "2.5"
       end
     end
