@@ -31,7 +31,12 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
 
   describe "#known_addresses" do
     it "returns a list of known addresses based on loaded rules" do
-      expect(handle.known_addresses).to match_array(["server.request.query", "server.db.statement", "server.db.system"])
+      expect(handle.known_addresses).to match_array([
+        "server.request.query",
+        "server.db.statement",
+        "server.db.system",
+        "server.request.headers.no_cookies"
+      ])
     end
 
     it "calls libddwaf once and memoizes the result" do

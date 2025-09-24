@@ -58,7 +58,7 @@ module Datadog
         def add_or_update_config(config, path:)
           ensure_pointer_presence!
 
-          config_obj = Converter.ruby_to_object(config)
+          config_obj = Converter.ruby_to_object(config, coerce: false)
           diagnostics_obj = LibDDWAF::Object.new
 
           LibDDWAF.ddwaf_builder_add_or_update_config(@builder_ptr, path, path.length, config_obj, diagnostics_obj)
