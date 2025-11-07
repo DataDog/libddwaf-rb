@@ -11,5 +11,46 @@ jobs:
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
           bundler: latest
           cache-version: v1 # bump this to invalidate cache
-      - run: sudo apt-get update && (sudo apt-get install -y valgrind || sleep 5 && sudo apt-get install -y valgrind --no-install-recommends --no-install-suggests) && valgrind --version
-      - run: bundle exec rake libddwaf:binary spec:memory_leaks:all
+
+      - name: Export libddwaf version to env
+        run: |
+          VALUE="$(ruby -e 'load "lib/datadog/appsec/waf/version.rb"; puts Datadog::AppSec::WAF::VERSION::BASE_STRING')"
+          echo "LIBDDWAF_VERSION=$VALUE" >> "$GITHUB_ENV"
+
+      - name: Install pre-requisites
+        run: |
+          sudo apt-get update && sudo apt-get install -y libc6-dbg
+
+      - name: Build Valgrind from source
+        run: |
+          git clone https://sourceware.org/git/valgrind.git && cd valgrind &&
+          ./autogen.sh && ./configure &&
+          make && sudo make install &&
+          valgrind --version
+
+      - name: Build libddwaf with debug info
+        run: |
+          git clone https://github.com/DataDog/libddwaf && cd libddwaf &&
+          git fetch --tags && git checkout tags/${LIBDDWAF_VERSION} &&
+          cmake -E make_directory build packages && cd build &&
+          cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=.. -DCPACK_PACKAGE_DIRECTORY=../packages .. &&
+          cmake --build . --config Debug --verbose --target libddwaf_shared --target libddwaf_static -j
+
+      - name: Add debuglink
+        run: |
+          cd libddwaf/build &&
+          objcopy --only-keep-debug libddwaf.so libddwaf.so.debug &&
+          strip --strip-debug libddwaf.so &&
+          objcopy --add-gnu-debuglink=libddwaf.so.debug libddwaf.so &&
+          readelf -S libddwaf.so | grep debuglink -n &&
+          nm -an libddwaf.so | head
+
+      - name: Copy binary with debug info
+        run: |
+          mkdir -p vendor/libddwaf/libddwaf-${LIBDDWAF_VERSION}-linux-x86_64/lib/.debug &&
+          cp libddwaf/build/libddwaf.so vendor/libddwaf/libddwaf-${LIBDDWAF_VERSION}-linux-x86_64/lib/ &&
+          cp libddwaf/build/libddwaf.so.debug vendor/libddwaf/libddwaf-${LIBDDWAF_VERSION}-linux-x86_64/lib/.debug
+
+      - name: Run memory leak specs
+        run: |
+          bundle exec rake spec:memory_leaks:all
