@@ -101,7 +101,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
         expect(result.status).to eq(:match)
         expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
         expect(result.duration).to be >= 0
-        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
+        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => 10, "status_code" => 403, "type" => "auto"}})
         expect(result.attributes).to eq({})
       end
     end
@@ -114,7 +114,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
         expect(result.status).to eq(:match)
         expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
         expect(result.duration).to be >= 0
-        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => "10", "status_code" => "403", "type" => "auto"}})
+        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => 10, "status_code" => 403, "type" => "auto"}})
         expect(result.attributes).to eq({})
       end
     end

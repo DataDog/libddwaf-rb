@@ -38,7 +38,7 @@ module Datadog
         "highlight" => ::Array[::String]
       }
       type actions = ::Hash[::String, action]
-      type action = ::Hash[::String, ::String]
+      type action = ::Hash[::String, ::String | ::Integer]
       type attributes = ::Hash[::String, opaque]
       type opaque = nil | bool | ::String | ::Integer | ::Float | ::Array[opaque] | ::Hash[::String, opaque]
 
