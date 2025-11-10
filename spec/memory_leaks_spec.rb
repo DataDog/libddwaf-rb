@@ -13,6 +13,7 @@ RSpec.describe "Memory leaks", memory_leaks: true do
 
       ruby_memcheck_config = RubyMemcheck::Configuration.new(
         output_io: string_io,
+        valgrind_generate_suppressions: true,
         valgrind_options: [
           "--num-callers=50",
           "--error-limit=no",
@@ -23,7 +24,7 @@ RSpec.describe "Memory leaks", memory_leaks: true do
           "--keep-debuginfo=yes",
           "--read-inline-info=yes",
           "--read-var-info=yes",
-          "--gen-suppressions=all"
+          "--suppressions=suppressions/re2.supp"
         ]
       )
 
