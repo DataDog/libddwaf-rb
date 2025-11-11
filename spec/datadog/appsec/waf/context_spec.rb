@@ -99,10 +99,19 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       aggregate_failures("result") do
         expect(result).not_to be_timeout
         expect(result.status).to eq(:match)
-        expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
+        expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything, "security_response_id" => anything}])
         expect(result.duration).to be >= 0
-        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => 10, "status_code" => 403, "type" => "auto"}})
         expect(result.attributes).to eq({})
+      end
+
+      aggregate_failures("result actions") do
+        expect(result.actions.keys).to contain_exactly("block_request")
+
+        expect(result.actions.dig("block_request", "security_response_id")).not_to be_empty
+
+        expect(result.actions.dig("block_request", "type")).to eq("auto")
+        expect(result.actions.dig("block_request", "status_code")).to eq(403)
+        expect(result.actions.dig("block_request", "grpc_status_code")).to eq(10)
       end
     end
 
@@ -112,10 +121,19 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       aggregate_failures("result") do
         expect(result).not_to be_timeout
         expect(result.status).to eq(:match)
-        expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything}])
+        expect(result.events).to match_array([{"rule" => anything, "rule_matches" => anything, "security_response_id" => anything}])
         expect(result.duration).to be >= 0
-        expect(result.actions).to eq({"block_request" => {"grpc_status_code" => 10, "status_code" => 403, "type" => "auto"}})
         expect(result.attributes).to eq({})
+      end
+
+      aggregate_failures("result actions") do
+        expect(result.actions.keys).to contain_exactly("block_request")
+
+        expect(result.actions.dig("block_request", "security_response_id")).not_to be_empty
+
+        expect(result.actions.dig("block_request", "type")).to eq("auto")
+        expect(result.actions.dig("block_request", "status_code")).to eq(403)
+        expect(result.actions.dig("block_request", "grpc_status_code")).to eq(10)
       end
     end
 
