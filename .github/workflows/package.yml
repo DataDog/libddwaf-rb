@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
-        ruby: ["3.3", "9.4"]
+        ruby: ["3.3", "4.0", "9.4"]
         libc: [gnu, musl]
         include:
           - os: ubuntu-24.04
@@ -16,6 +16,8 @@ jobs:
           - os: ubuntu-24.04-arm
             platform: aarch64-linux:llvm
           - ruby: 3.3
+            jruby: false
+          - ruby: 4.0
             jruby: false
           - ruby: 9.4
             jruby: true
