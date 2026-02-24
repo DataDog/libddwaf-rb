@@ -101,9 +101,9 @@ module Datadog
             res = if coerce
               LibDDWAF.ddwaf_object_string(obj, val.to_s)
             elsif val < 0
-              LibDDWAF.ddwaf_object_signed(obj, val)
+              LibDDWAF.ddwaf_object_signed(obj, val.clamp(-(2**63), -1))
             else
-              LibDDWAF.ddwaf_object_unsigned(obj, val)
+              LibDDWAF.ddwaf_object_unsigned(obj, val.clamp(0, 2**64 - 1))
             end
             raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 
