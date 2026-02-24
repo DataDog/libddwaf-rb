@@ -5,6 +5,9 @@ module Datadog
     module WAF
       # Module responsible for Ruby-to-C and C-to-Ruby conversions
       module Converter
+        INT64_MIN = -(2**63)
+        UINT64_MAX = 2**64 - 1
+
         module_function
 
         # standard:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
@@ -101,9 +104,11 @@ module Datadog
             res = if coerce
               LibDDWAF.ddwaf_object_string(obj, val.to_s)
             elsif val < 0
-              LibDDWAF.ddwaf_object_signed(obj, val)
+              clamped = val.clamp(INT64_MIN, -1) #: Integer
+              LibDDWAF.ddwaf_object_signed(obj, clamped)
             else
-              LibDDWAF.ddwaf_object_unsigned(obj, val)
+              clamped = val.clamp(0, UINT64_MAX) #: Integer
+              LibDDWAF.ddwaf_object_unsigned(obj, clamped)
             end
             raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
 

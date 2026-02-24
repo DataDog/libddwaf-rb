@@ -401,6 +401,18 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:valueUnion][:intValue]).to eq(-42)
       end
 
+      it "clamps a positive integer bigger than 2^64 - 1" do
+        obj = described_class.ruby_to_object(2**65, coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_unsigned
+        expect(obj[:valueUnion][:uintValue]).to eq 2**64 - 1
+      end
+
+      it "clamps a negative integer smaller than -2^63" do
+        obj = described_class.ruby_to_object(-(2**65), coerce: false)
+        expect(obj[:type]).to eq :ddwaf_obj_signed
+        expect(obj[:valueUnion][:intValue]).to eq(-(2**63))
+      end
+
       it "converts a float" do
         obj = described_class.ruby_to_object(Math::PI, coerce: false)
         expect(obj[:type]).to eq :ddwaf_obj_float
