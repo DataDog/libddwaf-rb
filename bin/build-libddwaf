@@ -1,0 +1,49 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+LIBDDWAF_VERSION=$(ruby -e 'load "'"$PROJECT_DIR"'/lib/datadog/appsec/waf/version.rb"; puts Datadog::AppSec::WAF::VERSION::BASE_STRING')
+ARCH=$(uname -m)
+LIBDDWAF_SRC="$PROJECT_DIR/tmp/libddwaf"
+VENDOR_DIR="$PROJECT_DIR/vendor/libddwaf/libddwaf-${LIBDDWAF_VERSION}-linux-${ARCH}"
+
+echo "=== Building libddwaf ${LIBDDWAF_VERSION} for ${ARCH} ==="
+
+# Clone or update libddwaf source
+if [ -d "$LIBDDWAF_SRC/.git" ]; then
+  echo "=== Updating existing libddwaf clone ==="
+  cd "$LIBDDWAF_SRC"
+  git fetch --tags
+else
+  echo "=== Cloning libddwaf ==="
+  mkdir -p "$PROJECT_DIR/tmp"
+  git clone https://github.com/DataDog/libddwaf "$LIBDDWAF_SRC"
+  cd "$LIBDDWAF_SRC"
+fi
+
+echo "=== Checking out tag ${LIBDDWAF_VERSION} ==="
+git checkout "tags/${LIBDDWAF_VERSION}"
+
+# Build with debug info
+echo "=== Compiling libddwaf with debug info ==="
+rm -rf build
+mkdir -p build packages
+cd build
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=.. -DCPACK_PACKAGE_DIRECTORY=../packages ..
+cmake --build . --config Debug --verbose --target libddwaf_shared --target libddwaf_static -j
+
+# Add debuglink
+echo "=== Adding debuglink ==="
+objcopy --only-keep-debug libddwaf.so libddwaf.so.debug
+strip --strip-debug libddwaf.so
+objcopy --add-gnu-debuglink=libddwaf.so.debug libddwaf.so
+
+# Copy to vendor
+echo "=== Copying to ${VENDOR_DIR} ==="
+mkdir -p "${VENDOR_DIR}/lib/.debug"
+cp libddwaf.so "${VENDOR_DIR}/lib/"
+cp libddwaf.so.debug "${VENDOR_DIR}/lib/.debug/"
+
+echo "=== Done ==="

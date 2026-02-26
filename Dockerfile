@@ -1,6 +1,6 @@
-FROM ruby:3.4
+FROM ruby:4.0
 
-RUN apt-get update && apt-get install -y valgrind --no-install-recommends --no-install-suggests
+RUN apt-get update && apt-get install -y valgrind libc6-dbg cmake build-essential binutils --no-install-recommends --no-install-suggests
 
 ADD . /libddwaf-rb
 
