@@ -3,9 +3,8 @@
 ``libddwaf-rb`` is library exposing the libddwaf C++ library to Ruby, packaging it in a multiplatform gem.
 
 For the libddwaf implementation, see this repository:
- - [``libddwaf``: libddwaf](https://github.com/DataDog/libddwaf.git)
 
-
+- [``libddwaf``: libddwaf](https://github.com/DataDog/libddwaf.git)
 
 ## Rake tasks
 
@@ -79,6 +78,15 @@ docker run --privileged --rm tonistiigi/binfmt --install amd64
 ```
 
 Then you can substitute e.g `--platform linux/x86_64` with `--platform linux/aarch64` below.
+
+### Memory leak specs
+
+```
+docker compose run libddwaf-rb bin/build-libddwaf
+docker compose run libddwaf-rb bundle exec rake spec:memory_leaks:all
+```
+
+`bin/build-libddwaf` builds libddwaf with debug headers so that Valgrind produces proper stack traces.
 
 ### GNU (Debian)
 
