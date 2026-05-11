@@ -15,7 +15,7 @@ Gemfile.lock
 /ext/libddwaf/*.so
 /ext/libddwaf/*.bundle
 /ext/libddwaf/mkmf.log
-/lib/libddwaf_native.so
-/lib/libddwaf_native.bundle
+/lib/libddwaf.so
+/lib/libddwaf.bundle
 
 *.o

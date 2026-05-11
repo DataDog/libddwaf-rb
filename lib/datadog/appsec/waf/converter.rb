@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "libddwaf_native"
+require "libddwaf"
 require "datadog/appsec/waf/errors"
 
 module Datadog

@@ -626,7 +626,7 @@ rb_libddwaf_ddwaf_run(VALUE self, VALUE ctx_w, VALUE pers_w, VALUE eph_w, VALUE 
 /* === Init =============================================================== */
 
 void
-Init_libddwaf_native(void)
+Init_libddwaf(void)
 {
     VALUE rb_mDatadog  = rb_define_module("Datadog");
     VALUE rb_mAppSec   = rb_define_module_under(rb_mDatadog, "AppSec");
