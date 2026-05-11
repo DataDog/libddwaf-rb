@@ -20,10 +20,13 @@ require_relative "../../lib/datadog/appsec/waf/version"
 LIBDDWAF_VERSION = Datadog::AppSec::WAF::VERSION::BASE_STRING
 
 host_platform = Gem::Platform.local.dup
-host_platform.instance_eval { @version = nil } if host_platform.os == "darwin"
-if host_platform.os == "linux" && host_platform.version.nil? && RUBY_PLATFORM =~ /linux-(.+)$/
-  host_platform.instance_eval { @version = ::Regexp.last_match(1) }
-end
+# Single libddwaf binary per OS — strip the libc/SDK version segment so the
+# vendor variant_dir matches what `libddwaf:binary` extracted (always
+# `libddwaf-<ver>-<os>-<cpu>`, no libc suffix). Without this, glibc Ruby's
+# `Gem::Platform.local.version = "gnu"` makes us look in a non-existent
+# `libddwaf-<ver>-linux-gnu-<cpu>/` and mkmf reports a misleading "install
+# development tools" error from the failed -lddwaf link probe.
+host_platform.instance_eval { @version = nil } if %w[darwin linux].include?(host_platform.os)
 
 LibDDWAFBinary.ensure_present(platform: host_platform, version: LIBDDWAF_VERSION)
 
