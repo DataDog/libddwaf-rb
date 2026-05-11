@@ -626,7 +626,7 @@ rb_libddwaf_ddwaf_run(VALUE self, VALUE ctx_w, VALUE pers_w, VALUE eph_w, VALUE 
 /* === Init =============================================================== */
 
 void
-Init_libddwaf(void)
+Init_libddwaf_ext(void)
 {
     VALUE rb_mDatadog  = rb_define_module("Datadog");
     VALUE rb_mAppSec   = rb_define_module_under(rb_mDatadog, "AppSec");
@@ -703,12 +703,4 @@ Init_libddwaf(void)
     rb_define_module_function(rb_mNative, "ddwaf_context_init",                  rb_libddwaf_ddwaf_context_init, 1);
     rb_define_module_function(rb_mNative, "ddwaf_context_destroy",               rb_libddwaf_ddwaf_context_destroy, 1);
     rb_define_module_function(rb_mNative, "ddwaf_run",                           rb_libddwaf_ddwaf_run, 5);
-
-    /* `require "libddwaf"` resolves to this shared object (the .rb shim was
-     * removed to avoid a name clash). Load the Ruby-side API here so the
-     * public entry point still pulls in Handle/Builder/Context/Converter.
-     * Safe against the internal `require "libddwaf"` lines in those files:
-     * Ruby registers this feature in $LOADED_FEATURES before calling Init,
-     * so re-requires resolve to no-ops. */
-    rb_require("datadog/appsec/waf");
 }

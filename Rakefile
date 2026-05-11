@@ -6,7 +6,7 @@ require "yard"
 require "fileutils"
 require_relative "ext/libddwaf/binary"
 
-Rake::ExtensionTask.new("libddwaf") do |ext|
+Rake::ExtensionTask.new("libddwaf_ext") do |ext|
   ext.ext_dir = "ext/libddwaf"
   ext.lib_dir = "lib"
 end

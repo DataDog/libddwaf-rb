@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require "libddwaf"
+require "libddwaf_ext"
 require "rbconfig"
 
 RSpec.describe "LibDDWAF trampolines" do
@@ -200,7 +200,7 @@ RSpec.describe "LibDDWAF trampolines" do
     # Sanity-check the Phase 4 trampoline ZJIT metadata is actually emitted.
     # Magic value 0x46464930 stored little-endian → bytes "\x30\x49\x46\x46".
     let(:bundle_path) do
-      File.expand_path("../../../../lib/libddwaf.#{RbConfig::CONFIG["DLEXT"]}", __dir__)
+      File.expand_path("../../../../lib/libddwaf_ext.#{RbConfig::CONFIG["DLEXT"]}", __dir__)
     end
 
     it "appears at least once per registered trampoline" do

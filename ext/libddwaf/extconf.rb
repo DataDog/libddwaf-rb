@@ -58,6 +58,6 @@ $defs << "-DHAVE_NAKED_ATTRIBUTE" if have_naked
 
 $CFLAGS << " -Wall -Wextra"
 
-create_makefile("libddwaf")
+create_makefile("libddwaf_ext")
 
 # standard:enable Style/GlobalVars

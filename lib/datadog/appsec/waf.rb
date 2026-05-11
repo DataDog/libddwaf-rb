@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "libddwaf"
+require "libddwaf_ext"
 
 require "datadog/appsec/waf/handle_builder"
 require "datadog/appsec/waf/handle"
