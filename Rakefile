@@ -21,7 +21,6 @@ end
 YARD::Rake::YardocTask.new(:docs) do |t|
   t.options += ["--title", "datadog-instrumentation #{Datadog::AppSec::WAF::VERSION::STRING} documentation"]
   t.options += ["--markup", "markdown"]
-  t.options += ["--markup-provider", "redcarpet"]
 end
 
 RSpec::Core::RakeTask.new(:spec) do |t, args|
