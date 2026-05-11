@@ -5,3 +5,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/libddwaf-rb
+    # Gemfile.lock is shared via the bind mount; host and container use
+    # different gem ABIs, so each side must `rm Gemfile.lock && bundle install`
+    # before its first build/test/bench. Bundling logic isolated per env via a
+    # separate Gemfile would be cleaner; deferred.

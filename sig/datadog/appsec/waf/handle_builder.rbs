@@ -2,7 +2,7 @@ module Datadog
   module AppSec
     module WAF
       class HandleBuilder
-        @builder_ptr: ::FFI::Pointer
+        @builder_ptr: untyped
 
         def initialize: (?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
 

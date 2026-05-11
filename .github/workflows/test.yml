@@ -42,45 +42,6 @@ jobs:
       - name: Run stress tests
         run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec:stress_tests
 
-  test-jruby-linux:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm]
-        jruby: ["9.3", "9.4"]
-        include:
-          - os: ubuntu-24.04
-            platform: x86_64-linux
-          - os: ubuntu-24.04-arm
-            platform: aarch64-linux
-
-    name: Test (Jruby ${{ matrix.jruby }}, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
-
-      - name: Build docker image
-        id: build-image
-        uses: ./.github/actions/docker-build-ruby
-        with:
-          ruby-version: ${{ matrix.jruby }}
-          jruby: true
-          libc: gnu
-
-      - name: Bundle install
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle install
-
-      - name: Fetch and extract binary library
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake libddwaf:binary[${{ matrix.platform }}]
-
-      - name: Run specs
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec
-
-      - name: Run stress tests
-        run: ${{ steps.build-image.outputs.run-cmd }} bundle exec rake spec:stress_tests
-
   test-darwin:
     strategy:
       fail-fast: false

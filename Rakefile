@@ -1,8 +1,17 @@
 require "bundler/gem_tasks"
 require "datadog/appsec/waf/version"
 require "rspec/core/rake_task"
+require "rake/extensiontask"
 require "yard"
 require "fileutils"
+require_relative "ext/libddwaf/binary"
+
+Rake::ExtensionTask.new("libddwaf_native") do |ext|
+  ext.ext_dir = "ext/libddwaf"
+  ext.lib_dir = "lib"
+end
+
+task spec: :compile
 
 def system!(*args)
   puts "Run: #{args.join(" ")}"
@@ -36,32 +45,6 @@ module Helpers
     gemspec
   end
 
-  def libddwaf_version
-    Datadog::AppSec::WAF::VERSION::BASE_STRING
-  end
-
-  def libddwaf_vendor_dir
-    Pathname.new("vendor/libddwaf")
-  end
-
-  def libddwaf_tarball_filename(platform:)
-    platform = if Gem::Version.new(libddwaf_version) >= Gem::Version.new("1.16.0") && platform.os == "linux"
-      [platform.cpu, platform.os, "musl"].compact.join("-")
-    else
-      [platform.os, platform.version, platform.cpu].compact.join("-")
-    end
-
-    "libddwaf-#{libddwaf_version}-#{platform}.tar.gz"
-  end
-
-  def libddwaf_library_path(platform:)
-    folder_name = "libddwaf-#{libddwaf_version}-#{[platform.os, platform.version, platform.cpu].compact.join("-")}"
-    extension = (platform.os == "darwin") ? "dylib" : "so"
-
-    # unfortunately archive name does not match extracted folder name for linux since libddwaf v1.16.0.
-    libddwaf_vendor_dir.join(folder_name, "lib/libddwaf.#{extension}")
-  end
-
   def parse_platform(platform_string = nil)
     local_platform = Gem::Platform.local
 
@@ -82,17 +65,6 @@ module Helpers
     end
 
     platform
-  end
-
-  def release_url(kind, binary_name:, version:)
-    unless %i[binary checksum].include?(kind)
-      raise Helpers.format("\n   %red[error] unknown release asset kind #{kind.inspect}\n\n")
-    end
-
-    url = "https://github.com/DataDog/libddwaf/releases/download/%<version>s/%<filename>s"
-    url += ".sha256" if kind == :checksum
-
-    Kernel.format(url, version: version, filename: binary_name)
   end
 
   def query_github_api(query)
@@ -127,25 +99,6 @@ module Helpers
     end
 
     response
-  end
-
-  def download(url, redirects_allowed: 3)
-    raise Helpers.format("\n   %red[error] exeeded maximum redirects count\n\n") if redirects_allowed.zero?
-
-    uri = URI.parse(url)
-    response = Net::HTTP.get_response(uri)
-
-    case response
-    when Net::HTTPFound then Helpers.download(response["Location"], redirects_allowed: redirects_allowed - 1)
-    when Net::HTTPOK then response.body
-    else
-      raise Helpers.format(<<~TEXT)
-
-           %red[error] fail to download #{uri}
-        %yellow[response] #{response.body}
-
-      TEXT
-    end
   end
 
   def github_token
@@ -280,74 +233,22 @@ namespace :libddwaf do
   desc "Extract pre-packaged `libddwaf` tarball into shared libs"
   task :extract, [:platform] do |_, args|
     platform = Helpers.parse_platform(args.to_h[:platform])
+    version = Datadog::AppSec::WAF::VERSION::BASE_STRING
+    lib_path = LibDDWAFBinary.shared_lib_path(platform, version)
 
-    if Helpers.libddwaf_library_path(platform: platform).exist?
-      path = Helpers.libddwaf_library_path(platform: platform)
-      next puts Helpers.format("    %yellow[skip] #{path} (exist)")
-    end
+    next puts Helpers.format("    %yellow[skip] #{lib_path} (exist)") if File.exist?(lib_path)
 
-    Rake::Task["libddwaf:fetch"].execute(args)
-
-    require "rubygems/package"
-
-    vendor_dir = Helpers.libddwaf_vendor_dir
-    binary_name = Helpers.libddwaf_tarball_filename(platform: platform)
-    binary_path = vendor_dir.join(binary_name)
-
-    puts Helpers.format(" %blue[extract]  #{binary_name}")
-
-    File.open(binary_path, "rb") do |file|
-      FileUtils.rm_rf(Helpers.libddwaf_library_path(platform: platform))
-      Gem::Package.new("").extract_tar_gz(file, vendor_dir)
-    end
-
-    puts Helpers.format("%green[complete] #{Helpers.libddwaf_library_path(platform: platform)}")
+    LibDDWAFBinary.ensure_present(platform: platform, version: version)
+    puts Helpers.format("%green[complete] #{lib_path}")
   end
 
   desc "Download pre-packaged `libddwaf` tarball into shared libs"
   task :fetch, [:platform] do |_, args|
     platform = Helpers.parse_platform(args.to_h[:platform])
+    version = Datadog::AppSec::WAF::VERSION::BASE_STRING
 
-    version = Helpers.libddwaf_version
-    vendor_dir = Helpers.libddwaf_vendor_dir
-
-    binary_name = Helpers.libddwaf_tarball_filename(platform: platform)
-    binary_path = vendor_dir.join(binary_name)
-
-    checksum_url = Helpers.release_url(:checksum, binary_name: binary_name, version: version)
-    expected_binary_sha256 = Helpers.download(checksum_url).split(" ", 2)[0]
-
-    if expected_binary_sha256.nil?
-      raise Helpers.format(
-        "\n   %red[error] Could not find checksum for %red[#{binary_name}]" \
-        "\n         Please check https://github.com/DataDog/libddwaf/releases page.\n\n"
-      )
-    end
-
-    if binary_path.exist? && Digest::SHA256.hexdigest(File.read(binary_path)) == expected_binary_sha256
-      next puts Helpers.format("    %yellow[skip] #{binary_name} (exists)")
-    end
-
-    puts Helpers.format("%blue[download] #{binary_name}")
-
-    release_url = Helpers.release_url(:binary, binary_name: binary_name, version: version)
-    binary = Helpers.download(release_url)
-    binary_sha256 = Digest::SHA256.hexdigest(binary)
-
-    if binary_sha256 != expected_binary_sha256
-      raise Helpers.format(<<~TEXT)
-
-           %red[error] fail to verify checksum of %blue[#{release_url}]
-        %green[expected] #{binary_sha256}
-          %yellow[actual] #{expected_binary_sha256}
-
-      TEXT
-    end
-
-    FileUtils.mkdir_p(vendor_dir)
-    File.binwrite(binary_path, binary)
-
-    puts Helpers.format("%green[complete] #{binary_path}")
+    LibDDWAFBinary.fetch_tarball(platform: platform, version: version)
+    puts Helpers.format("%green[complete] #{LibDDWAFBinary.tarball_path(platform, version)}")
   end
 
   desc "Download and extract pre-packaged `libddwaf` binary"
@@ -373,12 +274,6 @@ namespace :libddwaf do
       "aarch64-linux:gnu+musl" => %w[
         aarch64-linux
         aarch64-linux-musl
-      ],
-      "java" => %w[
-        x86_64-linux
-        aarch64-linux
-        x86_64-darwin
-        arm64-darwin
       ]
     }
 
@@ -449,13 +344,21 @@ namespace :libddwaf do
 
     platform_string, _opts = platform_arg.split(':')
     platform = Helpers.parse_platform(platform_string)
+    version = Datadog::AppSec::WAF::VERSION::BASE_STRING
 
-    vendor_dir = Helpers.libddwaf_vendor_dir.to_s
-    platform_binary = Helpers.libddwaf_library_path(platform: platform).to_s
+    # Gemspec.files holds gem-relative paths like
+    # "vendor/libddwaf/libddwaf-<ver>-<os>-<cpu>/{lib,include}/...". For a
+    # platform-specific gem, keep only the target platform's libddwaf binary
+    # and matching ddwaf.h header (extconf.rb needs the header at install
+    # time to compile the C extension).
+    platform_lib_path    = LibDDWAFBinary.gem_relative_lib_path(platform, version)
+    platform_header_path = LibDDWAFBinary.gem_relative_header_path(platform, version)
 
     gemspec = Helpers.binary_gemspec(platform: platform)
     gemspec.files.reject! do |file|
-      file.start_with?(vendor_dir) && file != platform_binary
+      file.start_with?("vendor/libddwaf/") &&
+        file != platform_lib_path &&
+        file != platform_header_path
     end
 
     FileUtils.chmod(0o0644, gemspec.files)
@@ -471,7 +374,7 @@ namespace :libddwaf do
     end
 
     FileUtils.mv(package, 'pkg')
-    puts Helpers.format("%green[libddwaf #{Helpers.libddwaf_version} built to pkg/#{package}.]")
+    puts Helpers.format("%green[libddwaf #{version} built to pkg/#{package}.]")
   end
 
   # NOTE: This is used in CI only
