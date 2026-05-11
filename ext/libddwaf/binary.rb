@@ -112,7 +112,7 @@ module LibDDWAFBinary
     end
 
     def log(msg)
-      $stderr.puts "[libddwaf] #{msg}"
+      warn "[libddwaf] #{msg}"
     end
   end
 end

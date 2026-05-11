@@ -1,3 +1,5 @@
+# standard:disable Style/GlobalVars -- mkmf's API is to mutate $INCFLAGS, $LDFLAGS, $CFLAGS, $defs.
+
 require "rbconfig"
 
 # Honor a `CC=` env override before mkmf is loaded — RbConfig::CONFIG['CC'] is
@@ -57,3 +59,5 @@ $defs << "-DHAVE_NAKED_ATTRIBUTE" if have_naked
 $CFLAGS << " -Wall -Wextra"
 
 create_makefile("libddwaf")
+
+# standard:enable Style/GlobalVars

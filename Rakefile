@@ -351,7 +351,7 @@ namespace :libddwaf do
     # platform-specific gem, keep only the target platform's libddwaf binary
     # and matching ddwaf.h header (extconf.rb needs the header at install
     # time to compile the C extension).
-    platform_lib_path    = LibDDWAFBinary.gem_relative_lib_path(platform, version)
+    platform_lib_path = LibDDWAFBinary.gem_relative_lib_path(platform, version)
     platform_header_path = LibDDWAFBinary.gem_relative_header_path(platform, version)
 
     gemspec = Helpers.binary_gemspec(platform: platform)
