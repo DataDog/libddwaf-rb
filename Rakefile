@@ -137,20 +137,20 @@ module Helpers
 end
 
 namespace :spec do
-  RSpec::Core::RakeTask.new(:stress_tests) do |t, _args|
+  RSpec::Core::RakeTask.new(stress_tests: :compile) do |t, _args|
     t.pattern = "spec/**/*_spec.rb"
     t.rspec_opts = "--tag stress_tests"
   end
 
   namespace :memory_leaks do
     desc "Run all tests for memory leaks"
-    RSpec::Core::RakeTask.new(:all) do |t, _args|
+    RSpec::Core::RakeTask.new(all: :compile) do |t, _args|
       t.rspec_opts = "--tag memory_leaks"
     end
 
     Dir.glob("spec/memory_leaks/*").select { |dir| File.directory?(dir) }.map { |dir| dir.sub("spec/memory_leaks/", "") }.each do |subdir|
       desc "Run #{subdir} related tests for memory leaks"
-      RSpec::Core::RakeTask.new(subdir) do |t, _args|
+      RSpec::Core::RakeTask.new(subdir => :compile) do |t, _args|
         t.rspec_opts = "--tag memory_leaks --example_matches /#{subdir}/"
       end
     end
