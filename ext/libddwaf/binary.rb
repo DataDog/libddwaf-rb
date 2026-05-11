@@ -82,7 +82,7 @@ module LibDDWAFBinary
     def tarball_filename(platform, version)
       modern_linux = Gem::Version.new(version) >= Gem::Version.new("1.16.0") && platform.os == "linux"
       parts = modern_linux ? [platform.cpu, platform.os, "musl"] : [platform.os, platform.version, platform.cpu]
-      "libddwaf-#{version}-#{parts.compact.join("-")}"
+      "libddwaf-#{version}-#{parts.compact.join("-")}.tar.gz"
     end
 
     def release_url(version, filename, kind: :binary)
