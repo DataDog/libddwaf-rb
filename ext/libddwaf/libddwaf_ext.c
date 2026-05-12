@@ -88,7 +88,10 @@ static VALUE rb_cNative_Context;
 typedef struct {
     ddwaf_object *obj;
     VALUE parent;   /* Qnil for owned; parent VALUE for borrowed children */
-    bool owned;     /* true means dfree calls ddwaf_object_free + xfree(obj) */
+    bool owned;     /* dfree calls ddwaf_object_free — toggled off by disown! */
+    bool heap_obj;  /* d->obj is our heap allocation (set in obj_alloc, never
+                       changed); independent of `owned` so dfree still xfrees
+                       the struct after disown! transferred the payload */
 } obj_data_t;
 
 static void
@@ -102,9 +105,9 @@ static void
 obj_data_free(void *ptr)
 {
     obj_data_t *d = (obj_data_t *)ptr;
-    if (d->owned && d->obj != NULL) {
-        ddwaf_object_free(d->obj);
-        xfree(d->obj);
+    if (d->obj != NULL) {
+        if (d->owned) ddwaf_object_free(d->obj);
+        if (d->heap_obj) xfree(d->obj);
     }
     xfree(d);
 }
@@ -113,7 +116,7 @@ static size_t
 obj_data_size(const void *ptr)
 {
     const obj_data_t *d = (const obj_data_t *)ptr;
-    return sizeof(*d) + (d->owned && d->obj ? sizeof(*d->obj) : 0);
+    return sizeof(*d) + (d->heap_obj && d->obj ? sizeof(*d->obj) : 0);
 }
 
 static const rb_data_type_t obj_data_type = {
@@ -134,6 +137,7 @@ obj_alloc(VALUE klass)
     d->obj = ZALLOC(ddwaf_object);
     d->parent = Qnil;
     d->owned = true;
+    d->heap_obj = true;
     return wrapper;
 }
 
@@ -146,6 +150,7 @@ obj_borrow(VALUE klass, ddwaf_object *target, VALUE parent)
     d->obj = target;
     d->parent = parent;
     d->owned = false;
+    d->heap_obj = false;
     return wrapper;
 }
 
