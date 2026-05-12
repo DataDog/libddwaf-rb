@@ -2,9 +2,9 @@ module Datadog
   module AppSec
     module WAF
       class Handle
-        @handle_ptr: ::FFI::Pointer
+        @handle_ptr: untyped
 
-        def initialize: (::FFI::Pointer handle_ptr) -> void
+        def initialize: (untyped handle_ptr) -> void
 
         def finalize!: () -> void
 

@@ -2,7 +2,7 @@ module Datadog
   module AppSec
     module WAF
       class Context
-        @context_ptr: ::FFI::Pointer
+        @context_ptr: untyped
 
         @retained: Array[untyped]
 
@@ -19,7 +19,7 @@ module Datadog
 
         RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
 
-        def initialize: (::FFI::Pointer context_ptr) -> void
+        def initialize: (untyped context_ptr) -> void
 
         def finalize!: () -> void
 

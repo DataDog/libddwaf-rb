@@ -3,56 +3,51 @@
 module Datadog
   module AppSec
     module WAF
-      # Ruby representation of the ddwaf_handle in libddwaf
-      # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/BINDING_IMPL_NOTES.md?plain=1#L4-L19
+      # Ruby wrapper around `LibDDWAF::Handle`. Built from a HandleBuilder.
+      # Use `#build_context` to obtain a request-scoped Context for running
+      # the WAF.
       class Handle
-        def initialize(handle_ptr)
-          @handle_ptr = handle_ptr
+        def initialize(native_handle)
+          @handle = native_handle
         end
 
-        # Destroys the WAF handle and sets the pointer to nil.
-        #
-        # The instance becomes unusable after this method is called.
+        # Destroys the underlying WAF handle. Instance is unusable afterwards.
         def finalize!
-          handle_ptr_to_destroy = @handle_ptr
-          @handle_ptr = nil
+          return if @handle.nil?
 
-          LibDDWAF.ddwaf_destroy(handle_ptr_to_destroy)
+          to_destroy, @handle = @handle, nil
+          LibDDWAF.ddwaf_destroy(to_destroy)
         end
 
-        # Builds a WAF context.
+        # Builds a request-scoped WAF context.
         #
         # @raise [LibDDWAFError] if libddwaf could not create the context.
-        # @return [Handle] the WAF handle
+        # @return [Context]
         def build_context
           ensure_pointer_presence!
 
-          context_obj = LibDDWAF.ddwaf_context_init(@handle_ptr)
-          raise LibDDWAFError, "Could not create context" if context_obj.null?
+          native_context = LibDDWAF.ddwaf_context_init(@handle)
+          raise LibDDWAFError, "Could not create context" if native_context.nil?
 
-          Context.new(context_obj)
+          Context.new(native_context)
         end
 
-        # Returns the list of known addresses in the WAF handle.
+        # Returns the list of known input addresses that the loaded ruleset
+        # references. Memoised on first call.
         #
-        # @return [Array<String>] the list of known addresses
+        # @return [Array<String>]
         def known_addresses
           return @known_addresses if defined?(@known_addresses)
 
           ensure_pointer_presence!
 
-          count = LibDDWAF::UInt32Ptr.new
-          list = LibDDWAF.ddwaf_known_addresses(@handle_ptr, count)
-
-          return [] if count == 0 # list is null
-
-          @known_addresses = list.get_array_of_string(0, count[:value]).compact
+          @known_addresses = LibDDWAF.ddwaf_known_addresses(@handle)
         end
 
         private
 
         def ensure_pointer_presence!
-          return if @handle_ptr
+          return if @handle
 
           raise InstanceFinalizedError, "Cannot use WAF handle after it has been finalized"
         end

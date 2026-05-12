@@ -28,16 +28,20 @@ Gem::Specification.new do |spec|
 
   spec.files = ["libddwaf.gemspec"]
   spec.files.concat(Dir.glob("lib/**/*.rb"))
+  spec.files.concat(Dir.glob("ext/**/*.{c,h,rb}"))
   spec.files.concat(Dir.glob("{vendor/rbs,sig}/**/*.rbs"))
   spec.files.concat(Dir.glob("{README,CHANGELOG,LICENSE,NOTICE}*"))
   spec.files.concat(%W[
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-darwin-arm64/include/ddwaf.h
     vendor/libddwaf/libddwaf-#{libddwaf_version}-darwin-arm64/lib/libddwaf.dylib
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-darwin-x86_64/include/ddwaf.h
     vendor/libddwaf/libddwaf-#{libddwaf_version}-darwin-x86_64/lib/libddwaf.dylib
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-linux-aarch64/include/ddwaf.h
     vendor/libddwaf/libddwaf-#{libddwaf_version}-linux-aarch64/lib/libddwaf.so
+    vendor/libddwaf/libddwaf-#{libddwaf_version}-linux-x86_64/include/ddwaf.h
     vendor/libddwaf/libddwaf-#{libddwaf_version}-linux-x86_64/lib/libddwaf.so
   ])
 
   spec.require_paths = ["lib"]
-
-  spec.add_dependency "ffi", "~> 1.0"
+  spec.extensions = ["ext/libddwaf/extconf.rb"]
 end

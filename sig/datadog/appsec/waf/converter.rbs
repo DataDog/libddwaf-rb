@@ -2,13 +2,16 @@ module Datadog
   module AppSec
     module WAF
       module Converter
+        INT64_MIN: ::Integer
+        UINT64_MAX: ::Integer
+
         def self?.ruby_to_object: (
-          top val,
+          WAF::input val,
           ?max_container_size: ::Integer?,
           ?max_container_depth: ::Integer?,
           ?max_string_length: ::Integer?,
           ?top_obj: LibDDWAF::Object?,
-          ?coerce: bool?
+          ?coerce: bool
         ) -> LibDDWAF::Object
 
         def self?.object_to_ruby: (LibDDWAF::Object obj) -> WAF::opaque

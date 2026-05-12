@@ -8,3 +8,14 @@
 .ruby-version
 .github-token
 Gemfile.lock
+
+# C extension build artifacts
+/ext/libddwaf/Makefile
+/ext/libddwaf/*.o
+/ext/libddwaf/*.so
+/ext/libddwaf/*.bundle
+/ext/libddwaf/mkmf.log
+/lib/libddwaf_ext.so
+/lib/libddwaf_ext.bundle
+
+*.o

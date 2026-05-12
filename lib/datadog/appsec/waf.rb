@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "datadog/appsec/waf/lib_ddwaf"
+require "libddwaf_ext"
 
 require "datadog/appsec/waf/handle_builder"
 require "datadog/appsec/waf/handle"
@@ -19,33 +19,15 @@ module Datadog
         LibDDWAF.ddwaf_get_version
       end
 
-      def log_callback(level, func, file, line, message, len)
-        return if WAF.logger.nil?
-
-        WAF.logger.debug do
-          {
-            level: level,
-            func: func,
-            file: file,
-            line: line,
-            message: message.read_bytes(len)
-          }.inspect
-        end
-      end
-
       def logger
         @logger
       end
 
+      # Sets the application-side logger. NOTE: libddwaf's internal
+      # `ddwaf_set_log_cb` integration is not yet wired in the C extension —
+      # this currently only sets the Ruby-side `@logger` reference; libddwaf
+      # internal log messages are not forwarded here.
       def logger=(logger)
-        unless @log_callback
-          log_callback = WAF.method(:log_callback)
-          LibDDWAF.ddwaf_set_log_cb(log_callback, :ddwaf_log_trace)
-
-          # retain logging proc if set properly
-          @log_callback = log_callback
-        end
-
         @logger = logger
       end
     end

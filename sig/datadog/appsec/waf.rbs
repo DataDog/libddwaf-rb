@@ -44,11 +44,7 @@ module Datadog
 
       self.@logger: ::Logger
 
-      self.@log_callback: LibDDWAF::ddwaf_log_cb
-
       def self?.version: () -> ::String
-
-      def self?.log_callback: (LibDDWAF::ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
 
       def self?.logger: () -> ::Logger
 
