@@ -1,0 +1,57 @@
+name: Notify Consumers
+
+# This repo releases the libddwaf gem manually (local rake release), so run
+# this workflow manually after a release. It reads the latest published
+# version from rubygems.org -- the only source guaranteed to match what
+# consumers will pin -- and tells dd-trace-rb to pin it.
+#
+#  gh workflow run "Notify Consumers" --ref master
+
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  notify:
+    name: "Notify DataDog/dd-trace-rb"
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - name: Read latest published version
+        id: gem
+        run: |
+          version=$(curl -sS https://rubygems.org/api/v1/gems/libddwaf.json | jq -r .version)
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::Could not read libddwaf version from rubygems.org"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Get GitHub Token via dd-octo-sts
+        id: generate-token
+        uses: DataDog/dd-octo-sts-action@c85802a58e202b7e764b5441e4378c76043c8108 # v1.0.5
+        with:
+          scope: DataDog/dd-trace-rb
+          policy: libddwaf-rb.notify-consumers
+
+      # There appears to be a race condition in token propagation, wait it out
+      - name: Wait for token propagation
+        run: sleep 30
+
+      - name: Dispatch to DataDog/dd-trace-rb
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          gh api "repos/DataDog/dd-trace-rb/dispatches" \
+            -f event_type=internal-dep-updated \
+            -f "client_payload[gem]=libddwaf" \
+            -f "client_payload[version]=${{ steps.gem.outputs.version }}" \
+            -f "client_payload[commit]=${{ github.sha }}" \
+            -f "client_payload[triggered_by]=${{ github.repository }}" \
+            -f "client_payload[source_run_url]=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
