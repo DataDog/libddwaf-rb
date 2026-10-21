@@ -6,6 +6,7 @@ module Datadog
       # Module responsible for Ruby-to-C and C-to-Ruby conversions
       module Converter
         INT64_MIN = -(2**63)
+        UINT32_MAX = 2**32 - 1
         UINT64_MAX = 2**64 - 1
 
         module_function
@@ -14,8 +15,8 @@ module Datadog
         def ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil, top_obj: nil, coerce: true)
           case val
           when Array
-            obj = LibDDWAF::Object.new
-            res = LibDDWAF.ddwaf_object_array(obj)
+            container = LibDDWAF::Object.new
+            res = LibDDWAF.ddwaf_object_array(container)
             raise ConversionError, "Could not convert into object: #{val}" if res.null?
 
             if max_container_depth == 0
@@ -23,7 +24,7 @@ module Datadog
             else
               val.each.with_index do |e, i|
                 if max_container_size && i >= max_container_size
-                  (top_obj || obj).mark_truncated!
+                  (top_obj || container).mark_truncated!
                   break val
                 end
 
@@ -32,18 +33,19 @@ module Datadog
                   max_container_size: max_container_size,
                   max_container_depth: (max_container_depth - 1 if max_container_depth),
                   max_string_length: max_string_length,
-                  top_obj: top_obj || obj,
+                  top_obj: top_obj || container,
                   coerce: coerce
                 )
-                e_res = LibDDWAF.ddwaf_object_array_add(obj, member)
+                e_res = LibDDWAF.ddwaf_object_array_add(container, member)
                 raise ConversionError, "Could not add to array object: #{e.inspect}" unless e_res
               end
             end
 
-            obj
+            container_complete = true
+            container
           when Hash
-            obj = LibDDWAF::Object.new
-            res = LibDDWAF.ddwaf_object_map(obj)
+            container = LibDDWAF::Object.new
+            res = LibDDWAF.ddwaf_object_map(container)
             raise ConversionError, "Could not convert into object: #{val}" if res.null?
 
             if max_container_depth == 0
@@ -51,7 +53,7 @@ module Datadog
             else
               val.each.with_index do |e, i|
                 if max_container_size && i >= max_container_size
-                  (top_obj || obj).mark_truncated!
+                  (top_obj || container).mark_truncated!
                   break val
                 end
 
@@ -61,19 +63,30 @@ module Datadog
 
                 if max_string_length && k.length > max_string_length
                   k = k[0, max_string_length]
-                  (top_obj || obj).mark_truncated!
+                  (top_obj || container).mark_truncated!
                 end
                 member = Converter.ruby_to_object(
                   v,
                   max_container_size: max_container_size,
                   max_container_depth: (max_container_depth - 1 if max_container_depth),
                   max_string_length: max_string_length,
-                  top_obj: top_obj || obj,
+                  top_obj: top_obj || container,
                   coerce: coerce
                 )
-                kv_res = LibDDWAF.ddwaf_object_map_addl(obj, k, k.bytesize, member)
+                kv_res = LibDDWAF.ddwaf_object_map_addl(container, k, k.bytesize, member)
                 raise ConversionError, "Could not add to map object: #{e[0].inspect} => #{v.inspect}" unless kv_res
               end
+            end
+
+            container_complete = true
+            container
+          when JSONString
+            length = val.bytesize
+            raise ConversionError, "JSON string exceeds the native length limit" if length > UINT32_MAX
+
+            obj = LibDDWAF::Object.new
+            unless LibDDWAF.ddwaf_object_from_json(obj, val, length)
+              raise ConversionError, "Could not convert JSON string"
             end
 
             obj
@@ -146,6 +159,8 @@ module Datadog
           else
             Converter.ruby_to_object("")
           end
+        ensure
+          LibDDWAF.ddwaf_object_free(container) if container && !container_complete
         end
         # standard:enable Metrics/MethodLength,Metrics/CyclomaticComplexity
 

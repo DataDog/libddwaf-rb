@@ -43,6 +43,12 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj).not_to be_truncated
       end
 
+      it "converts a JSON string" do
+        obj = described_class.ruby_to_object(Datadog::AppSec::WAF::JSONString.new('{"value":[1,true,null]}'))
+        expect(obj[:type]).to eq(:ddwaf_obj_map)
+        expect(described_class.object_to_ruby(obj)).to eq("value" => [1, true, nil])
+      end
+
       it "converts a binary string" do
         obj = described_class.ruby_to_object("foo\x00bar")
         expect(obj[:type]).to eq :ddwaf_obj_string
@@ -373,6 +379,145 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(obj[:type]).to eq :ddwaf_obj_string
         expect(obj[:nbEntries]).to eq 3
         expect(obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])).to eq "foo"
+      end
+
+      it "converts a JSON string without Ruby JSON parsing" do
+        expect(JSON).not_to receive(:parse)
+
+        obj = described_class.ruby_to_object(
+          Datadog::AppSec::WAF::JSONString.new('{"value":[1,true,null]}'),
+          coerce: false
+        )
+        expect(obj[:type]).to eq(:ddwaf_obj_map)
+        expect(described_class.object_to_ruby(obj)).to eq("value" => [1, true, nil])
+      end
+
+      it "converts a frozen JSON string" do
+        obj = described_class.ruby_to_object(
+          Datadog::AppSec::WAF::JSONString.new('{"value":[1,true,null]}').freeze,
+          coerce: false
+        )
+        expect(obj[:type]).to eq(:ddwaf_obj_map)
+        expect(described_class.object_to_ruby(obj)).to eq("value" => [1, true, nil])
+      end
+
+      it "converts JSON false" do
+        obj = described_class.ruby_to_object(Datadog::AppSec::WAF::JSONString.new("false"), coerce: false)
+        expect(obj[:type]).to eq(:ddwaf_obj_bool)
+        expect(obj[:valueUnion][:boolean]).to eq(false)
+      end
+
+      it "converts JSON null" do
+        obj = described_class.ruby_to_object(Datadog::AppSec::WAF::JSONString.new("null"), coerce: false)
+        expect(obj[:type]).to eq(:ddwaf_obj_null)
+        expect(described_class.object_to_ruby(obj)).to be_nil
+      end
+
+      it "converts JSON with non-ASCII text" do
+        obj = described_class.ruby_to_object(Datadog::AppSec::WAF::JSONString.new('{"name":"é"}'), coerce: false)
+        expect(obj[:type]).to eq(:ddwaf_obj_map)
+        expect(described_class.object_to_ruby(obj)).to eq("name" => "é")
+      end
+
+      it "rejects malformed JSON" do
+        expect {
+          described_class.ruby_to_object(Datadog::AppSec::WAF::JSONString.new('{"missing":'), coerce: false)
+        }.to raise_error(Datadog::AppSec::WAF::ConversionError)
+      end
+
+      it "rejects empty JSON" do
+        expect {
+          described_class.ruby_to_object(Datadog::AppSec::WAF::JSONString.new(""), coerce: false)
+        }.to raise_error(Datadog::AppSec::WAF::ConversionError)
+      end
+
+      it "rejects JSONP" do
+        expect {
+          described_class.ruby_to_object(Datadog::AppSec::WAF::JSONString.new('callback({"x":1})'), coerce: false)
+        }.to raise_error(Datadog::AppSec::WAF::ConversionError)
+      end
+
+      it "converts marked and unmarked strings in a hash" do
+        obj = described_class.ruby_to_object(
+          {
+            "decoded" => Datadog::AppSec::WAF::JSONString.new('{"x":1}'),
+            "literal" => '{"x":1}'
+          },
+          coerce: false
+        )
+        expect(obj[:type]).to eq(:ddwaf_obj_map)
+        expect(described_class.object_to_ruby(obj)).to eq("decoded" => {"x" => 1}, "literal" => '{"x":1}')
+      end
+
+      it "converts marked and unmarked strings in an array" do
+        obj = described_class.ruby_to_object(
+          [Datadog::AppSec::WAF::JSONString.new("[1,2]"), "[1,2]"],
+          coerce: false
+        )
+        expect(obj[:type]).to eq(:ddwaf_obj_array)
+        expect(described_class.object_to_ruby(obj)).to eq([[1, 2], "[1,2]"])
+      end
+
+      it "frees a partial hash when JSON parsing fails" do
+        expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_free).and_wrap_original do |original, obj|
+          expect(described_class.object_to_ruby(obj)).to eq("safe" => "value")
+          original.call(obj)
+        end
+
+        expect do
+          described_class.ruby_to_object(
+            {"safe" => "value", "body" => Datadog::AppSec::WAF::JSONString.new("{")},
+            coerce: false
+          )
+        end.to raise_error(Datadog::AppSec::WAF::ConversionError, "Could not convert JSON string")
+      end
+
+      it "frees a partial array when JSON parsing fails" do
+        expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_free).and_wrap_original do |original, obj|
+          expect(described_class.object_to_ruby(obj)).to eq(["value"])
+          original.call(obj)
+        end
+
+        expect do
+          described_class.ruby_to_object(
+            ["value", Datadog::AppSec::WAF::JSONString.new("{")],
+            coerce: false
+          )
+        end.to raise_error(Datadog::AppSec::WAF::ConversionError, "Could not convert JSON string")
+      end
+
+      it "frees each partial container when nested JSON parsing fails" do
+        expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_free).ordered.and_wrap_original do |original, obj|
+          expect(described_class.object_to_ruby(obj)).to eq(["inner"])
+          original.call(obj)
+        end
+        expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_free).ordered.and_wrap_original do |original, obj|
+          expect(described_class.object_to_ruby(obj)).to eq("safe" => "outer")
+          original.call(obj)
+        end
+
+        expect do
+          described_class.ruby_to_object(
+            {"safe" => "outer", "nested" => ["inner", Datadog::AppSec::WAF::JSONString.new("{")]},
+            coerce: false
+          )
+        end.to raise_error(Datadog::AppSec::WAF::ConversionError, "Could not convert JSON string")
+      end
+
+      context "when the JSON string exceeds the native length limit" do
+        before do
+          allow(json_string).to receive(:bytesize).and_return(0x1_0000_0000)
+          allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_from_json).and_call_original
+        end
+
+        let(:json_string) { Datadog::AppSec::WAF::JSONString.new("null") }
+
+        it "rejects the input before passing a truncated length to native code" do
+          expect { described_class.ruby_to_object(json_string, coerce: false) }
+            .to raise_error(Datadog::AppSec::WAF::ConversionError)
+
+          expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_object_from_json)
+        end
       end
 
       it "converts a binary string" do

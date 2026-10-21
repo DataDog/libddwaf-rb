@@ -13,6 +13,10 @@ require "datadog/appsec/waf/version"
 module Datadog
   module AppSec
     module WAF
+      # A marker class representing string containing JSON.
+      # If given as an address value will trigger parsing into native WAF objects
+      JSONString = Class.new(String)
+
       module_function
 
       def version

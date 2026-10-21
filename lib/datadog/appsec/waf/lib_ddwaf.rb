@@ -161,6 +161,7 @@ module Datadog
         attach_function :ddwaf_object_bool, [:ddwaf_object, :bool], :ddwaf_object
         attach_function :ddwaf_object_null, [:ddwaf_object], :ddwaf_object
         attach_function :ddwaf_object_float, [:ddwaf_object, :double], :ddwaf_object
+        attach_function :ddwaf_object_from_json, [:ddwaf_object, :charptr, :uint32], :bool
 
         attach_function :ddwaf_object_array, [:ddwaf_object], :ddwaf_object
         attach_function :ddwaf_object_array_add, [:ddwaf_object, :ddwaf_object], :bool

@@ -42,6 +42,9 @@ module Datadog
       type attributes = ::Hash[::String, opaque]
       type opaque = nil | bool | ::String | ::Integer | ::Float | ::Array[opaque] | ::Hash[::String, opaque]
 
+      class JSONString < String
+      end
+
       self.@logger: ::Logger
 
       self.@log_callback: LibDDWAF::ddwaf_log_cb
