@@ -152,6 +152,15 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
     end
 
+    it "returns rule output for a JSON address value" do
+      result = context.run({headers: Datadog::AppSec::WAF::JSONString.new('{"user":"Attack"}')}, {})
+
+      expect(result.status).to eq(:match)
+      expect(result.attributes).to eq({
+        "out.integer" => 42, "out.string" => "forty two", "out.by_path" => "Attack"
+      })
+    end
+
     it "defines result input as non-truncated" do
       result = context.run({value2: ["rule1"]}, {value2: ["rule1"]})
       expect(result).not_to be_input_truncated

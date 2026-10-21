@@ -6,6 +6,7 @@ module Datadog
       # Module responsible for Ruby-to-C and C-to-Ruby conversions
       module Converter
         INT64_MIN = -(2**63)
+        UINT32_MAX = 2**32 - 1
         UINT64_MAX = 2**64 - 1
 
         module_function
@@ -74,6 +75,16 @@ module Datadog
                 kv_res = LibDDWAF.ddwaf_object_map_addl(obj, k, k.bytesize, member)
                 raise ConversionError, "Could not add to map object: #{e[0].inspect} => #{v.inspect}" unless kv_res
               end
+            end
+
+            obj
+          when JSONString
+            length = val.bytesize
+            raise ConversionError, "JSON string exceeds the native length limit" if length > UINT32_MAX
+
+            obj = LibDDWAF::Object.new
+            unless LibDDWAF.ddwaf_object_from_json(obj, val, length)
+              raise ConversionError, "Could not convert JSON string"
             end
 
             obj

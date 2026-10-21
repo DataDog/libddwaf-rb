@@ -2,6 +2,12 @@ module Datadog
   module AppSec
     module WAF
       module Converter
+        INT64_MIN: Integer
+
+        UINT32_MAX: Integer
+
+        UINT64_MAX: Integer
+
         def self?.ruby_to_object: (
           top val,
           ?max_container_size: ::Integer?,
