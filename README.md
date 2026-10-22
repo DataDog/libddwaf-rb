@@ -66,6 +66,24 @@ rake binary[x86_64-linux:llvm]      # Hybrid build: linked to llvm static libs a
 
 See upstream libddwaf for details about the [hybrid portable build](https://github.com/DataDog/libddwaf/blob/master/docker/libddwaf/README.md).
 
+## Releasing
+
+Releases are manual and run from a maintainer's machine:
+
+```
+rake libddwaf:release
+```
+
+This requires the matching libddwaf binaries to be released upstream first. The task builds the gems for all supported platforms, pushes the Ruby gem and its tag, and pushes each platform gem to rubygems.org.
+
+After releasing, tell dd-trace-rb:
+
+```
+gh workflow run "Notify Consumers" --ref master
+```
+
+That workflow reads the latest published version from rubygems.org and opens a PR in dd-trace-rb pinning it.
+
 ## Testing with Docker
 
 Unless using Docker for Mac, remember to enable foreign CPU emulation via QEMU:
