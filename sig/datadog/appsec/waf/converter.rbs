@@ -4,6 +4,8 @@ module Datadog
       module Converter
         INT64_MIN: Integer
 
+        UINT16_MAX: Integer
+
         UINT32_MAX: Integer
 
         UINT64_MAX: Integer
@@ -17,7 +19,24 @@ module Datadog
           ?coerce: bool?
         ) -> LibDDWAF::Object
 
+        def self?.populate_object: (
+          LibDDWAF::Object object,
+          top val,
+          allocator: ::FFI::Pointer,
+          top_obj: LibDDWAF::Object,
+          max_container_size: ::Integer?,
+          max_container_depth: ::Integer?,
+          max_string_length: ::Integer?,
+          coerce: bool?
+        ) -> LibDDWAF::Object
+
+        def self?.string_to_object: (LibDDWAF::Object object, ::String string, ::FFI::Pointer allocator) -> LibDDWAF::Object
+
+        def self?.container_capacity: (::Integer size, ::Integer? max_container_size, ::Integer? max_container_depth) -> ::Integer
+
         def self?.object_to_ruby: (LibDDWAF::Object obj) -> WAF::opaque
+
+        def self?.object_to_string: (LibDDWAF::Object obj) -> ::String
       end
     end
   end
