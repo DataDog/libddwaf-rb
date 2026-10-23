@@ -82,15 +82,17 @@ module Datadog
 
         # ddwaf::object data structure
 
-        DDWAF_OBJ_TYPE = enum :ddwaf_obj_invalid, 0,
-          :ddwaf_obj_signed, 1 << 0,
-          :ddwaf_obj_unsigned, 1 << 1,
-          :ddwaf_obj_string, 1 << 2,
-          :ddwaf_obj_array, 1 << 3,
-          :ddwaf_obj_map, 1 << 4,
-          :ddwaf_obj_bool, 1 << 5,
-          :ddwaf_obj_float, 1 << 6,
-          :ddwaf_obj_null, 1 << 7
+        DDWAF_OBJ_TYPE = enum :ddwaf_obj_invalid, 0x00,
+          :ddwaf_obj_null, 0x01,
+          :ddwaf_obj_bool, 0x02,
+          :ddwaf_obj_signed, 0x04,
+          :ddwaf_obj_unsigned, 0x06,
+          :ddwaf_obj_float, 0x08,
+          :ddwaf_obj_string, 0x10,
+          :ddwaf_obj_literal_string, 0x12,
+          :ddwaf_obj_small_string, 0x14,
+          :ddwaf_obj_array, 0x20,
+          :ddwaf_obj_map, 0x40
 
         typedef DDWAF_OBJ_TYPE, :ddwaf_obj_type
 
@@ -118,24 +120,53 @@ module Datadog
 
         typedef SizeTPtr.by_ref, :sizeptr
 
-        # Ruby representation of C union
-        class ObjectValueUnion < ::FFI::Union
-          layout :stringValue, :charptr,
-            :uintValue, :uint64,
-            :intValue, :int64,
-            :array, :pointer,
-            :boolean, :bool,
-            :f64, :double
+        class ObjectBool < ::FFI::Struct
+          layout :type, :uint8, :val, :bool
         end
 
-        # Ruby representation of ddwaf_object
-        # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L94C1-L115C3
-        class Object < ::FFI::Struct
-          layout :parameterName, :charptr,
-            :parameterNameLength, :uint64,
-            :valueUnion, ObjectValueUnion,
-            :nbEntries, :uint64,
-            :type, :ddwaf_obj_type
+        class ObjectSigned < ::FFI::Struct
+          layout :type, :uint8, :val, :int64
+        end
+
+        class ObjectUnsigned < ::FFI::Struct
+          layout :type, :uint8, :val, :uint64
+        end
+
+        class ObjectFloat < ::FFI::Struct
+          layout :type, :uint8, :val, :double
+        end
+
+        class ObjectString < ::FFI::Struct
+          layout :type, :uint8, :size, :uint32, :ptr, :pointer
+        end
+
+        class ObjectSmallString < ::FFI::Struct
+          layout :type, :uint8, :size, :uint8, :data, [:char, 14]
+        end
+
+        class ObjectArray < ::FFI::Struct
+          layout :type, :uint8, :size, :uint16, :capacity, :uint16, :ptr, :pointer
+        end
+
+        class ObjectMap < ::FFI::Struct
+          layout :type, :uint8, :size, :uint16, :capacity, :uint16, :ptr, :pointer
+        end
+
+        class ObjectValueUnion < ::FFI::Union
+          layout :b8, ObjectBool,
+            :i64, ObjectSigned,
+            :u64, ObjectUnsigned,
+            :f64, ObjectFloat,
+            :str, ObjectString,
+            :sstr, ObjectSmallString,
+            :array, ObjectArray,
+            :map, ObjectMap
+        end
+
+        # See: https://github.com/DataDog/libddwaf/blob/2.0.0/include/ddwaf.h
+        class Object < ::FFI::Union
+          layout :type, :uint8,
+            :via, ObjectValueUnion
 
           def truncated?
             @truncated == true
@@ -146,93 +177,75 @@ module Datadog
           end
         end
 
+        class ObjectKV < ::FFI::Struct
+          layout :key, Object,
+            :val, Object
+        end
+
         typedef Object.by_ref, :ddwaf_object
+
+        # allocators
+
+        typedef :pointer, :ddwaf_allocator
+
+        attach_function :ddwaf_get_default_allocator, [], :ddwaf_allocator
+        attach_function :ddwaf_allocator_alloc, [:ddwaf_allocator, :size_t, :size_t], :pointer
+        attach_function :ddwaf_allocator_free, [:ddwaf_allocator, :pointer, :size_t, :size_t], :void
 
         ## setters
 
-        attach_function :ddwaf_object_invalid, [:ddwaf_object], :ddwaf_object
-        attach_function :ddwaf_object_string, [:ddwaf_object, :string], :ddwaf_object
-        attach_function :ddwaf_object_stringl, [:ddwaf_object, :charptr, :size_t], :ddwaf_object
-        attach_function :ddwaf_object_stringl_nc, [:ddwaf_object, :charptr, :size_t], :ddwaf_object
-        attach_function :ddwaf_object_string_from_unsigned, [:ddwaf_object, :uint64], :ddwaf_object
-        attach_function :ddwaf_object_string_from_signed, [:ddwaf_object, :int64], :ddwaf_object
-        attach_function :ddwaf_object_unsigned, [:ddwaf_object, :uint64], :ddwaf_object
-        attach_function :ddwaf_object_signed, [:ddwaf_object, :int64], :ddwaf_object
-        attach_function :ddwaf_object_bool, [:ddwaf_object, :bool], :ddwaf_object
-        attach_function :ddwaf_object_null, [:ddwaf_object], :ddwaf_object
-        attach_function :ddwaf_object_float, [:ddwaf_object, :double], :ddwaf_object
-        attach_function :ddwaf_object_from_json, [:ddwaf_object, :charptr, :uint32], :bool
+        attach_function :ddwaf_object_set_invalid, [:ddwaf_object], :ddwaf_object
+        attach_function :ddwaf_object_set_null, [:ddwaf_object], :ddwaf_object
+        attach_function :ddwaf_object_set_bool, [:ddwaf_object, :bool], :ddwaf_object
+        attach_function :ddwaf_object_set_signed, [:ddwaf_object, :int64], :ddwaf_object
+        attach_function :ddwaf_object_set_unsigned, [:ddwaf_object, :uint64], :ddwaf_object
+        attach_function :ddwaf_object_set_float, [:ddwaf_object, :double], :ddwaf_object
 
-        attach_function :ddwaf_object_array, [:ddwaf_object], :ddwaf_object
-        attach_function :ddwaf_object_array_add, [:ddwaf_object, :ddwaf_object], :bool
+        attach_function :ddwaf_object_from_json, [:ddwaf_object, :charptr, :uint32, :ddwaf_allocator], :bool
 
-        attach_function :ddwaf_object_map, [:ddwaf_object], :ddwaf_object
-        attach_function :ddwaf_object_map_add, [:ddwaf_object, :string, :pointer], :bool
-        attach_function :ddwaf_object_map_addl, [:ddwaf_object, :charptr, :size_t, :pointer], :bool
-        attach_function :ddwaf_object_map_addl_nc, [:ddwaf_object, :charptr, :size_t, :pointer], :bool
+        attach_function :ddwaf_object_set_string, [:ddwaf_object, :charptr, :uint32, :ddwaf_allocator], :ddwaf_object
+        attach_function :ddwaf_object_set_string_literal, [:ddwaf_object, :charptr, :uint32], :ddwaf_object
+        attach_function :ddwaf_object_set_string_nocopy, [:ddwaf_object, :charptr, :uint32], :ddwaf_object
+
+        attach_function :ddwaf_object_set_array, [:ddwaf_object, :uint16, :ddwaf_allocator], :ddwaf_object
+        attach_function :ddwaf_object_set_map, [:ddwaf_object, :uint16, :ddwaf_allocator], :ddwaf_object
+
+        attach_function :ddwaf_object_insert, [:ddwaf_object, :ddwaf_allocator], :ddwaf_object
+        attach_function :ddwaf_object_insert_key, [:ddwaf_object, :charptr, :uint32, :ddwaf_allocator], :ddwaf_object
+        attach_function :ddwaf_object_insert_key_nocopy, [:ddwaf_object, :charptr, :uint32, :ddwaf_allocator], :ddwaf_object
 
         ## getters
 
-        attach_function :ddwaf_object_type, [:ddwaf_object], DDWAF_OBJ_TYPE
-        attach_function :ddwaf_object_size, [:ddwaf_object], :uint64
-        attach_function :ddwaf_object_length, [:ddwaf_object], :size_t
-        attach_function :ddwaf_object_get_key, [:ddwaf_object, :sizeptr], :charptr
+        attach_function :ddwaf_object_get_type, [:ddwaf_object], DDWAF_OBJ_TYPE
+        attach_function :ddwaf_object_get_size, [:ddwaf_object], :size_t
+        attach_function :ddwaf_object_get_length, [:ddwaf_object], :size_t
         attach_function :ddwaf_object_get_string, [:ddwaf_object, :sizeptr], :charptr
         attach_function :ddwaf_object_get_unsigned, [:ddwaf_object], :uint64
         attach_function :ddwaf_object_get_signed, [:ddwaf_object], :int64
-        attach_function :ddwaf_object_get_index, [:ddwaf_object, :size_t], :ddwaf_object
         attach_function :ddwaf_object_get_bool, [:ddwaf_object], :bool
         attach_function :ddwaf_object_get_float, [:ddwaf_object], :double
 
-        ## freeers
+        attach_function :ddwaf_object_at_key, [:ddwaf_object, :size_t], :ddwaf_object
+        attach_function :ddwaf_object_at_value, [:ddwaf_object, :size_t], :ddwaf_object
 
-        ObjectFree = attach_function :ddwaf_object_free, [:ddwaf_object], :void
-        ObjectNoFree = ::FFI::Pointer::NULL
+        ## destruction
+
+        attach_function :ddwaf_object_destroy, [:ddwaf_object, :ddwaf_allocator], :void
 
         # handle builder
 
         typedef :pointer, :ddwaf_builder
         typedef :pointer, :ddwaf_handle
-        typedef :pointer, :ddwaf_diagnostics
 
-        callback :ddwaf_object_free_fn, [:ddwaf_object], :void
-
-        # Ruby representation of ddwaf_config
-        # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L129-L152
-        class HandleBuilderConfig < ::FFI::Struct
-          # Ruby representation of ddwaf_config_limits
-          # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L131-L138
-          class Limits < ::FFI::Struct
-            layout :max_container_size, :uint32,
-              :max_container_depth, :uint32,
-              :max_string_length, :uint32
-          end
-
-          # Ruby representation of ddwaf_config_obfuscator
-          # https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/include/ddwaf.h#L141-L146
-          class Obfuscator < ::FFI::Struct
-            layout :key_regex, :pointer, # should be :charptr
-              :value_regex, :pointer  # should be :charptr
-          end
-
-          layout :limits, Limits,
-            :obfuscator, Obfuscator,
-            :free_fn, :pointer # :ddwaf_object_free_fn
-        end
-
-        typedef HandleBuilderConfig.by_ref, :ddwaf_config
-
-        attach_function :ddwaf_builder_init, [:ddwaf_config], :ddwaf_builder
+        attach_function :ddwaf_builder_init, [], :ddwaf_builder
         attach_function :ddwaf_builder_destroy, [:ddwaf_builder], :void
 
-        attach_function :ddwaf_builder_add_or_update_config, [:ddwaf_builder, :string, :size_t, :ddwaf_object, :ddwaf_diagnostics], :bool
-        attach_function :ddwaf_builder_remove_config, [:ddwaf_builder, :string, :size_t], :bool
+        attach_function :ddwaf_builder_add_or_update_config, [:ddwaf_builder, :string, :uint32, :ddwaf_object, :ddwaf_object], :bool
+        attach_function :ddwaf_builder_remove_config, [:ddwaf_builder, :string, :uint32], :bool
 
         attach_function :ddwaf_builder_build_instance, [:ddwaf_builder], :ddwaf_handle
 
         # handle
-
-        callback :ddwaf_object_free_fn, [:ddwaf_object], :void
 
         attach_function :ddwaf_destroy, [:ddwaf_handle], :void
 
@@ -247,16 +260,19 @@ module Datadog
           :ddwaf_match, 1
         typedef DDWAF_RET_CODE, :ddwaf_ret_code
 
-        # running
+        # evaluation
 
         typedef :pointer, :ddwaf_context
-
-        attach_function :ddwaf_context_init, [:ddwaf_handle], :ddwaf_context
-        attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
-
+        typedef :pointer, :ddwaf_subcontext
         typedef :uint64, :timeout_us
 
-        attach_function :ddwaf_run, [:ddwaf_context, :ddwaf_object, :ddwaf_object, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
+        attach_function :ddwaf_context_init, [:ddwaf_handle, :ddwaf_allocator], :ddwaf_context
+        attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
+        attach_function :ddwaf_context_eval, [:ddwaf_context, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
+
+        attach_function :ddwaf_subcontext_init, [:ddwaf_context], :ddwaf_subcontext
+        attach_function :ddwaf_subcontext_destroy, [:ddwaf_subcontext], :void
+        attach_function :ddwaf_subcontext_eval, [:ddwaf_subcontext, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
 
         # logging
 

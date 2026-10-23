@@ -54,10 +54,34 @@ module Datadog
         class SizeTPtr < ::FFI::Struct[::FFI::AbstractMemory, ::Integer]
         end
 
+        class ObjectBool < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        class ObjectSigned < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        class ObjectUnsigned < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        class ObjectFloat < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        class ObjectString < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        class ObjectSmallString < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        class ObjectArray < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        class ObjectMap < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
         class ObjectValueUnion < ::FFI::Union[::FFI::AbstractMemory, untyped]
         end
 
-        class Object < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        class Object < ::FFI::Union[::FFI::AbstractMemory, untyped]
           @truncated: bool
 
           def truncated?: () -> bool
@@ -65,52 +89,59 @@ module Datadog
           def mark_truncated!: () -> bool
         end
 
+        class ObjectKV < ::FFI::Struct[::FFI::AbstractMemory, untyped]
+        end
+
+        # allocators
+
+        def self.ddwaf_get_default_allocator: () -> ::FFI::Pointer
+        def self.ddwaf_allocator_alloc: (::FFI::Pointer, ::Integer, ::Integer) -> ::FFI::Pointer
+        def self.ddwaf_allocator_free: (::FFI::Pointer, ::FFI::Pointer, ::Integer, ::Integer) -> void
+
         # setters
 
-        def self.ddwaf_object_invalid: (LibDDWAF::Object) -> ::FFI::Pointer
-        def self.ddwaf_object_string: (LibDDWAF::Object, ::String) -> ::FFI::Pointer
-        def self.ddwaf_object_stringl: (LibDDWAF::Object, ::String, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_stringl_nc: (LibDDWAF::Object, ::String, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_unsigned: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_string_from_unsigned: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_string_from_signed: (LibDDWAF::Object, ::Integer) -> ::FFI::Pointer
-        def self.ddwaf_object_bool: (LibDDWAF::Object, bool) -> ::FFI::Pointer
-        def self.ddwaf_object_float: (LibDDWAF::Object, ::Float) -> ::FFI::Pointer
-        def self.ddwaf_object_null: (LibDDWAF::Object) -> ::FFI::Pointer
-        def self.ddwaf_object_from_json: (LibDDWAF::Object, String, Integer) -> bool
+        # Object.by_ref returns an Object wrapper even for NULL; check to_ptr.null?.
+        def self.ddwaf_object_set_invalid: (LibDDWAF::Object) -> LibDDWAF::Object
+        def self.ddwaf_object_set_null: (LibDDWAF::Object) -> LibDDWAF::Object
+        def self.ddwaf_object_set_bool: (LibDDWAF::Object, bool) -> LibDDWAF::Object
+        def self.ddwaf_object_set_signed: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
+        def self.ddwaf_object_set_unsigned: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
+        def self.ddwaf_object_set_float: (LibDDWAF::Object, ::Float) -> LibDDWAF::Object
 
-        def self.ddwaf_object_array: (LibDDWAF::Object) -> ::FFI::Pointer
-        def self.ddwaf_object_array_add: (LibDDWAF::Object, LibDDWAF::Object) -> bool
+        def self.ddwaf_object_from_json: (LibDDWAF::Object, ::String | ::FFI::Pointer, ::Integer, ::FFI::Pointer) -> bool
 
-        def self.ddwaf_object_map: (LibDDWAF::Object) -> ::FFI::Pointer
-        def self.ddwaf_object_map_add: (LibDDWAF::Object, ::String, LibDDWAF::Object) -> bool
-        def self.ddwaf_object_map_addl: (LibDDWAF::Object, ::String, ::Integer, LibDDWAF::Object) -> bool
-        def self.ddwaf_object_map_addl_nc: (LibDDWAF::Object, ::String, ::Integer, LibDDWAF::Object) -> bool
+        def self.ddwaf_object_set_string: (LibDDWAF::Object, ::String | ::FFI::Pointer, ::Integer, ::FFI::Pointer) -> LibDDWAF::Object
+        def self.ddwaf_object_set_string_literal: (LibDDWAF::Object, ::FFI::Pointer, ::Integer) -> LibDDWAF::Object
+        def self.ddwaf_object_set_string_nocopy: (LibDDWAF::Object, ::FFI::Pointer, ::Integer) -> LibDDWAF::Object
+
+        def self.ddwaf_object_set_array: (LibDDWAF::Object, ::Integer, ::FFI::Pointer) -> LibDDWAF::Object
+        def self.ddwaf_object_set_map: (LibDDWAF::Object, ::Integer, ::FFI::Pointer) -> LibDDWAF::Object
+
+        def self.ddwaf_object_insert: (LibDDWAF::Object, ::FFI::Pointer) -> LibDDWAF::Object
+        def self.ddwaf_object_insert_key: (LibDDWAF::Object, ::String | ::FFI::Pointer, ::Integer, ::FFI::Pointer) -> LibDDWAF::Object
+        def self.ddwaf_object_insert_key_nocopy: (LibDDWAF::Object, ::FFI::Pointer, ::Integer, ::FFI::Pointer) -> LibDDWAF::Object
 
         # getters
 
-        def self.ddwaf_object_type: (LibDDWAF::Object) -> ::FFI::Enum
-        def self.ddwaf_object_size: (LibDDWAF::Object) -> ::Integer
-        def self.ddwaf_object_length: (LibDDWAF::Object) -> ::Integer
-        def self.ddwaf_object_get_key: (LibDDWAF::Object, SizeTPtr) -> ::String
-        def self.ddwaf_object_get_string: (LibDDWAF::Object, SizeTPtr) -> ::String
-        def self.ddwaf_object_get_unsigned: (LibDDWAF::Object, SizeTPtr) -> ::Integer
-        def self.ddwaf_object_get_signed: (LibDDWAF::Object, SizeTPtr) -> ::Integer
-        def self.ddwaf_object_get_index: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
+        def self.ddwaf_object_get_type: (LibDDWAF::Object) -> ::Symbol
+        def self.ddwaf_object_get_size: (LibDDWAF::Object) -> ::Integer
+        def self.ddwaf_object_get_length: (LibDDWAF::Object) -> ::Integer
+        def self.ddwaf_object_get_string: (LibDDWAF::Object, SizeTPtr?) -> ::FFI::Pointer
+        def self.ddwaf_object_get_unsigned: (LibDDWAF::Object) -> ::Integer
+        def self.ddwaf_object_get_signed: (LibDDWAF::Object) -> ::Integer
         def self.ddwaf_object_get_bool: (LibDDWAF::Object) -> bool
         def self.ddwaf_object_get_float: (LibDDWAF::Object) -> ::Float
 
-        # freeers
+        def self.ddwaf_object_at_key: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
+        def self.ddwaf_object_at_value: (LibDDWAF::Object, ::Integer) -> LibDDWAF::Object
 
-        def self.ddwaf_object_free: (LibDDWAF::Object) -> void
+        # destruction
 
-        ObjectFree: ::FFI::Function
-        ObjectNoFree: ::FFI::Pointer
+        def self.ddwaf_object_destroy: (LibDDWAF::Object, ::FFI::Pointer) -> void
 
         # handle builder
 
-        def self.ddwaf_builder_init: (HandleBuilderConfig) -> ::FFI::Pointer
+        def self.ddwaf_builder_init: () -> ::FFI::Pointer
         def self.ddwaf_builder_destroy: (::FFI::Pointer) -> void
 
         def self.ddwaf_builder_add_or_update_config: (::FFI::Pointer, ::String, ::Integer, LibDDWAF::Object, LibDDWAF::Object) -> bool
@@ -120,29 +151,23 @@ module Datadog
 
         # main handle
 
-        class HandleBuilderConfig < ::FFI::Struct[::FFI::AbstractMemory, untyped]
-          class Limits < ::FFI::Struct[::FFI::AbstractMemory, ::Integer]
-          end
-
-          class Obfuscator < ::FFI::Struct[::FFI::AbstractMemory, ::FFI::Pointer]
-          end
-        end
-
         def self.ddwaf_destroy: (::FFI::Pointer) -> void
 
         def self.ddwaf_known_addresses: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
-        def self.ddwaf_rule_data_ids: (::FFI::Pointer, UInt32Ptr) -> ::FFI::Pointer
 
         # updating
 
         DDWAF_RET_CODE: ::FFI::Enum
 
-        # running
+        # evaluation
 
-        def self.ddwaf_context_init: (::FFI::Pointer) -> ::FFI::Pointer
+        def self.ddwaf_context_init: (::FFI::Pointer, ::FFI::Pointer) -> ::FFI::Pointer
         def self.ddwaf_context_destroy: (::FFI::Pointer) -> void
+        def self.ddwaf_context_eval: (::FFI::Pointer, Object, ::FFI::Pointer, Object, ::Integer) -> ::Symbol
 
-        def self.ddwaf_run: (::FFI::Pointer, Object, Object, Object, ::Integer) -> ::Symbol
+        def self.ddwaf_subcontext_init: (::FFI::Pointer) -> ::FFI::Pointer
+        def self.ddwaf_subcontext_destroy: (::FFI::Pointer) -> void
+        def self.ddwaf_subcontext_eval: (::FFI::Pointer, Object, ::FFI::Pointer, Object, ::Integer) -> ::Symbol
 
         # logging
 
