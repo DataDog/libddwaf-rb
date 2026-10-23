@@ -2,6 +2,12 @@ ARG RUBY_VERSION
 
 FROM ruby:${RUBY_VERSION:-2.5}-alpine
 
+# EOL Alpine v3.13: no fixed ca-certificates package ships, so drop the two compromised roots from the bundle.
+RUN apk add --no-cache ca-certificates \
+ && sed -i -e 's|^mozilla/emSign_ECC_Root_CA_-_G3.crt|!&|' -e 's|^mozilla/Comodo_AAA_Services_root.crt|!&|' /etc/ca-certificates.conf \
+ && rm -f /usr/share/ca-certificates/mozilla/emSign_ECC_Root_CA_-_G3.crt /usr/share/ca-certificates/mozilla/Comodo_AAA_Services_root.crt \
+ && update-ca-certificates
+
 RUN apk add --no-cache build-base git
 
 RUN gem update --system 3.3.27
