@@ -11,497 +11,103 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   end
 
   context "Object" do
-    it "creates ddwaf_object_invalid" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_invalid(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_invalid
-      described_class.ddwaf_object_free(object)
+    let(:allocator) { described_class.ddwaf_get_default_allocator }
+    let(:object) { described_class::Object.new }
+
+    around do |example|
+      raise "Could not obtain the native allocator" if allocator.null?
+
+      described_class.ddwaf_object_set_invalid(object)
+      begin
+        example.run
+      ensure
+        described_class.ddwaf_object_destroy(object, allocator)
+      end
     end
 
-    it "creates ddwaf_object_bool with true" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_bool(object, true)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_bool
-      expect(object[:valueUnion][:boolean]).to be true
-      described_class.ddwaf_object_free(object)
+    it "passes and returns signed 64-bit integers through an Object reference" do
+      value = -0x1_0000_0001
+
+      result = described_class.ddwaf_object_set_signed(object, value)
+
+      expect(result).to be_a(described_class::Object)
+      expect(result.to_ptr).to eq(object.to_ptr)
+      expect(described_class.ddwaf_object_get_type(object)).to eq(:ddwaf_obj_signed)
+      expect(described_class.ddwaf_object_get_signed(object)).to eql(value)
     end
 
-    it "creates ddwaf_object_bool with false" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_bool(object, false)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_bool
-      expect(object[:valueUnion][:boolean]).to be false
-      described_class.ddwaf_object_free(object)
+    it "passes and returns unsigned 64-bit integers" do
+      value = 0x8000_0000_0000_0001
+
+      described_class.ddwaf_object_set_unsigned(object, value)
+
+      expect(described_class.ddwaf_object_get_unsigned(object)).to eql(value)
     end
 
-    it "creates ddwaf_object_string" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_string(object, "foobar")
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "foobar"
-      described_class.ddwaf_object_free(object)
+    it "passes and returns Ruby true" do
+      described_class.ddwaf_object_set_bool(object, true)
+
+      expect(described_class.ddwaf_object_get_bool(object)).to be(true)
     end
 
-    it "creates ddwaf_object_string with binary data" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_stringl(object, "foo\x00bar", 7)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 7
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "foo\x00bar"
-      described_class.ddwaf_object_free(object)
+    it "passes and returns Ruby false" do
+      described_class.ddwaf_object_set_bool(object, false)
+
+      expect(described_class.ddwaf_object_get_bool(object)).to be(false)
     end
 
-    it "creates ddwaf_object_string with zero-copy binary data" do
-      s = "foo\x00bar"
-      buf = FFI::MemoryPointer.from_string(s)
-      buf.autorelease = false
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_stringl_nc(object, buf, s.size)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 7
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "foo\x00bar"
-      described_class.ddwaf_object_free(object)
+    it "passes and returns double-precision floats" do
+      value = 1.0000000000000002
+
+      described_class.ddwaf_object_set_float(object, value)
+
+      expect(described_class.ddwaf_object_get_float(object)).to eql(value)
     end
 
-    it "creates ddwaf_object_string from unsigned" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_string_from_unsigned(object, 42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 2
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "42"
-      described_class.ddwaf_object_free(object)
+    it "passes string bytes and reads a pointer with a size_t output length" do
+      bytes = "caf\u00e9\0tail".b
+      length = described_class::SizeTPtr.new
+      described_class.ddwaf_object_set_string(object, bytes, bytes.bytesize, allocator)
+
+      pointer = described_class.ddwaf_object_get_string(object, length)
+
+      expect(pointer).not_to be_null
+      expect(length[:value]).to eql(bytes.bytesize)
+      expect(pointer.read_bytes(length[:value])).to eq(bytes)
+      expect(described_class.ddwaf_object_get_length(object)).to eql(bytes.bytesize)
     end
 
-    it "creates ddwaf_object_string from signed" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_string_from_signed(object, -42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 3
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "-42"
-      described_class.ddwaf_object_free(object)
+    it "passes array slots as Object references and returns an integer size" do
+      described_class.ddwaf_object_set_array(object, 1, allocator)
+      slot = described_class.ddwaf_object_insert(object, allocator)
+      expect(slot.to_ptr).not_to be_null
+      described_class.ddwaf_object_set_signed(slot, 42)
+
+      value = described_class.ddwaf_object_at_value(object, 0)
+
+      expect(value.to_ptr).not_to be_null
+      expect(described_class.ddwaf_object_get_signed(value)).to eql(42)
+      expect(described_class.ddwaf_object_get_size(object)).to eql(1)
     end
 
-    it "creates ddwaf_object_unsigned" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_unsigned(object, 42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_unsigned
-      expect(object[:valueUnion][:uintValue]).to be 42
-      described_class.ddwaf_object_free(object)
-    end
+    it "passes map keys with a byte length and returns key and value Object references" do
+      bytes = "key\0\u00e9".b
+      described_class.ddwaf_object_set_map(object, 1, allocator)
+      slot = described_class.ddwaf_object_insert_key(object, bytes, bytes.bytesize, allocator)
+      expect(slot.to_ptr).not_to be_null
+      described_class.ddwaf_object_set_signed(slot, 42)
 
-    it "creates ddwaf_object_signed" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_signed(object, -42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_signed
-      expect(object[:valueUnion][:intValue]).to be(-42)
-      described_class.ddwaf_object_free(object)
-    end
+      key = described_class.ddwaf_object_at_key(object, 0)
+      value = described_class.ddwaf_object_at_value(object, 0)
 
-    it "creates ddwaf_object_array" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_array(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_array
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each do |c|
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string(o, c)
-        r = described_class.ddwaf_object_array_add(object, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(("a".bytes.first + i).chr)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    it "creates ddwaf_object_map" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_map(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_map
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each.with_index do |c, i|
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string_from_unsigned(o, i)
-        r = described_class.ddwaf_object_map_add(object, c, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:parameterNameLength]).to eq 1
-        expect(o[:parameterName].read_bytes(o[:parameterNameLength])).to eq(("a".bytes.first + i).chr)
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(i.to_s)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    it "creates ddwaf_object_map with binary keys" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_map(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_map
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each.with_index do |c, i|
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string_from_unsigned(o, i)
-        r = described_class.ddwaf_object_map_addl(object, c << "\x00foo", 5, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:parameterNameLength]).to eq 5
-        expect(o[:parameterName].read_bytes(o[:parameterNameLength])).to eq(("a".bytes.first + i).chr << "\x00foo")
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(i.to_s)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    it "creates ddwaf_object_map with zero-copy binary keys" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_map(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_map
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each.with_index do |c, i|
-        s = c << "\x00foo"
-        buf = FFI::MemoryPointer.from_string(s)
-        buf.autorelease = false
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string_from_unsigned(o, i)
-        r = described_class.ddwaf_object_map_addl_nc(object, buf, s.size, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:parameterNameLength]).to eq 5
-        expect(o[:parameterName].read_bytes(o[:parameterNameLength])).to eq(("a".bytes.first + i).chr << "\x00foo")
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(i.to_s)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    context "getters" do
-      let(:ddwaf_object) { described_class::Object.new }
-
-      after do
-        described_class.ddwaf_object_free(ddwaf_object)
-      end
-
-      describe ".ddwaf_object_type" do
-        [
-          ["for array object", :ddwaf_object_array, nil, :ddwaf_obj_array],
-          ["for map object", :ddwaf_object_map, nil, :ddwaf_obj_map],
-          ["for signed object", :ddwaf_object_signed, -12, :ddwaf_obj_signed],
-          ["for unsigened object", :ddwaf_object_unsigned, 12, :ddwaf_obj_unsigned],
-          ["for string object", :ddwaf_object_string, "Hello World", :ddwaf_obj_string],
-          ["for boolean object", :ddwaf_object_bool, true, :ddwaf_obj_bool]
-        ].each do |message, method, value, expected_object_type|
-          context message do
-            it "returns object type #{expected_object_type.inspect}" do
-              if value
-                described_class.send(method, ddwaf_object, value)
-              else
-                described_class.send(method, ddwaf_object)
-              end
-              object_type = described_class.ddwaf_object_type(ddwaf_object)
-              expect(object_type).to eq(expected_object_type)
-            end
-          end
-        end
-      end
-
-      describe ".ddwaf_object_size" do
-        context "for array object" do
-          it "returns size" do
-            described_class.ddwaf_object_array(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "Hello World")
-            described_class.ddwaf_object_array_add(ddwaf_object, member_object)
-
-            size = described_class.ddwaf_object_size(ddwaf_object)
-            expect(size).to eq(1)
-          end
-        end
-
-        context "for map object" do
-          it "returns size" do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-
-            size = described_class.ddwaf_object_size(ddwaf_object)
-            expect(size).to eq(1)
-          end
-        end
-
-        context "for non container objects" do
-          it "returns 0" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            size = described_class.ddwaf_object_size(ddwaf_object)
-            expect(size).to eq(0)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_string" do
-        context "for string object" do
-          it "returns string" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            string = described_class.ddwaf_object_get_string(ddwaf_object, described_class::SizeTPtr.new)
-            expect(string.get_string(0)).to eq("Hello World")
-          end
-        end
-
-        context "non string object" do
-          it "returns null" do
-            described_class.ddwaf_object_map(ddwaf_object)
-            string = described_class.ddwaf_object_get_string(ddwaf_object, described_class::SizeTPtr.new)
-            expect(string).to be_null
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_index" do
-        context "for map object" do
-          before do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-          end
-
-          context "with index in range" do
-            it "returns object" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-              expect(object).to_not be_null
-            end
-          end
-
-          context "with index out of range" do
-            it "returns null" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 1)
-              expect(object).to be_null
-            end
-          end
-        end
-
-        context "for array object" do
-          before do
-            described_class.ddwaf_object_array(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "Hello World")
-            described_class.ddwaf_object_array_add(ddwaf_object, member_object)
-          end
-
-          context "with index in range" do
-            it "returns object" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-              expect(object).to_not be_null
-            end
-          end
-
-          context "with index out of range" do
-            it "returns null" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 1)
-              expect(object).to be_null
-            end
-          end
-        end
-
-        context "non container object" do
-          it "returns null" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-            expect(object).to be_null
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_key" do
-        context "for map object" do
-          it "returns object key" do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-
-            object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-            key_object = described_class.ddwaf_object_get_key(object, described_class::SizeTPtr.new)
-
-            expect(key_object.get_string(0)).to eq("foo")
-          end
-
-          it "returns key length" do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-
-            object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-            length = described_class::SizeTPtr.new
-
-            expect(length.pointer.get_int(0)).to eq(0)
-            described_class.ddwaf_object_get_key(object, length)
-            expect(length.pointer.get_int(0)).to eq(3)
-          end
-
-          context "for non map object" do
-            it "returns nulls" do
-              described_class.ddwaf_object_string(ddwaf_object, "bar")
-              key_object = described_class.ddwaf_object_get_key(ddwaf_object, described_class::SizeTPtr.new)
-
-              expect(key_object).to be_null
-            end
-          end
-        end
-
-        context "non map objects" do
-          it "returns nulll" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            object = described_class.ddwaf_object_get_key(ddwaf_object, described_class::SizeTPtr.new)
-            expect(object).to be_null
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_signed" do
-        context "for signed object" do
-          it "returns value" do
-            described_class.ddwaf_object_signed(ddwaf_object, -12)
-            value = described_class.ddwaf_object_get_signed(ddwaf_object)
-            expect(value).to eq(-12)
-          end
-        end
-
-        context "for non signed object" do
-          it "returns 0" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_signed(ddwaf_object)
-            expect(value).to eq(0)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_unsigned" do
-        context "for unsigned object" do
-          it "returns value" do
-            described_class.ddwaf_object_unsigned(ddwaf_object, 12)
-            value = described_class.ddwaf_object_get_unsigned(ddwaf_object)
-            expect(value).to eq(12)
-          end
-        end
-
-        context "for non unsigned object" do
-          it "returns 0" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_unsigned(ddwaf_object)
-            expect(value).to eq(0)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_bool" do
-        context "for boolean object" do
-          context "true" do
-            it "returns value" do
-              described_class.ddwaf_object_bool(ddwaf_object, true)
-              value = described_class.ddwaf_object_get_bool(ddwaf_object)
-              expect(value).to eq(true)
-            end
-          end
-
-          context "false" do
-            it "returns value" do
-              described_class.ddwaf_object_bool(ddwaf_object, false)
-              value = described_class.ddwaf_object_get_bool(ddwaf_object)
-              expect(value).to eq(false)
-            end
-          end
-        end
-
-        context "for non boolean object" do
-          it "returns false" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_bool(ddwaf_object)
-            expect(value).to eq(false)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_float" do
-        context "for float object" do
-          it "returns value" do
-            described_class.ddwaf_object_float(ddwaf_object, 12.5)
-            value = described_class.ddwaf_object_get_float(ddwaf_object)
-            expect(value).to eq(12.5)
-          end
-        end
-
-        context "for non float object" do
-          it "returns value" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_float(ddwaf_object)
-            expect(value).to eq(0.0)
-          end
-        end
-      end
+      expect(key.to_ptr).not_to be_null
+      expect(value.to_ptr).not_to be_null
+      length = described_class::SizeTPtr.new
+      pointer = described_class.ddwaf_object_get_string(key, length)
+      expect(pointer).not_to be_null
+      expect(length[:value]).to eql(bytes.bytesize)
+      expect(pointer.read_bytes(length[:value])).to eq(bytes)
+      expect(described_class.ddwaf_object_get_signed(value)).to eql(42)
     end
   end
 
