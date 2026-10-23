@@ -81,7 +81,7 @@ module Datadog
         class ObjectValueUnion < ::FFI::Union[::FFI::AbstractMemory, untyped]
         end
 
-        class Object < ::FFI::Union[::FFI::AbstractMemory, untyped]
+        class Object < ::FFI::Union[::FFI::Pointer, untyped]
           @truncated: bool
 
           def truncated?: () -> bool
