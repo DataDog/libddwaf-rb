@@ -2,5 +2,20 @@ ARG RUBY_VERSION
 
 FROM jruby:${RUBY_VERSION:-9.2}
 
+# EOL Ubuntu 20.04: no fixed ca-certificates package ships, so drop the two compromised roots from the OS bundle.
+RUN sed -i -e 's|^mozilla/emSign_ECC_Root_CA_-_G3.crt|!&|' -e 's|^mozilla/Comodo_AAA_Services_root.crt|!&|' /etc/ca-certificates.conf \
+ && rm -f /usr/share/ca-certificates/mozilla/emSign_ECC_Root_CA_-_G3.crt /usr/share/ca-certificates/mozilla/Comodo_AAA_Services_root.crt \
+ && update-ca-certificates -f
+
+# Bundled JDK cacerts: delete both compromised roots by alias (no JDK update tag is available on this base).
+# keytool has no -cacerts option on this image, so pass the keystore path. Listings go to files so a failing keytool fails the step.
+RUN KS=/opt/java/openjdk/lib/security/cacerts \
+ && keytool -list -v -keystore "$KS" -storepass changeit > /tmp/cacerts.before \
+ && awk '/^Alias name: /{a=substr($0,13); sub(/ \[.*/,"",a)} /^Owner: .*(emSign ECC Root CA - G3|AAA Certificate Services)/{print a}' /tmp/cacerts.before \
+    | while IFS= read -r a; do echo "deleting cacerts alias: $a"; keytool -delete -keystore "$KS" -storepass changeit -alias "$a"; done \
+ && keytool -list -v -keystore "$KS" -storepass changeit > /tmp/cacerts.after \
+ && ! grep -E '^Owner: .*(emSign ECC Root CA - G3|AAA Certificate Services)' /tmp/cacerts.after \
+ && rm -f /tmp/cacerts.before /tmp/cacerts.after
+
 RUN apt-get update
 RUN apt-get install -y build-essential git
