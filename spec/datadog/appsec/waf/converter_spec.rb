@@ -120,24 +120,6 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
     end
 
-    it "does not mark an empty array as truncated at the depth limit" do
-      object = described_class.ruby_to_object([], max_container_depth: 0, coerce: false)
-
-      expect(described_class.object_to_ruby(object)).to eq([])
-      expect(object).not_to be_truncated
-    ensure
-      Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-    end
-
-    it "does not mark an empty hash as truncated at the depth limit" do
-      object = described_class.ruby_to_object({}, max_container_depth: 0, coerce: false)
-
-      expect(described_class.object_to_ruby(object)).to eq({})
-      expect(object).not_to be_truncated
-    ensure
-      Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-    end
-
     context "with JSON strings" do
       it "parses frozen JSONString values natively while preserving ordinary strings" do
         json = '{"value":[1,true,null,"é"]}'
@@ -233,118 +215,153 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
     end
 
-    context "with container size limit" do
-      it "marks nested arrays exceeding limit as input truncated" do
-        object = described_class.ruby_to_object([(1..6).to_a], max_container_size: 3, coerce: false)
+    context "with request limits" do
+      let(:limits) do
+        {max_container_size: 256, max_container_depth: 20, max_string_length: 16_384}.freeze
+      end
 
-        expect(described_class.object_to_ruby(object)).to eq([[1, 2, 3]])
-        expect(object).to be_truncated
+      it "rejects a non-Hash input before allocating native objects" do
+        object = nil
+        expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_get_default_allocator)
+
+        expect do
+          object = described_class.ruby_to_object([], limits: limits, coerce: false)
+        end.to raise_error(TypeError, "WAF input must be a Hash")
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
 
-      it "does not mark arrays at the limit as truncated" do
-        object = described_class.ruby_to_object([1, 2, 3], max_container_size: 3, coerce: false)
+      it "accepts an empty input without marking it as truncated" do
+        object = described_class.ruby_to_object({}, limits: limits, coerce: false)
 
-        expect(described_class.object_to_ruby(object)).to eq([1, 2, 3])
+        expect(described_class.object_to_ruby(object)).to eq({})
         expect(object).not_to be_truncated
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
 
-      it "marks nested hashes exceeding limit as input truncated" do
-        object = described_class.ruby_to_object({some_key: {foo: 1, bar: 2, baz: 3, qux: 4}}, max_container_size: 3, coerce: false)
+      it "limits payload containers and text while preserving complete addresses" do
+        object = described_class.ruby_to_object(
+          {
+            :"server.request.body" => ["ééé", "discarded"],
+            "server.request.query" => {"ééé".encode(Encoding::UTF_16LE) => :"😀😀", "discarded" => 1}
+          },
+          limits: limits.merge(max_container_size: 1, max_string_length: 5), coerce: false
+        )
 
-        expect(described_class.object_to_ruby(object)).to eq({"some_key" => {"foo" => 1, "bar" => 2, "baz" => 3}})
+        expect(described_class.object_to_ruby(object)).to eq({
+          "server.request.body" => ["éé"],
+          "server.request.query" => {"éé" => "😀"}
+        })
         expect(object).to be_truncated
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
 
-      it "does not mark hashes at the limit as truncated" do
-        object = described_class.ruby_to_object({foo: 1, bar: 2, baz: 3}, max_container_size: 3, coerce: false)
+      it "does not mark payloads at the limits or empty nested containers as truncated" do
+        object = described_class.ruby_to_object(
+          {"server.request.body" => {"éé" => ["éé", {}], "arr" => [[], nil]}},
+          limits: limits.merge(max_container_size: 2, max_container_depth: 2, max_string_length: 4), coerce: false
+        )
 
-        expect(described_class.object_to_ruby(object)).to eq({"foo" => 1, "bar" => 2, "baz" => 3})
+        expect(described_class.object_to_ruby(object)).to eq({"server.request.body" => {"éé" => ["éé", {}], "arr" => [[], nil]}})
         expect(object).not_to be_truncated
+      ensure
+        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
+      end
+
+      it "counts custom depth from the first payload container" do
+        object = described_class.ruby_to_object(
+          {"server.request.body" => {"array" => [1], "map" => {"key" => 2}}},
+          limits: limits.merge(max_container_depth: 1), coerce: false
+        )
+
+        expect(described_class.object_to_ruby(object)).to eq({"server.request.body" => {"array" => [], "map" => {}}})
+        expect(object).to be_truncated
+      ensure
+        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
+      end
+
+      it "keeps the Ruby safety caps when custom limits are larger" do
+        deep_value = "leaf"
+        20.times { deep_value = [deep_value] }
+        limited_depth = []
+        19.times { limited_depth = [limited_depth] }
+
+        object = described_class.ruby_to_object(
+          {"array" => Array.new(257, 0), "string" => "a" * 4097, "depth" => deep_value},
+          limits: {max_container_size: 1000, max_container_depth: 1000, max_string_length: 100_000}, coerce: false
+        )
+
+        expect(described_class.object_to_ruby(object)).to eq({
+          "array" => Array.new(256, 0), "string" => "a" * 4096, "depth" => limited_depth
+        })
+        expect(object).to be_truncated
+      ensure
+        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
+      end
+
+      it "omits oversized addresses and counts them within the first 256 source entries" do
+        input = {("😀" * 4097) => "discarded"}
+        256.times { |index| input["address#{index}"] = "value" }
+        object = described_class.ruby_to_object(input, limits: limits, coerce: false)
+
+        expect(described_class.object_to_ruby(object).keys).to eq((0...255).map { |index| "address#{index}" })
+        expect(object).to be_truncated
+      ensure
+        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
+      end
+
+      it "rejects JSONString payloads for now and destroys only the partially populated root" do
+        object = nil
+        expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_object_from_json)
+        expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy)
+          .with(an_instance_of(Datadog::AppSec::WAF::LibDDWAF::Object), allocator).once.and_wrap_original do |original, root, alloc|
+            begin
+              expect(described_class.object_to_ruby(root)).to eq({"body" => ["safe", nil]})
+            ensure
+              original.call(root, alloc)
+            end
+          end
+
+        expect do
+          object = described_class.ruby_to_object(
+            {"body" => ["safe", Datadog::AppSec::WAF::JSONString.new('{"key":"value"}')]},
+            limits: limits, coerce: false
+          )
+        end.to raise_error(Datadog::AppSec::WAF::ConversionError, "JSONString input conversion is not implemented yet")
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
     end
+  end
 
-    context "with container depth limit" do
-      it "converts nested arrays up to the limit" do
-        object = described_class.ruby_to_object([1, [2, [3, [4]]]], max_container_depth: 3, coerce: false)
+  describe ".truncate_string_bytes" do
+    it "keeps a string at the byte limit without marking the root as truncated" do
+      root = Datadog::AppSec::WAF::LibDDWAF::Object.new
 
-        expect(described_class.object_to_ruby(object)).to eq([1, [2, [3, []]]])
-        expect(object).to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
+      result = described_class.truncate_string_bytes("éé", max_bytes: 4, top_obj: root)
 
-      it "does not mark nested arrays within limit as truncated" do
-        object = described_class.ruby_to_object([1, [2, [3]]], max_container_depth: 3, coerce: false)
-
-        expect(described_class.object_to_ruby(object)).to eq([1, [2, [3]]])
-        expect(object).not_to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
-
-      it "converts nested hashes up to the limit" do
-        object = described_class.ruby_to_object({foo: {bar: {baz: {qux: 4}}}}, max_container_depth: 3, coerce: false)
-
-        expect(described_class.object_to_ruby(object)).to eq({"foo" => {"bar" => {"baz" => {}}}})
-        expect(object).to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
-
-      it "does not mark nested hashes within limit as truncated" do
-        object = described_class.ruby_to_object({foo: {bar: {baz: :qux}}}, max_container_depth: 3, coerce: false)
-
-        expect(described_class.object_to_ruby(object)).to eq({"foo" => {"bar" => {"baz" => "qux"}}})
-        expect(object).not_to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
+      expect(result).to eq("éé")
+      expect(root).not_to be_truncated
     end
 
-    context "with string length limit" do
-      it "truncates nested strings by character count and marks the root" do
-        object = described_class.ruby_to_object(["é\0尾😀tail"], max_string_length: 4, coerce: false)
+    it "drops an incomplete trailing character and marks the root as truncated" do
+      root = Datadog::AppSec::WAF::LibDDWAF::Object.new
 
-        expect(described_class.object_to_ruby(object)).to eq(["é\0尾😀"])
-        expect(object).to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
+      result = described_class.truncate_string_bytes("ééé", max_bytes: 5, top_obj: root)
 
-      it "does not mark a string at the limit as truncated" do
-        object = described_class.ruby_to_object("a" * 10, max_string_length: 10, coerce: false)
+      expect(result).to eq("éé")
+      expect(root).to be_truncated
+    end
 
-        expect(described_class.object_to_ruby(object)).to eq("a" * 10)
-        expect(object).not_to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
+    it "returns an empty string when the first character does not fit" do
+      root = Datadog::AppSec::WAF::LibDDWAF::Object.new
 
-      it "truncates nested symbol values and marks the root" do
-        object = described_class.ruby_to_object({foo: :abcdefghijk}, max_string_length: 10, coerce: false)
+      result = described_class.truncate_string_bytes("é", max_bytes: 1, top_obj: root)
 
-        expect(described_class.object_to_ruby(object)).to eq({"foo" => "abcdefghij"})
-        expect(object).to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
-
-      it "truncates nested hash keys after string conversion and marks the root" do
-        object = described_class.ruby_to_object({foo: {abcdefghijk: 42}}, max_string_length: 10, coerce: false)
-
-        expect(described_class.object_to_ruby(object)).to eq({"foo" => {"abcdefghij" => 42}})
-        expect(object).to be_truncated
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
+      expect(result).to eq("")
+      expect(root).to be_truncated
     end
   end
 

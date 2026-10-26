@@ -56,9 +56,7 @@ module Datadog
 
           persistent_data_obj = Converter.ruby_to_object(
             persistent_data,
-            max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
-            max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
-            max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
+            limits: @limits,
             coerce: false
           )
           if persistent_data_obj.null?
@@ -70,9 +68,7 @@ module Datadog
 
           ephemeral_data_obj = Converter.ruby_to_object(
             ephemeral_data,
-            max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
-            max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
-            max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
+            limits: @limits,
             coerce: false
           )
           if ephemeral_data_obj.null?
