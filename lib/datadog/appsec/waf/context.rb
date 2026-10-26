@@ -23,8 +23,9 @@ module Datadog
           ddwaf_err_invalid_argument: :err_invalid_argument
         }.freeze
 
-        def initialize(context_ptr)
+        def initialize(context_ptr, limits:)
           @context_ptr = context_ptr
+          @limits = limits
         end
 
         # Destroys the WAF context and sets the pointer to nil.

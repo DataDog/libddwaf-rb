@@ -2,9 +2,12 @@ module Datadog
   module AppSec
     module WAF
       class HandleBuilder
-        @builder_ptr: ::FFI::Pointer
+        OBFUSCATOR_CONFIG_PATH: ::String
 
-        def initialize: (?limits: ::Hash[::Symbol, ::Integer], ?obfuscator: ::Hash[::Symbol, ::String]) -> void
+        @builder_ptr: ::FFI::Pointer
+        @limits: ::Hash[::Symbol, ::Integer]
+
+        def initialize: (?limits: ::Hash[::Symbol, ::Integer?], ?obfuscator: ::Hash[::Symbol, ::String?]) -> void
 
         def finalize!: () -> void
 
@@ -15,6 +18,10 @@ module Datadog
         def remove_config_at_path: (::String path) -> bool
 
         private
+
+        def normalize_limits: (::Hash[::Symbol, ::Integer?] limits) -> ::Hash[::Symbol, ::Integer]
+
+        def configure_obfuscator: (::Hash[::Symbol, ::String?] obfuscator) -> void
 
         def ensure_pointer_presence!: () -> void
       end
