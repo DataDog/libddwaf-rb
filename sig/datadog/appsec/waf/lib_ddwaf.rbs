@@ -178,7 +178,7 @@ module Datadog
         # TODO: signature is as below but steep 1.1 does not yet support method/proc/block mapping
         # type ddwaf_log_cb = ^(ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
         type ddwaf_log_cb = ::Method | ::Proc
-        def self.ddwaf_set_log_cb: (ddwaf_log_cb, ddwaf_log_level) -> bool
+        def self.ddwaf_set_log_cb: (ddwaf_log_cb?, ddwaf_log_level) -> bool
       end
     end
   end
