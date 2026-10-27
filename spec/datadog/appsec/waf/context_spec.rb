@@ -433,4 +433,94 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       builder.finalize!
     end
   end
+
+  describe "#build_subcontext" do
+    let(:builder) do
+      Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
+        config = JSON.parse(File.read("spec/fixtures/valid_config.json"))
+        builder.add_or_update_config(config, path: "test")
+      end
+    end
+
+    let(:handle) { builder.build_handle }
+    let(:context) { handle.build_context }
+
+    it "returns a child with independent, idempotent finalization" do
+      subcontext = context.build_subcontext
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).and_call_original
+
+      context.finalize!
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_subcontext_destroy)
+
+      subcontext.finalize!
+      subcontext.finalize!
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_destroy).once
+    ensure
+      subcontext&.finalize!
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+
+    it "returns the block value and finalizes the child" do
+      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).once.and_call_original
+
+      result = context.build_subcontext do |subcontext|
+        expect(subcontext).to be_a(Datadog::AppSec::WAF::Subcontext)
+        :block_result
+      end
+
+      expect(result).to eq(:block_result)
+    ensure
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+
+    it "finalizes the child when the block raises" do
+      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).once.and_call_original
+
+      expect do
+        context.build_subcontext { raise "block failed" }
+      end.to raise_error(RuntimeError, "block failed")
+    ensure
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+
+    it "raises when native initialization fails" do
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_init).and_return(FFI::Pointer::NULL)
+
+      expect { context.build_subcontext }.to raise_error(
+        Datadog::AppSec::WAF::LibDDWAFError, "Could not create subcontext"
+      )
+    ensure
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+
+    it "destroys the native child when Ruby wrapper construction fails" do
+      allow(Datadog::AppSec::WAF::Subcontext).to receive(:new).and_raise(RuntimeError, "wrapper failed")
+      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).once.and_call_original
+
+      expect { context.build_subcontext }.to raise_error(RuntimeError, "wrapper failed")
+    ensure
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+
+    it "rejects creation after parent finalization" do
+      context.finalize!
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_subcontext_init)
+
+      expect { context.build_subcontext }.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError)
+    ensure
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+  end
 end

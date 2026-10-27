@@ -1,0 +1,14 @@
+module Datadog
+  module AppSec
+    module WAF
+      class Subcontext
+        @subcontext_ptr: ::FFI::Pointer?
+        @limits: ::Hash[::Symbol, ::Integer]
+
+        def initialize: (::FFI::Pointer subcontext_ptr, limits: ::Hash[::Symbol, ::Integer]) -> void
+
+        def finalize!: () -> void
+      end
+    end
+  end
+end

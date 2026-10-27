@@ -24,6 +24,9 @@ module Datadog
 
         def finalize!: () -> void
 
+        def build_subcontext: () -> Subcontext
+                            | [T] () { (Subcontext) -> T } -> T
+
         def eval: (::Hash[WAF::input, WAF::input] data, ?::Integer timeout) -> Result
 
         private

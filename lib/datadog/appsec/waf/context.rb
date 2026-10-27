@@ -36,6 +36,33 @@ module Datadog
           end
         end
 
+        def build_subcontext
+          subcontext = nil #: Subcontext?
+          caller_owned = false
+
+          begin
+            subcontext = Thread.handle_interrupt(::Object => :never) do
+              pointer = LibDDWAF.ddwaf_subcontext_init(ensure_active!)
+              raise LibDDWAFError, "Could not create subcontext" if pointer.null?
+
+              begin
+                subcontext = Subcontext.new(pointer, limits: @limits)
+              ensure
+                LibDDWAF.ddwaf_subcontext_destroy(pointer) unless subcontext
+              end
+            end
+
+            if block_given?
+              yield subcontext
+            else
+              caller_owned = true
+              subcontext
+            end
+          ensure
+            subcontext&.finalize! unless caller_owned
+          end
+        end
+
         def eval(data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           ensure_active!
           raise TypeError, "WAF input must be a Hash" unless Hash === data

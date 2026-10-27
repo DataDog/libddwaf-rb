@@ -8,6 +8,7 @@ require "datadog/appsec/waf/converter"
 require "datadog/appsec/waf/errors"
 require "datadog/appsec/waf/result"
 require "datadog/appsec/waf/context"
+require "datadog/appsec/waf/subcontext"
 require "datadog/appsec/waf/version"
 
 module Datadog
