@@ -6,6 +6,7 @@ module Datadog
         @limits: ::Hash[::Symbol, ::Integer]
 
         @state: :active | :failed | :finalized
+        @failed: bool
 
         EMPTY_RESULT: {
           "events" => WAF::events,
@@ -21,6 +22,10 @@ module Datadog
         RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
 
         def initialize: (::FFI::Pointer context_ptr, limits: ::Hash[::Symbol, ::Integer]) -> void
+
+        def failed?: () -> bool
+
+        def mark_failed!: () -> bool
 
         def finalize!: () -> void
 

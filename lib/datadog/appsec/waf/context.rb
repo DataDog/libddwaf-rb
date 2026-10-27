@@ -27,6 +27,15 @@ module Datadog
           @context_ptr = context_ptr
           @limits = limits
           @state = :active
+          @failed = false
+        end
+
+        def failed?
+          @failed
+        end
+
+        def mark_failed!
+          @failed = true
         end
 
         def finalize!
@@ -46,7 +55,7 @@ module Datadog
               raise LibDDWAFError, "Could not create subcontext" if pointer.null?
 
               begin
-                subcontext = Subcontext.new(pointer, limits: @limits)
+                subcontext = Subcontext.new(pointer, context: self, limits: @limits)
               ensure
                 LibDDWAF.ddwaf_subcontext_destroy(pointer) unless subcontext
               end
@@ -83,6 +92,8 @@ module Datadog
               code = LibDDWAF.ddwaf_context_eval(ensure_active!, input_obj, allocator, result_obj, timeout)
               # In libddwaf 2.0.0, only INVALID_ARGUMENT returns before input ownership transfers.
               input_transferred = code != :ddwaf_err_invalid_argument
+
+              mark_failed! if code == :ddwaf_err_internal
 
               if code == :ddwaf_err_internal || code == :ddwaf_err_invalid_argument
                 @state = :failed
@@ -125,6 +136,8 @@ module Datadog
           when :finalized
             raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized"
           end
+
+          raise LibDDWAFError, "Cannot use WAF context after a native error" if failed?
 
           @context_ptr || raise(LibDDWAFError, "WAF context pointer is missing")
         end

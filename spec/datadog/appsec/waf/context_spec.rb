@@ -313,6 +313,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
     it "returns an empty error result and closes the context on internal error" do
       waf_context = context
+      subcontext = waf_context.build_subcontext
       allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_eval).and_wrap_original do |original, *args|
         original.call(*args)
         :ddwaf_err_internal
@@ -328,7 +329,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
         timeout: false, keep: false, input_truncated: false
       })
       expect { waf_context.eval({}) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect { waf_context.build_subcontext }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+
+      waf_context.finalize!
+      expect { subcontext.eval({}) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
     ensure
+      subcontext&.finalize!
       context.finalize!
       handle.finalize!
       builder.finalize!
@@ -452,9 +458,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       context.finalize!
       expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_subcontext_destroy)
 
+      expect(subcontext.eval({}).status).to eq(:ok)
+
       subcontext.finalize!
       subcontext.finalize!
       expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_destroy).once
+      expect { subcontext.eval({}) }.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError)
     ensure
       subcontext&.finalize!
       context.finalize!
