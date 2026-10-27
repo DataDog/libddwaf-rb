@@ -312,24 +312,16 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
 
-      it "rejects JSONString payloads for now and destroys only the partially populated root" do
-        object = nil
-        expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_object_from_json)
-        expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy)
-          .with(an_instance_of(Datadog::AppSec::WAF::LibDDWAF::Object), allocator).once.and_wrap_original do |original, root, alloc|
-            begin
-              expect(described_class.object_to_ruby(root)).to eq({"body" => ["safe", nil]})
-            ensure
-              original.call(root, alloc)
-            end
-          end
+      it "parses JSONString payloads without applying request limits" do
+        json = Datadog::AppSec::WAF::JSONString.new('{"items":["value","other"]}')
+        object = described_class.ruby_to_object(
+          {"body" => json},
+          limits: limits.merge(max_container_size: 1, max_container_depth: 1, max_string_length: 1),
+          coerce: false
+        )
 
-        expect do
-          object = described_class.ruby_to_object(
-            {"body" => ["safe", Datadog::AppSec::WAF::JSONString.new('{"key":"value"}')]},
-            limits: limits, coerce: false
-          )
-        end.to raise_error(Datadog::AppSec::WAF::ConversionError, "JSONString input conversion is not implemented yet")
+        expect(described_class.object_to_ruby(object)).to eq({"body" => {"items" => ["value", "other"]}})
+        expect(object).not_to be_truncated
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end

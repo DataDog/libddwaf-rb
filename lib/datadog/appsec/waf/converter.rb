@@ -104,8 +104,7 @@ module Datadog
             end
             object
           when JSONString
-            raise ConversionError, "JSONString input conversion is not implemented yet" if limits
-
+            # TODO: Pass request limits to JSON parsing once libddwaf supports them.
             length = val.bytesize
             raise ConversionError, "JSON string exceeds the native length limit" if length > UINT32_MAX
 
