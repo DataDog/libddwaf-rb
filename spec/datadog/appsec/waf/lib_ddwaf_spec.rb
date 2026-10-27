@@ -111,437 +111,81 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     end
   end
 
-  context "run" do
-    let(:data1) do
-      {
-        "version" => "1.0",
-        "events" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1", "value2"], "regex" => "rule1"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 2,
-            "name" => "Rule 2",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1"], "regex" => "rule2"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 3,
-            "name" => "Rule 3",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value2"], "regex" => "rule3"}}
-            ],
-            "action" => "record"
-          }
-        ]
+  it "passes log callback arguments and returns a boolean" do
+    previous_callback = Datadog::AppSec::WAF.instance_variable_get(:@log_callback)
+    received_log = nil
+    callback = proc do |level, function, file, line, message, length|
+      received_log = {
+        level: level,
+        function: function,
+        file: file,
+        line: line,
+        message: message.read_bytes(length)
       }
     end
 
-    let(:data2) do
-      {
-        "version" => "1.0",
-        "events" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1"], "regex" => "rule2"}},
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value2"], "regex" => "rule3"}}
-            ],
-            "action" => "record"
-          }
-        ]
-      }
-    end
+    expect(described_class.ddwaf_set_log_cb(callback, :ddwaf_log_trace)).to be(true)
+    expect(received_log).to match(
+      level: :ddwaf_log_info,
+      function: a_string_including("ddwaf_set_log_cb"),
+      file: a_string_ending_with("interface.cpp"),
+      line: a_kind_of(Integer),
+      message: "Sending log messages to binding, min level trace"
+    )
+  ensure
+    level = previous_callback ? :ddwaf_log_trace : :ddwaf_log_off
+    described_class.ddwaf_set_log_cb(previous_callback, level)
+  end
 
-    let(:data3) do
-      require "json"
+  it "passes allocator and object pointers through context and subcontext evaluation" do
+    parent_input_transferred = false
+    child_input_transferred = false
+    allocator = described_class.ddwaf_get_default_allocator
+    expect(allocator).not_to be_null
 
-      JSON.parse(File.read(File.expand_path("../../../fixtures/waf_rules.json", __dir__)))
-    end
+    configuration = Datadog::AppSec::WAF::Converter.ruby_to_object(
+      JSON.parse(File.read("spec/fixtures/valid_config.json")), coerce: false
+    )
+    diagnostics = described_class::Object.new
+    builder = described_class.ddwaf_builder_init
+    expect(builder).not_to be_null
+    expect(described_class.ddwaf_builder_add_or_update_config(builder, "test", 4, configuration, diagnostics)).to be(true)
+    expect(described_class.ddwaf_object_get_type(diagnostics)).to eq(:ddwaf_obj_map)
 
-    let(:data4) do
-      {
-        "version" => "2.2",
-        "metadata" => {
-          "rules_version" => "0.1.2"
-        },
-        "rules" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operator" => "match_regex", "parameters" => {"inputs" => [{"address" => "value1"}], "regex" => "rule2"}}
-            ],
-            "action" => "record"
-          }
-        ]
-      }
-    end
+    handle = described_class.ddwaf_builder_build_instance(builder)
+    expect(handle).not_to be_null
+    context = described_class.ddwaf_context_init(handle, allocator)
+    expect(context).not_to be_null
 
-    let(:data5) do
-      {
-        "version" => "2.2",
-        "metadata" => {
-          "rules_version" => "0.1.2"
-        },
-        "rules" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operator" => "match_regex", "parameters" => {"inputs" => [{"address" => "value1"}], "regex" => "rule2"}}
-            ],
-            "on_match" => ["action1", "action2", "action3", "action4"]
-          }
-        ],
-        "actions" => [
-          {
-            "id" => "action1",
-            "type" => "block",
-            "parameters" => {"status_code" => "401", "grpc_status_code" => "41", "type" => "auto"}
-          },
-          {
-            "id" => "action2",
-            "type" => "extract_schema",
-            "parameters" => {"status_code" => "402", "grpc_status_code" => "42", "type" => "auto"}
-          },
-          {
-            "id" => "action3",
-            "type" => "stacktrace",
-            "parameters" => {"status_code" => "403", "grpc_status_code" => "43", "type" => "auto"}
-          },
-          {
-            "id" => "action4",
-            "type" => "unblock",
-            "parameters" => {"status_code" => "404", "grpc_status_code" => "44", "type" => "auto"}
-          }
-        ]
-      }
-    end
+    parent_input = Datadog::AppSec::WAF::Converter.ruby_to_object({}, coerce: false)
+    parent_result = described_class::Object.new
+    code = described_class.ddwaf_context_eval(context, parent_input, allocator, parent_result, 10_000_000)
+    parent_input_transferred = code != :ddwaf_err_invalid_argument
 
-    let(:bad_data) do
-      {
-        "version" => "1.0",
-        "events" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1", "value2"], "regex" => "rule1"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 2,
-            "badname" => "Rule 2",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1"], "regex" => "rule2"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 3,
-            "name" => "Rule 3",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value2"], "regex" => "rule3"}}
-            ],
-            "action" => "record"
-          }
-        ]
-      }
-    end
+    expect(code).to eq(:ddwaf_ok)
+    expect(described_class.ddwaf_object_get_type(parent_result)).to eq(:ddwaf_obj_map)
 
-    let(:invalid_action_data) do
-      {
-        "version" => "2.2",
-        "metadata" => {
-          "rules_version" => "0.1.2"
-        },
-        "rules" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operator" => "match_regex", "parameters" => {"inputs" => [{"address" => "value1"}], "regex" => "rule2"}}
-            ],
-            "on_match" => ["invalid-action", "valid-action-1", "valid-action-2", "unknown-action"]
-          }
-        ],
-        "actions" => [
-          {
-            "id" => "valid-action-1",
-            "type" => "block",
-            "parameters" => {"status_code" => "401", "grpc_status_code" => "41", "type" => "auto"}
-          },
-          {
-            "id" => "valid-action-2",
-            "type" => "unblock",
-            "parameters" => {"status_code" => "402", "grpc_status_code" => "42", "type" => "auto"}
-          },
-          {
-            "id" => "invalid-action",
-            "parameters" => {"status" => "500", "grpc_status" => "??", "type" => "invalid"}
-          }
-        ]
-      }
-    end
+    subcontext = described_class.ddwaf_subcontext_init(context)
+    expect(subcontext).not_to be_null
+    child_input = Datadog::AppSec::WAF::Converter.ruby_to_object(
+      {"server.request.headers.no_cookies" => {"user-agent" => "TraceTagging/v1"}}, coerce: false
+    )
+    child_result = described_class::Object.new
+    code = described_class.ddwaf_subcontext_eval(subcontext, child_input, allocator, child_result, 10_000_000)
+    child_input_transferred = code != :ddwaf_err_invalid_argument
 
-    let(:rule1) { Datadog::AppSec::WAF::Converter.ruby_to_object(data1) }
-    let(:rule2) { Datadog::AppSec::WAF::Converter.ruby_to_object(data2) }
-    let(:rule3) { Datadog::AppSec::WAF::Converter.ruby_to_object(data3) }
-    let(:rule4) { Datadog::AppSec::WAF::Converter.ruby_to_object(data4) }
-    let(:rule5) { Datadog::AppSec::WAF::Converter.ruby_to_object(data5) }
-    let(:bad_rule) { Datadog::AppSec::WAF::Converter.ruby_to_object(bad_data) }
-    let(:invalid_action_rule) { Datadog::AppSec::WAF::Converter.ruby_to_object(invalid_action_data) }
-
-    let(:log_store) { [] }
-
-    let(:log_cb) do
-      proc do |level, func, file, line, message, len|
-        log_store << {level: level, func: func, file: file, line: line, message: message.read_bytes(len)}
-      end
-    end
-
-    let(:config) { described_class::HandleBuilderConfig.new }
-
-    let(:input) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object({value1: [4242, "randomString"], value2: ["rule1"]})
-    end
-
-    let(:empty_input) { Datadog::AppSec::WAF::Converter.ruby_to_object({}) }
-
-    let(:attack) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}})
-    end
-
-    let(:block) { Datadog::AppSec::WAF::Converter.ruby_to_object({value1: "rule2"}) }
-
-    let(:timeout_usec) { 10_000_000 }
-    let(:diagnostics_obj) { described_class::Object.new }
-
-    let(:builder) { described_class.ddwaf_builder_init(config) }
-
-    before(:each) do
-      expect(log_store).to eq([])
-      described_class.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
-      expect(log_store.size).to eq 1
-      expect(log_store.select { |log| log[:message] =~ /Sending log messages to binding/ })
-    end
-
-    after(:each) do |example|
-      if example.exception
-        puts "\n== #{example.full_description}"
-        log_store.each do |log|
-          puts log.inspect
-        end
-        puts "== #{example.full_description}"
-      end
-    end
-
-    after do
-      described_class.ddwaf_set_log_cb(nil, :ddwaf_log_off)
-    end
-
-    it "logs via the log callback" do
-      expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
-    end
-
-    context "with diagnostics" do
-      it "records successful old diagnostics" do
-        described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-        handle = described_class.ddwaf_builder_build_instance(builder)
-        expect(handle.null?).to be false
-
-        diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
-
-        expect(diagnostics["rules"]["loaded"].size).to eq(3)
-        expect(diagnostics["rules"]["failed"].size).to eq(0)
-        expect(diagnostics["rules"]["errors"]).to be_empty
-      end
-
-      it "records successful new diagnostics" do
-        described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule4, diagnostics_obj)
-        handle = described_class.ddwaf_builder_build_instance(builder)
-        expect(handle.null?).to be false
-
-        diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
-
-        expect(diagnostics["rules"]["loaded"].size).to eq(1)
-        expect(diagnostics["rules"]["failed"].size).to eq(0)
-        expect(diagnostics["rules"]["errors"]).to be_empty
-        expect(diagnostics["ruleset_version"]).to eq("0.1.2")
-      end
-
-      it "records failing diagnostics" do
-        described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, bad_rule, diagnostics_obj)
-        handle = described_class.ddwaf_builder_build_instance(builder)
-        expect(handle.null?).to be false
-
-        diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
-
-        expect(diagnostics["rules"]["loaded"].size).to eq(2)
-        expect(diagnostics["rules"]["failed"].size).to eq(1)
-        expect(diagnostics["rules"]["errors"]).to_not be_empty
-        expect(diagnostics["ruleset_version"]).to be_nil
-      end
-    end
-
-    it "lists required addresses" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
-
-      count = described_class::UInt32Ptr.new
-      list = described_class.ddwaf_known_addresses(handle, count)
-      expect(list.get_array_of_string(0, count[:value]).sort).to eq(["value1", "value2"])
-    end
-
-    it "triggers a monitoring rule" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "does not trigger" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule2, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_ok
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "does not trigger a monitoring rule due to timeout" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, 1)
-
-      expect(code).to eq :ddwaf_ok
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(true)
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "triggers a known attack" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule3, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, attack, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "triggers a known actionable attack" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule5, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to eq(4)
-      expect(result["actions"].keys).to eq(["unblock", "stacktrace", "extract_schema", "block"])
-    end
-
-    it "silently drops invalid or unknown actions on actionable attack" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, invalid_action_rule, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to eq(2)
-      expect(result["actions"].keys).to eq(["unblock", "block"])
-    end
+    expect(code).to eq(:ddwaf_match)
+    expect(described_class.ddwaf_object_get_type(child_result)).to eq(:ddwaf_obj_map)
+  ensure
+    described_class.ddwaf_object_destroy(child_result, allocator) if child_result
+    described_class.ddwaf_object_destroy(parent_result, allocator) if parent_result
+    described_class.ddwaf_subcontext_destroy(subcontext) if subcontext
+    described_class.ddwaf_context_destroy(context) if context
+    described_class.ddwaf_object_destroy(child_input, allocator) if child_input && !child_input_transferred
+    described_class.ddwaf_object_destroy(parent_input, allocator) if parent_input && !parent_input_transferred
+    described_class.ddwaf_destroy(handle) if handle
+    described_class.ddwaf_builder_destroy(builder) if builder
+    described_class.ddwaf_object_destroy(diagnostics, allocator) if diagnostics
+    described_class.ddwaf_object_destroy(configuration, allocator) if configuration
   end
 end
