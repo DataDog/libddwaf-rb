@@ -60,7 +60,9 @@ RSpec.describe Datadog::AppSec::WAF::Context, stress_tests: true do
           run_count.times do |i|
             ephemeral_data = i.even? ? matching_input : passing_input
             ephemeral_data[:value3] = [i]
-            waf_result = context.run({}, ephemeral_data, 10_000_000)
+            waf_result = context.build_subcontext do |subcontext|
+              subcontext.eval(ephemeral_data, 10_000_000)
+            end
             mutex.synchronize do
               if waf_result.timeout?
                 if i.even?
