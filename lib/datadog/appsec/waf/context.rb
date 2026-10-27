@@ -4,7 +4,7 @@ module Datadog
   module AppSec
     module WAF
       # Ruby representation of the ddwaf_context in libddwaf
-      # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/BINDING_IMPL_NOTES.md?plain=1#L125-L158
+      # See https://github.com/DataDog/libddwaf/blob/2.0.0/src/interface.cpp
       class Context
         EMPTY_RESULT = {
           "events" => [],     #: WAF::events
@@ -26,107 +26,88 @@ module Datadog
         def initialize(context_ptr, limits:)
           @context_ptr = context_ptr
           @limits = limits
+          @state = :active
         end
 
-        # Destroys the WAF context and sets the pointer to nil.
-        #
-        # The instance becomes unusable after this method is called.
         def finalize!
-          context_ptr_to_destroy = @context_ptr
-          @context_ptr = nil
-
-          retained.each do |retained_obj|
-            next unless retained_obj.is_a?(LibDDWAF::Object)
-
-            LibDDWAF.ddwaf_object_free(retained_obj)
+          Thread.handle_interrupt(::Object => :never) do
+            @state = :finalized
+            destroy_context!
           end
-
-          retained.clear
-          LibDDWAF.ddwaf_context_destroy(context_ptr_to_destroy)
         end
 
-        # Runs the WAF context with the given persistent and ephemeral data.
-        #
-        # @raise [ConversionError] if the conversion of persistent or ephemeral data fails
-        # @raise [LibDDWAFError] if libddwaf could not create the result object
-        #
-        # @return [Result] the result of the WAF run
-        def run(persistent_data, ephemeral_data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
-          ensure_pointer_presence!
+        def eval(data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
+          ensure_active!
+          raise TypeError, "WAF input must be a Hash" unless Hash === data
 
-          persistent_data_obj = Converter.ruby_to_object(
-            persistent_data,
-            limits: @limits,
-            coerce: false
-          )
-          if persistent_data_obj.null?
-            raise ConversionError, "Could not convert persistent data: #{persistent_data.inspect}"
+          allocator = LibDDWAF.ddwaf_get_default_allocator
+          raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
+
+          Thread.handle_interrupt(::Object => :never) do
+            input_obj = nil
+            result_obj = nil
+            input_transferred = false
+
+            begin
+              input_obj = Converter.ruby_to_object(data, limits: @limits, coerce: false)
+              input_truncated = input_obj.truncated?
+              result_obj = LibDDWAF::Object.new
+
+              code = LibDDWAF.ddwaf_context_eval(ensure_active!, input_obj, allocator, result_obj, timeout)
+              # In libddwaf 2.0.0, only INVALID_ARGUMENT returns before input ownership transfers.
+              input_transferred = code != :ddwaf_err_invalid_argument
+
+              if code == :ddwaf_err_internal || code == :ddwaf_err_invalid_argument
+                @state = :failed
+                destroy_context!
+              end
+
+              raw_result = if SUCCESS_RESULT_CODES.include?(code)
+                decoded = Converter.object_to_ruby(result_obj)
+                raise ConversionError, "Could not convert result into object: #{code}" unless decoded.is_a?(Hash)
+
+                decoded #: as untyped
+              else
+                EMPTY_RESULT
+              end
+
+              result = Result.new(
+                status: RESULT_CODE_TO_STATUS.fetch(code),
+                events: raw_result["events"],
+                actions: raw_result["actions"],
+                attributes: raw_result["attributes"],
+                duration: raw_result["duration"],
+                timeout: raw_result["timeout"],
+                keep: raw_result["keep"]
+              )
+              result.mark_input_truncated! if input_truncated
+              result
+            ensure
+              LibDDWAF.ddwaf_object_destroy(result_obj, allocator) if result_obj
+              LibDDWAF.ddwaf_object_destroy(input_obj, allocator) if input_obj && !input_transferred
+            end
           end
-
-          # retain C objects in memory for subsequent calls to run
-          retain(persistent_data_obj)
-
-          ephemeral_data_obj = Converter.ruby_to_object(
-            ephemeral_data,
-            limits: @limits,
-            coerce: false
-          )
-          if ephemeral_data_obj.null?
-            raise ConversionError, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
-          end
-
-          result_obj = LibDDWAF::Object.new
-          raise LibDDWAFError, "Could not create result object" if result_obj.null?
-
-          code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
-          result = Converter.object_to_ruby(result_obj)
-
-          # NOTE: In case of the error, `libddwaf` will not "fill" the result
-          #       object, so it will be empty and the conversion of it will return
-          #       `nil`, but that is not a conversion issue.
-          if SUCCESS_RESULT_CODES.include?(code) && result.nil?
-            raise ConversionError, "Could not convert result into object: #{code}"
-          end
-
-          result ||= EMPTY_RESULT
-          result = Result.new(
-            status: RESULT_CODE_TO_STATUS[code],
-            events: result["events"],
-            actions: result["actions"],
-            attributes: result["attributes"],
-            duration: result["duration"],
-            timeout: result["timeout"],
-            keep: result["keep"]
-          )
-
-          if persistent_data_obj.truncated? || ephemeral_data_obj.truncated?
-            result.mark_input_truncated!
-          end
-
-          result
-        ensure
-          LibDDWAF.ddwaf_object_free(result_obj) if result_obj
-          LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
         end
 
         private
 
-        def ensure_pointer_presence!
-          return if @context_ptr
+        def ensure_active!
+          case @state
+          when :failed
+            raise LibDDWAFError, "Cannot use WAF context after a native error"
+          when :finalized
+            raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized"
+          end
 
-          raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized"
+          @context_ptr || raise(LibDDWAFError, "WAF context pointer is missing")
         end
 
-        def retained
-          @retained ||= []
-        end
+        def destroy_context!
+          pointer = @context_ptr
+          return unless pointer
 
-        def retain(object)
-          retained << object
-        end
-
-        def release(object)
-          retained.delete(object)
+          @context_ptr = nil
+          LibDDWAF.ddwaf_context_destroy(pointer)
         end
       end
     end

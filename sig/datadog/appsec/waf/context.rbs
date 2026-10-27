@@ -2,10 +2,10 @@ module Datadog
   module AppSec
     module WAF
       class Context
-        @context_ptr: ::FFI::Pointer
+        @context_ptr: ::FFI::Pointer?
         @limits: ::Hash[::Symbol, ::Integer]
 
-        @retained: Array[untyped]
+        @state: :active | :failed | :finalized
 
         EMPTY_RESULT: {
           "events" => WAF::events,
@@ -24,17 +24,13 @@ module Datadog
 
         def finalize!: () -> void
 
-        def run: (WAF::input persistent_data, WAF::input ephemeral_data, ?::Integer timeout) -> Result
+        def eval: (::Hash[WAF::input, WAF::input] data, ?::Integer timeout) -> Result
 
         private
 
-        def ensure_pointer_presence!: () -> void
+        def ensure_active!: () -> ::FFI::Pointer
 
-        def retained: () -> Array[untyped]
-
-        def retain: (top object) -> void
-
-        def release: (top object) -> void
+        def destroy_context!: () -> void
       end
     end
   end
