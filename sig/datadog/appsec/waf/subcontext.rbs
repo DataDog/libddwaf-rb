@@ -1,0 +1,26 @@
+module Datadog
+  module AppSec
+    module WAF
+      class Subcontext
+        @subcontext_ptr: ::FFI::Pointer?
+        @context: Context
+        @limits: ::Hash[::Symbol, ::Integer]
+        @state: :active | :failed | :finalized
+
+        def initialize: (
+          ::FFI::Pointer subcontext_ptr,
+          context: Context,
+          limits: ::Hash[::Symbol, ::Integer]
+        ) -> void
+
+        def finalize!: () -> void
+
+        def eval: (::Hash[WAF::input, WAF::input] data, ?::Integer timeout) -> Result
+
+        private
+
+        def ensure_active!: () -> ::FFI::Pointer
+      end
+    end
+  end
+end

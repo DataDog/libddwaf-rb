@@ -45,7 +45,7 @@ module Datadog
       class JSONString < String
       end
 
-      self.@logger: ::Logger
+      self.@logger: ::Logger?
 
       self.@log_callback: LibDDWAF::ddwaf_log_cb
 
@@ -53,9 +53,9 @@ module Datadog
 
       def self?.log_callback: (LibDDWAF::ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
 
-      def self?.logger: () -> ::Logger
+      def self?.logger: () -> ::Logger?
 
-      def self?.logger=: (::Logger logger) -> void
+      def self?.logger=: (::Logger? logger) -> void
     end
   end
 end

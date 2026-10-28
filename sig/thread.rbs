@@ -1,0 +1,3 @@
+class Thread
+  def self.handle_interrupt: [T] (::Hash[::Module, :immediate | :on_blocking | :never] mask) { () -> T } -> T
+end

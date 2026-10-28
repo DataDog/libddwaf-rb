@@ -11,7 +11,9 @@ builder.add_or_update_config(config, path: "APPSEC/RC_CONFIG")
 handle = builder.build_handle
 context = handle.build_context
 
-context.run({}, {"server.db.statement" => "SELECT * from users where id = 'foo';delete from users;--'"})
+context.build_subcontext do |subcontext|
+  subcontext.eval({"server.db.statement" => "SELECT * from users where id = 'foo';delete from users;--'"})
+end
 
 context.finalize!
 handle.finalize!

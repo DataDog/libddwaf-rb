@@ -4,20 +4,39 @@ module Datadog
       module Converter
         INT64_MIN: Integer
 
+        UINT16_MAX: Integer
+
         UINT32_MAX: Integer
 
         UINT64_MAX: Integer
 
         def self?.ruby_to_object: (
           top val,
-          ?max_container_size: ::Integer?,
-          ?max_container_depth: ::Integer?,
-          ?max_string_length: ::Integer?,
-          ?top_obj: LibDDWAF::Object?,
+          ?limits: ::Hash[::Symbol, ::Integer]?,
           ?coerce: bool?
         ) -> LibDDWAF::Object
 
+        def self?.populate_object: (
+          LibDDWAF::Object object,
+          top val,
+          allocator: ::FFI::Pointer,
+          top_obj: LibDDWAF::Object,
+          limits: ::Hash[::Symbol, ::Integer]?,
+          depth: ::Integer,
+          coerce: bool?
+        ) -> LibDDWAF::Object
+
+        def self?.truncate_input_string: (::String string, max_bytes: ::Integer, top_obj: LibDDWAF::Object) -> ::String
+
+        def self?.truncate_string_bytes: (::String string, max_bytes: ::Integer, top_obj: LibDDWAF::Object) -> ::String
+
+        def self?.string_to_object: (LibDDWAF::Object object, ::String string, ::FFI::Pointer allocator, limits: ::Hash[::Symbol, ::Integer]?, top_obj: LibDDWAF::Object) -> LibDDWAF::Object
+
+        def self?.container_capacity: (::Integer size, limits: ::Hash[::Symbol, ::Integer]?, depth: ::Integer) -> ::Integer
+
         def self?.object_to_ruby: (LibDDWAF::Object obj) -> WAF::opaque
+
+        def self?.object_to_string: (LibDDWAF::Object obj) -> ::String
       end
     end
   end

@@ -13,9 +13,13 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.run({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, {})
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, 10_000_000)
 
         expect(result.status).to eq(:match)
+      ensure
+        context&.finalize!
+        handle&.finalize!
+        builder&.finalize!
       end
 
       it "does not match when value is not within container size limit" do
@@ -24,9 +28,13 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.run({"server.request.headers.no_cookies" => {"another" => "key", "user-agent" => "Nessus SOAP"}}, {})
+        result = context.eval({"server.request.headers.no_cookies" => {"another" => "key", "user-agent" => "Nessus SOAP"}}, 10_000_000)
 
         expect(result.status).to eq(:ok)
+      ensure
+        context&.finalize!
+        handle&.finalize!
+        builder&.finalize!
       end
     end
 
@@ -37,9 +45,13 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.run({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, {})
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, 10_000_000)
 
         expect(result.status).to eq(:match)
+      ensure
+        context&.finalize!
+        handle&.finalize!
+        builder&.finalize!
       end
 
       it "does not match when value is not within container depth limit" do
@@ -48,9 +60,13 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.run({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, {})
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, 10_000_000)
 
         expect(result.status).to eq(:ok)
+      ensure
+        context&.finalize!
+        handle&.finalize!
+        builder&.finalize!
       end
     end
 
@@ -61,9 +77,13 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.run({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, {})
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, 10_000_000)
 
         expect(result.status).to eq(:match)
+      ensure
+        context&.finalize!
+        handle&.finalize!
+        builder&.finalize!
       end
 
       it "does not match when value is not within string length limit" do
@@ -72,9 +92,13 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.run({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, {})
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, 10_000_000)
 
         expect(result.status).to eq(:ok)
+      ensure
+        context&.finalize!
+        handle&.finalize!
+        builder&.finalize!
       end
     end
   end
@@ -86,10 +110,14 @@ RSpec.describe "WAF configuration" do
       handle = builder.build_handle
       context = handle.build_context
 
-      result = context.run({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, {})
+      result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, 10_000_000)
 
       expect(result.status).to eq(:match)
       expect(result.events.dig(0, "rule_matches", 0, "parameters", 0, "value")).to eq("<Redacted>")
+    ensure
+      context&.finalize!
+      handle&.finalize!
+      builder&.finalize!
     end
 
     it "matches and obfuscates values" do
@@ -98,10 +126,14 @@ RSpec.describe "WAF configuration" do
       handle = builder.build_handle
       context = handle.build_context
 
-      result = context.run({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, {})
+      result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, 10_000_000)
 
       expect(result.status).to eq(:match)
       expect(result.events.dig(0, "rule_matches", 0, "parameters", 0, "value")).to eq("<Redacted>")
+    ensure
+      context&.finalize!
+      handle&.finalize!
+      builder&.finalize!
     end
   end
 end

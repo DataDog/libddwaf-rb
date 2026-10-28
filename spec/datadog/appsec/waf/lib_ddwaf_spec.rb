@@ -11,931 +11,181 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
   end
 
   context "Object" do
-    it "creates ddwaf_object_invalid" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_invalid(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_invalid
-      described_class.ddwaf_object_free(object)
+    let(:allocator) { described_class.ddwaf_get_default_allocator }
+    let(:object) { described_class::Object.new }
+
+    around do |example|
+      raise "Could not obtain the native allocator" if allocator.null?
+
+      described_class.ddwaf_object_set_invalid(object)
+      begin
+        example.run
+      ensure
+        described_class.ddwaf_object_destroy(object, allocator)
+      end
     end
 
-    it "creates ddwaf_object_bool with true" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_bool(object, true)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_bool
-      expect(object[:valueUnion][:boolean]).to be true
-      described_class.ddwaf_object_free(object)
+    it "passes and returns signed 64-bit integers through an Object reference" do
+      value = -0x1_0000_0001
+
+      result = described_class.ddwaf_object_set_signed(object, value)
+
+      expect(result).to be_a(described_class::Object)
+      expect(result.to_ptr).to eq(object.to_ptr)
+      expect(described_class.ddwaf_object_get_type(object)).to eq(:ddwaf_obj_signed)
+      expect(described_class.ddwaf_object_get_signed(object)).to eql(value)
     end
 
-    it "creates ddwaf_object_bool with false" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_bool(object, false)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_bool
-      expect(object[:valueUnion][:boolean]).to be false
-      described_class.ddwaf_object_free(object)
+    it "passes and returns unsigned 64-bit integers" do
+      value = 0x8000_0000_0000_0001
+
+      described_class.ddwaf_object_set_unsigned(object, value)
+
+      expect(described_class.ddwaf_object_get_unsigned(object)).to eql(value)
     end
 
-    it "creates ddwaf_object_string" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_string(object, "foobar")
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "foobar"
-      described_class.ddwaf_object_free(object)
+    it "passes and returns Ruby true" do
+      described_class.ddwaf_object_set_bool(object, true)
+
+      expect(described_class.ddwaf_object_get_bool(object)).to be(true)
     end
 
-    it "creates ddwaf_object_string with binary data" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_stringl(object, "foo\x00bar", 7)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 7
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "foo\x00bar"
-      described_class.ddwaf_object_free(object)
+    it "passes and returns Ruby false" do
+      described_class.ddwaf_object_set_bool(object, false)
+
+      expect(described_class.ddwaf_object_get_bool(object)).to be(false)
     end
 
-    it "creates ddwaf_object_string with zero-copy binary data" do
-      s = "foo\x00bar"
-      buf = FFI::MemoryPointer.from_string(s)
-      buf.autorelease = false
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_stringl_nc(object, buf, s.size)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 7
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "foo\x00bar"
-      described_class.ddwaf_object_free(object)
+    it "passes and returns double-precision floats" do
+      value = 1.0000000000000002
+
+      described_class.ddwaf_object_set_float(object, value)
+
+      expect(described_class.ddwaf_object_get_float(object)).to eql(value)
     end
 
-    it "creates ddwaf_object_string from unsigned" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_string_from_unsigned(object, 42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 2
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "42"
-      described_class.ddwaf_object_free(object)
+    it "passes string bytes and reads a pointer with a size_t output length" do
+      bytes = "caf\u00e9\0tail".b
+      length = described_class::SizeTPtr.new
+      described_class.ddwaf_object_set_string(object, bytes, bytes.bytesize, allocator)
+
+      pointer = described_class.ddwaf_object_get_string(object, length)
+
+      expect(pointer).not_to be_null
+      expect(length[:value]).to eql(bytes.bytesize)
+      expect(pointer.read_bytes(length[:value])).to eq(bytes)
+      expect(described_class.ddwaf_object_get_length(object)).to eql(bytes.bytesize)
     end
 
-    it "creates ddwaf_object_string from signed" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_string_from_signed(object, -42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_string
-      expect(object[:nbEntries]).to eq 3
-      expect(object[:valueUnion][:stringValue].null?).to be false
-      expect(object[:valueUnion][:stringValue].read_bytes(object[:nbEntries])).to eq "-42"
-      described_class.ddwaf_object_free(object)
+    it "passes array slots as Object references and returns an integer size" do
+      described_class.ddwaf_object_set_array(object, 1, allocator)
+      slot = described_class.ddwaf_object_insert(object, allocator)
+      expect(slot.to_ptr).not_to be_null
+      described_class.ddwaf_object_set_signed(slot, 42)
+
+      value = described_class.ddwaf_object_at_value(object, 0)
+
+      expect(value.to_ptr).not_to be_null
+      expect(described_class.ddwaf_object_get_signed(value)).to eql(42)
+      expect(described_class.ddwaf_object_get_size(object)).to eql(1)
     end
 
-    it "creates ddwaf_object_unsigned" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_unsigned(object, 42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_unsigned
-      expect(object[:valueUnion][:uintValue]).to be 42
-      described_class.ddwaf_object_free(object)
-    end
+    it "passes map keys with a byte length and returns key and value Object references" do
+      bytes = "key\0\u00e9".b
+      described_class.ddwaf_object_set_map(object, 1, allocator)
+      slot = described_class.ddwaf_object_insert_key(object, bytes, bytes.bytesize, allocator)
+      expect(slot.to_ptr).not_to be_null
+      described_class.ddwaf_object_set_signed(slot, 42)
 
-    it "creates ddwaf_object_signed" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_signed(object, -42)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_signed
-      expect(object[:valueUnion][:intValue]).to be(-42)
-      described_class.ddwaf_object_free(object)
-    end
+      key = described_class.ddwaf_object_at_key(object, 0)
+      value = described_class.ddwaf_object_at_value(object, 0)
 
-    it "creates ddwaf_object_array" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_array(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_array
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each do |c|
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string(o, c)
-        r = described_class.ddwaf_object_array_add(object, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(("a".bytes.first + i).chr)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    it "creates ddwaf_object_map" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_map(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_map
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each.with_index do |c, i|
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string_from_unsigned(o, i)
-        r = described_class.ddwaf_object_map_add(object, c, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:parameterNameLength]).to eq 1
-        expect(o[:parameterName].read_bytes(o[:parameterNameLength])).to eq(("a".bytes.first + i).chr)
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(i.to_s)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    it "creates ddwaf_object_map with binary keys" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_map(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_map
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each.with_index do |c, i|
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string_from_unsigned(o, i)
-        r = described_class.ddwaf_object_map_addl(object, c << "\x00foo", 5, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:parameterNameLength]).to eq 5
-        expect(o[:parameterName].read_bytes(o[:parameterNameLength])).to eq(("a".bytes.first + i).chr << "\x00foo")
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(i.to_s)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    it "creates ddwaf_object_map with zero-copy binary keys" do
-      object = described_class::Object.new
-      r = described_class.ddwaf_object_map(object)
-      expect(r.null?).to be false
-      expect(r.pointer).to eq object.pointer
-      expect(object[:type]).to eq :ddwaf_obj_map
-      expect(object[:nbEntries]).to eq 0
-      expect(object[:valueUnion][:array].null?).to be(true)
-      ("a".."f").each.with_index do |c, i|
-        s = c << "\x00foo"
-        buf = FFI::MemoryPointer.from_string(s)
-        buf.autorelease = false
-        o = described_class::Object.new
-        o = described_class.ddwaf_object_string_from_unsigned(o, i)
-        r = described_class.ddwaf_object_map_addl_nc(object, buf, s.size, o)
-      end
-      expect(object[:nbEntries]).to eq 6
-      expect(object[:valueUnion][:array].null?).to be(false)
-      (0...object[:nbEntries]).each do |i|
-        ptr = object[:valueUnion][:array] + i * described_class::Object.size
-        o = described_class::Object.new(ptr)
-        expect(o[:type]).to be :ddwaf_obj_string
-        expect(o[:parameterNameLength]).to eq 5
-        expect(o[:parameterName].read_bytes(o[:parameterNameLength])).to eq(("a".bytes.first + i).chr << "\x00foo")
-        expect(o[:nbEntries]).to eq 1
-        expect(o[:valueUnion][:stringValue].read_bytes(o[:nbEntries])).to eq(i.to_s)
-      end
-      described_class.ddwaf_object_free(object)
-    end
-
-    context "getters" do
-      let(:ddwaf_object) { described_class::Object.new }
-
-      after do
-        described_class.ddwaf_object_free(ddwaf_object)
-      end
-
-      describe ".ddwaf_object_type" do
-        [
-          ["for array object", :ddwaf_object_array, nil, :ddwaf_obj_array],
-          ["for map object", :ddwaf_object_map, nil, :ddwaf_obj_map],
-          ["for signed object", :ddwaf_object_signed, -12, :ddwaf_obj_signed],
-          ["for unsigened object", :ddwaf_object_unsigned, 12, :ddwaf_obj_unsigned],
-          ["for string object", :ddwaf_object_string, "Hello World", :ddwaf_obj_string],
-          ["for boolean object", :ddwaf_object_bool, true, :ddwaf_obj_bool]
-        ].each do |message, method, value, expected_object_type|
-          context message do
-            it "returns object type #{expected_object_type.inspect}" do
-              if value
-                described_class.send(method, ddwaf_object, value)
-              else
-                described_class.send(method, ddwaf_object)
-              end
-              object_type = described_class.ddwaf_object_type(ddwaf_object)
-              expect(object_type).to eq(expected_object_type)
-            end
-          end
-        end
-      end
-
-      describe ".ddwaf_object_size" do
-        context "for array object" do
-          it "returns size" do
-            described_class.ddwaf_object_array(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "Hello World")
-            described_class.ddwaf_object_array_add(ddwaf_object, member_object)
-
-            size = described_class.ddwaf_object_size(ddwaf_object)
-            expect(size).to eq(1)
-          end
-        end
-
-        context "for map object" do
-          it "returns size" do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-
-            size = described_class.ddwaf_object_size(ddwaf_object)
-            expect(size).to eq(1)
-          end
-        end
-
-        context "for non container objects" do
-          it "returns 0" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            size = described_class.ddwaf_object_size(ddwaf_object)
-            expect(size).to eq(0)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_string" do
-        context "for string object" do
-          it "returns string" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            string = described_class.ddwaf_object_get_string(ddwaf_object, described_class::SizeTPtr.new)
-            expect(string.get_string(0)).to eq("Hello World")
-          end
-        end
-
-        context "non string object" do
-          it "returns null" do
-            described_class.ddwaf_object_map(ddwaf_object)
-            string = described_class.ddwaf_object_get_string(ddwaf_object, described_class::SizeTPtr.new)
-            expect(string).to be_null
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_index" do
-        context "for map object" do
-          before do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-          end
-
-          context "with index in range" do
-            it "returns object" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-              expect(object).to_not be_null
-            end
-          end
-
-          context "with index out of range" do
-            it "returns null" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 1)
-              expect(object).to be_null
-            end
-          end
-        end
-
-        context "for array object" do
-          before do
-            described_class.ddwaf_object_array(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "Hello World")
-            described_class.ddwaf_object_array_add(ddwaf_object, member_object)
-          end
-
-          context "with index in range" do
-            it "returns object" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-              expect(object).to_not be_null
-            end
-          end
-
-          context "with index out of range" do
-            it "returns null" do
-              object = described_class.ddwaf_object_get_index(ddwaf_object, 1)
-              expect(object).to be_null
-            end
-          end
-        end
-
-        context "non container object" do
-          it "returns null" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-            expect(object).to be_null
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_key" do
-        context "for map object" do
-          it "returns object key" do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-
-            object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-            key_object = described_class.ddwaf_object_get_key(object, described_class::SizeTPtr.new)
-
-            expect(key_object.get_string(0)).to eq("foo")
-          end
-
-          it "returns key length" do
-            key = "foo"
-            described_class.ddwaf_object_map(ddwaf_object)
-            member_object = described_class::Object.new
-            described_class.ddwaf_object_string(member_object, "bar")
-            described_class.ddwaf_object_map_addl(ddwaf_object, key, key.bytesize, member_object)
-
-            object = described_class.ddwaf_object_get_index(ddwaf_object, 0)
-            length = described_class::SizeTPtr.new
-
-            expect(length.pointer.get_int(0)).to eq(0)
-            described_class.ddwaf_object_get_key(object, length)
-            expect(length.pointer.get_int(0)).to eq(3)
-          end
-
-          context "for non map object" do
-            it "returns nulls" do
-              described_class.ddwaf_object_string(ddwaf_object, "bar")
-              key_object = described_class.ddwaf_object_get_key(ddwaf_object, described_class::SizeTPtr.new)
-
-              expect(key_object).to be_null
-            end
-          end
-        end
-
-        context "non map objects" do
-          it "returns nulll" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            object = described_class.ddwaf_object_get_key(ddwaf_object, described_class::SizeTPtr.new)
-            expect(object).to be_null
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_signed" do
-        context "for signed object" do
-          it "returns value" do
-            described_class.ddwaf_object_signed(ddwaf_object, -12)
-            value = described_class.ddwaf_object_get_signed(ddwaf_object)
-            expect(value).to eq(-12)
-          end
-        end
-
-        context "for non signed object" do
-          it "returns 0" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_signed(ddwaf_object)
-            expect(value).to eq(0)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_unsigned" do
-        context "for unsigned object" do
-          it "returns value" do
-            described_class.ddwaf_object_unsigned(ddwaf_object, 12)
-            value = described_class.ddwaf_object_get_unsigned(ddwaf_object)
-            expect(value).to eq(12)
-          end
-        end
-
-        context "for non unsigned object" do
-          it "returns 0" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_unsigned(ddwaf_object)
-            expect(value).to eq(0)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_bool" do
-        context "for boolean object" do
-          context "true" do
-            it "returns value" do
-              described_class.ddwaf_object_bool(ddwaf_object, true)
-              value = described_class.ddwaf_object_get_bool(ddwaf_object)
-              expect(value).to eq(true)
-            end
-          end
-
-          context "false" do
-            it "returns value" do
-              described_class.ddwaf_object_bool(ddwaf_object, false)
-              value = described_class.ddwaf_object_get_bool(ddwaf_object)
-              expect(value).to eq(false)
-            end
-          end
-        end
-
-        context "for non boolean object" do
-          it "returns false" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_bool(ddwaf_object)
-            expect(value).to eq(false)
-          end
-        end
-      end
-
-      describe ".ddwaf_object_get_float" do
-        context "for float object" do
-          it "returns value" do
-            described_class.ddwaf_object_float(ddwaf_object, 12.5)
-            value = described_class.ddwaf_object_get_float(ddwaf_object)
-            expect(value).to eq(12.5)
-          end
-        end
-
-        context "for non float object" do
-          it "returns value" do
-            described_class.ddwaf_object_string(ddwaf_object, "Hello World")
-            value = described_class.ddwaf_object_get_float(ddwaf_object)
-            expect(value).to eq(0.0)
-          end
-        end
-      end
+      expect(key.to_ptr).not_to be_null
+      expect(value.to_ptr).not_to be_null
+      length = described_class::SizeTPtr.new
+      pointer = described_class.ddwaf_object_get_string(key, length)
+      expect(pointer).not_to be_null
+      expect(length[:value]).to eql(bytes.bytesize)
+      expect(pointer.read_bytes(length[:value])).to eq(bytes)
+      expect(described_class.ddwaf_object_get_signed(value)).to eql(42)
     end
   end
 
-  context "run" do
-    let(:data1) do
-      {
-        "version" => "1.0",
-        "events" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1", "value2"], "regex" => "rule1"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 2,
-            "name" => "Rule 2",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1"], "regex" => "rule2"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 3,
-            "name" => "Rule 3",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value2"], "regex" => "rule3"}}
-            ],
-            "action" => "record"
-          }
-        ]
+  it "passes log callback arguments and returns a boolean" do
+    previous_callback = Datadog::AppSec::WAF.instance_variable_get(:@log_callback)
+    received_log = nil
+    callback = proc do |level, function, file, line, message, length|
+      received_log = {
+        level: level,
+        function: function,
+        file: file,
+        line: line,
+        message: message.read_bytes(length)
       }
     end
 
-    let(:data2) do
-      {
-        "version" => "1.0",
-        "events" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1"], "regex" => "rule2"}},
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value2"], "regex" => "rule3"}}
-            ],
-            "action" => "record"
-          }
-        ]
-      }
-    end
+    expect(described_class.ddwaf_set_log_cb(callback, :ddwaf_log_trace)).to be(true)
+    expect(received_log).to match(
+      level: :ddwaf_log_info,
+      function: a_string_including("ddwaf_set_log_cb"),
+      file: a_string_ending_with("interface.cpp"),
+      line: a_kind_of(Integer),
+      message: "Sending log messages to binding, min level trace"
+    )
+  ensure
+    level = previous_callback ? :ddwaf_log_trace : :ddwaf_log_off
+    described_class.ddwaf_set_log_cb(previous_callback, level)
+  end
 
-    let(:data3) do
-      require "json"
+  it "passes allocator and object pointers through context and subcontext evaluation" do
+    parent_input_transferred = false
+    child_input_transferred = false
+    allocator = described_class.ddwaf_get_default_allocator
+    expect(allocator).not_to be_null
 
-      JSON.parse(File.read(File.expand_path("../../../fixtures/waf_rules.json", __dir__)))
-    end
+    configuration = Datadog::AppSec::WAF::Converter.ruby_to_object(
+      JSON.parse(File.read("spec/fixtures/valid_config.json")), coerce: false
+    )
+    diagnostics = described_class::Object.new
+    builder = described_class.ddwaf_builder_init
+    expect(builder).not_to be_null
+    expect(described_class.ddwaf_builder_add_or_update_config(builder, "test", 4, configuration, diagnostics)).to be(true)
+    expect(described_class.ddwaf_object_get_type(diagnostics)).to eq(:ddwaf_obj_map)
 
-    let(:data4) do
-      {
-        "version" => "2.2",
-        "metadata" => {
-          "rules_version" => "0.1.2"
-        },
-        "rules" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operator" => "match_regex", "parameters" => {"inputs" => [{"address" => "value1"}], "regex" => "rule2"}}
-            ],
-            "action" => "record"
-          }
-        ]
-      }
-    end
+    handle = described_class.ddwaf_builder_build_instance(builder)
+    expect(handle).not_to be_null
+    context = described_class.ddwaf_context_init(handle, allocator)
+    expect(context).not_to be_null
 
-    let(:data5) do
-      {
-        "version" => "2.2",
-        "metadata" => {
-          "rules_version" => "0.1.2"
-        },
-        "rules" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operator" => "match_regex", "parameters" => {"inputs" => [{"address" => "value1"}], "regex" => "rule2"}}
-            ],
-            "on_match" => ["action1", "action2", "action3", "action4"]
-          }
-        ],
-        "actions" => [
-          {
-            "id" => "action1",
-            "type" => "block",
-            "parameters" => {"status_code" => "401", "grpc_status_code" => "41", "type" => "auto"}
-          },
-          {
-            "id" => "action2",
-            "type" => "extract_schema",
-            "parameters" => {"status_code" => "402", "grpc_status_code" => "42", "type" => "auto"}
-          },
-          {
-            "id" => "action3",
-            "type" => "stacktrace",
-            "parameters" => {"status_code" => "403", "grpc_status_code" => "43", "type" => "auto"}
-          },
-          {
-            "id" => "action4",
-            "type" => "unblock",
-            "parameters" => {"status_code" => "404", "grpc_status_code" => "44", "type" => "auto"}
-          }
-        ]
-      }
-    end
+    parent_input = Datadog::AppSec::WAF::Converter.ruby_to_object({}, coerce: false)
+    parent_result = described_class::Object.new
+    code = described_class.ddwaf_context_eval(context, parent_input, allocator, parent_result, 10_000_000)
+    parent_input_transferred = code != :ddwaf_err_invalid_argument
 
-    let(:bad_data) do
-      {
-        "version" => "1.0",
-        "events" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1", "value2"], "regex" => "rule1"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 2,
-            "badname" => "Rule 2",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value1"], "regex" => "rule2"}}
-            ],
-            "action" => "record"
-          },
-          {
-            "id" => 3,
-            "name" => "Rule 3",
-            "tags" => {"type" => "flow2"},
-            "conditions" => [
-              {"operation" => "match_regex", "parameters" => {"inputs" => ["value2"], "regex" => "rule3"}}
-            ],
-            "action" => "record"
-          }
-        ]
-      }
-    end
+    expect(code).to eq(:ddwaf_ok)
+    expect(described_class.ddwaf_object_get_type(parent_result)).to eq(:ddwaf_obj_map)
 
-    let(:invalid_action_data) do
-      {
-        "version" => "2.2",
-        "metadata" => {
-          "rules_version" => "0.1.2"
-        },
-        "rules" => [
-          {
-            "id" => 1,
-            "name" => "Rule 1",
-            "tags" => {"type" => "flow1"},
-            "conditions" => [
-              {"operator" => "match_regex", "parameters" => {"inputs" => [{"address" => "value1"}], "regex" => "rule2"}}
-            ],
-            "on_match" => ["invalid-action", "valid-action-1", "valid-action-2", "unknown-action"]
-          }
-        ],
-        "actions" => [
-          {
-            "id" => "valid-action-1",
-            "type" => "block",
-            "parameters" => {"status_code" => "401", "grpc_status_code" => "41", "type" => "auto"}
-          },
-          {
-            "id" => "valid-action-2",
-            "type" => "unblock",
-            "parameters" => {"status_code" => "402", "grpc_status_code" => "42", "type" => "auto"}
-          },
-          {
-            "id" => "invalid-action",
-            "parameters" => {"status" => "500", "grpc_status" => "??", "type" => "invalid"}
-          }
-        ]
-      }
-    end
+    subcontext = described_class.ddwaf_subcontext_init(context)
+    expect(subcontext).not_to be_null
+    child_input = Datadog::AppSec::WAF::Converter.ruby_to_object(
+      {"server.request.headers.no_cookies" => {"user-agent" => "TraceTagging/v1"}}, coerce: false
+    )
+    child_result = described_class::Object.new
+    code = described_class.ddwaf_subcontext_eval(subcontext, child_input, allocator, child_result, 10_000_000)
+    child_input_transferred = code != :ddwaf_err_invalid_argument
 
-    let(:rule1) { Datadog::AppSec::WAF::Converter.ruby_to_object(data1) }
-    let(:rule2) { Datadog::AppSec::WAF::Converter.ruby_to_object(data2) }
-    let(:rule3) { Datadog::AppSec::WAF::Converter.ruby_to_object(data3) }
-    let(:rule4) { Datadog::AppSec::WAF::Converter.ruby_to_object(data4) }
-    let(:rule5) { Datadog::AppSec::WAF::Converter.ruby_to_object(data5) }
-    let(:bad_rule) { Datadog::AppSec::WAF::Converter.ruby_to_object(bad_data) }
-    let(:invalid_action_rule) { Datadog::AppSec::WAF::Converter.ruby_to_object(invalid_action_data) }
-
-    let(:log_store) { [] }
-
-    let(:log_cb) do
-      proc do |level, func, file, line, message, len|
-        log_store << {level: level, func: func, file: file, line: line, message: message.read_bytes(len)}
-      end
-    end
-
-    let(:config) { described_class::HandleBuilderConfig.new }
-
-    let(:input) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object({value1: [4242, "randomString"], value2: ["rule1"]})
-    end
-
-    let(:empty_input) { Datadog::AppSec::WAF::Converter.ruby_to_object({}) }
-
-    let(:attack) do
-      Datadog::AppSec::WAF::Converter.ruby_to_object({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}})
-    end
-
-    let(:block) { Datadog::AppSec::WAF::Converter.ruby_to_object({value1: "rule2"}) }
-
-    let(:timeout_usec) { 10_000_000 }
-    let(:diagnostics_obj) { described_class::Object.new }
-
-    let(:builder) { described_class.ddwaf_builder_init(config) }
-
-    before(:each) do
-      expect(log_store).to eq([])
-      described_class.ddwaf_set_log_cb(log_cb, :ddwaf_log_trace)
-      expect(log_store.size).to eq 1
-      expect(log_store.select { |log| log[:message] =~ /Sending log messages to binding/ })
-    end
-
-    after(:each) do |example|
-      if example.exception
-        puts "\n== #{example.full_description}"
-        log_store.each do |log|
-          puts log.inspect
-        end
-        puts "== #{example.full_description}"
-      end
-    end
-
-    after do
-      described_class.ddwaf_set_log_cb(nil, :ddwaf_log_off)
-    end
-
-    it "logs via the log callback" do
-      expect(log_store.select { |log| log[:message] == "Sending log messages to binding, min level trace" }).to_not be_empty
-    end
-
-    context "with diagnostics" do
-      it "records successful old diagnostics" do
-        described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-        handle = described_class.ddwaf_builder_build_instance(builder)
-        expect(handle.null?).to be false
-
-        diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
-
-        expect(diagnostics["rules"]["loaded"].size).to eq(3)
-        expect(diagnostics["rules"]["failed"].size).to eq(0)
-        expect(diagnostics["rules"]["errors"]).to be_empty
-      end
-
-      it "records successful new diagnostics" do
-        described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule4, diagnostics_obj)
-        handle = described_class.ddwaf_builder_build_instance(builder)
-        expect(handle.null?).to be false
-
-        diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
-
-        expect(diagnostics["rules"]["loaded"].size).to eq(1)
-        expect(diagnostics["rules"]["failed"].size).to eq(0)
-        expect(diagnostics["rules"]["errors"]).to be_empty
-        expect(diagnostics["ruleset_version"]).to eq("0.1.2")
-      end
-
-      it "records failing diagnostics" do
-        described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, bad_rule, diagnostics_obj)
-        handle = described_class.ddwaf_builder_build_instance(builder)
-        expect(handle.null?).to be false
-
-        diagnostics = Datadog::AppSec::WAF::Converter.object_to_ruby(diagnostics_obj)
-
-        expect(diagnostics["rules"]["loaded"].size).to eq(2)
-        expect(diagnostics["rules"]["failed"].size).to eq(1)
-        expect(diagnostics["rules"]["errors"]).to_not be_empty
-        expect(diagnostics["ruleset_version"]).to be_nil
-      end
-    end
-
-    it "lists required addresses" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle.null?).to be false
-
-      count = described_class::UInt32Ptr.new
-      list = described_class.ddwaf_known_addresses(handle, count)
-      expect(list.get_array_of_string(0, count[:value]).sort).to eq(["value1", "value2"])
-    end
-
-    it "triggers a monitoring rule" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "does not trigger" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule2, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_ok
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "does not trigger a monitoring rule due to timeout" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule1, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, input, empty_input, result, 1)
-
-      expect(code).to eq :ddwaf_ok
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(true)
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "triggers a known attack" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule3, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, attack, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to be_zero
-    end
-
-    it "triggers a known actionable attack" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, rule5, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to eq(4)
-      expect(result["actions"].keys).to eq(["unblock", "stacktrace", "extract_schema", "block"])
-    end
-
-    it "silently drops invalid or unknown actions on actionable attack" do
-      described_class.ddwaf_builder_add_or_update_config(builder, "some/path", 9, invalid_action_rule, diagnostics_obj)
-      handle = described_class.ddwaf_builder_build_instance(builder)
-      expect(handle).not_to be_null
-
-      context = described_class.ddwaf_context_init(handle)
-      expect(context).not_to be_null
-
-      result = described_class::Object.new
-      code = described_class.ddwaf_run(context, block, empty_input, result, timeout_usec)
-
-      expect(code).to eq :ddwaf_match
-      expect(result).to be_a(described_class::Object)
-
-      result = Datadog::AppSec::WAF::Converter.object_to_ruby(result)
-      expect(result["events"]).to be_a(Array)
-      expect(result["actions"]).to be_a(Hash)
-      expect(result["timeout"]).to eq(false)
-      expect(result["actions"].size).to eq(2)
-      expect(result["actions"].keys).to eq(["unblock", "block"])
-    end
+    expect(code).to eq(:ddwaf_match)
+    expect(described_class.ddwaf_object_get_type(child_result)).to eq(:ddwaf_obj_map)
+  ensure
+    described_class.ddwaf_object_destroy(child_result, allocator) if child_result
+    described_class.ddwaf_object_destroy(parent_result, allocator) if parent_result
+    described_class.ddwaf_subcontext_destroy(subcontext) if subcontext
+    described_class.ddwaf_context_destroy(context) if context
+    described_class.ddwaf_object_destroy(child_input, allocator) if child_input && !child_input_transferred
+    described_class.ddwaf_object_destroy(parent_input, allocator) if parent_input && !parent_input_transferred
+    described_class.ddwaf_destroy(handle) if handle
+    described_class.ddwaf_builder_destroy(builder) if builder
+    described_class.ddwaf_object_destroy(diagnostics, allocator) if diagnostics
+    described_class.ddwaf_object_destroy(configuration, allocator) if configuration
   end
 end
