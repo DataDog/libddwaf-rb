@@ -35,16 +35,16 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
 
   describe "#eval" do
     it "combines parent data with limited child input and returns an independent result" do
-      context.eval({request: "attack"})
+      context.eval({request: "attack"}, 10_000_000)
 
       result = context.build_subcontext do |subcontext|
-        subcontext.eval({operation: "execute trailing text"})
+        subcontext.eval({operation: "execute trailing text"}, 10_000_000)
       end
 
       expect(result.status).to eq(:match)
       expect(result).to be_input_truncated
       expect(result.events.first.dig("rule", "id")).to eq("both-inputs")
-      expect(context.eval({}).status).to eq(:ok)
+      expect(context.eval({}, 10_000_000).status).to eq(:ok)
     ensure
       context.finalize!
       handle.finalize!
@@ -62,13 +62,13 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
       allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).and_call_original
       allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).and_call_original
 
-      expect(subcontext.eval({operation: "execute"}).status).to eq(:err_internal)
+      expect(subcontext.eval({operation: "execute"}, 10_000_000).status).to eq(:err_internal)
       expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_destroy).once
       expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_context_destroy)
-      expect { context.eval({}) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect { context.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
       expect { context.build_subcontext }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
-      expect { sibling.eval({}) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
-      expect(independent_context.eval({}).status).to eq(:ok)
+      expect { sibling.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect(independent_context.eval({}, 10_000_000).status).to eq(:ok)
     ensure
       subcontext&.finalize!
       sibling&.finalize!
@@ -84,8 +84,8 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
         original.call(FFI::Pointer::NULL, *args)
       end
 
-      expect(subcontext.eval({operation: "execute"}).status).to eq(:err_invalid_argument)
-      expect(context.eval({}).status).to eq(:ok)
+      expect(subcontext.eval({operation: "execute"}, 10_000_000).status).to eq(:err_invalid_argument)
+      expect(context.eval({}, 10_000_000).status).to eq(:ok)
     ensure
       subcontext&.finalize!
       context.finalize!

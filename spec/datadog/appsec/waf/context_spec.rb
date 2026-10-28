@@ -68,7 +68,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     let(:context) { handle.build_context }
 
     it "passes non-matching input" do
-      result = context.eval({value1: ["rule1"]})
+      result = context.eval({value1: ["rule1"]}, 10_000_000)
 
       aggregate_failures("result") do
         expect(result).not_to be_timeout
@@ -86,7 +86,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
 
     it "catches a match" do
-      result = context.eval({value2: ["rule1"]})
+      result = context.eval({value2: ["rule1"]}, 10_000_000)
 
       aggregate_failures("result") do
         expect(result).not_to be_timeout
@@ -112,7 +112,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
 
     it "returns output of a rule with correct types" do
-      result = context.eval({headers: {user: "Attack"}})
+      result = context.eval({headers: {user: "Attack"}}, 10_000_000)
 
       aggregate_failures("result") do
         expect(result).not_to be_timeout
@@ -131,7 +131,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
 
     it "returns rule output for a JSON address value" do
-      result = context.eval({headers: Datadog::AppSec::WAF::JSONString.new('{"user":"Attack"}')})
+      result = context.eval({headers: Datadog::AppSec::WAF::JSONString.new('{"user":"Attack"}')}, 10_000_000)
 
       expect(result.status).to eq(:match)
       expect(result.attributes).to eq({
@@ -148,7 +148,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       context.finalize!
       context.finalize!
 
-      expect { context.eval({value2: ["rule1"]}) }.to raise_error(
+      expect { context.eval({value2: ["rule1"]}, 10_000_000) }.to raise_error(
         Datadog::AppSec::WAF::InstanceFinalizedError, /Cannot use WAF context after it has been finalized/
       )
     ensure
@@ -158,7 +158,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
 
     it "catches a match with a non UTF-8 string" do
-      result = context.eval({value2: ["rule1".dup.force_encoding("ASCII-8BIT")]})
+      result = context.eval({value2: ["rule1".dup.force_encoding("ASCII-8BIT")]}, 10_000_000)
 
       expect(result.status).to eq(:match)
     ensure
@@ -169,7 +169,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
 
     context "with incorrectly encoded string" do
       it "returns valid UTF-8" do
-        result = context.eval({value2: ["rule1\xE2".dup.force_encoding("ASCII-8BIT")]})
+        result = context.eval({value2: ["rule1\xE2".dup.force_encoding("ASCII-8BIT")]}, 10_000_000)
 
         first_match_parameters = result.events.dig(0, "rule_matches", 0, "parameters", 0)
 
@@ -186,7 +186,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       before { stub_const("Datadog::AppSec::WAF::LibDDWAF::DDWAF_MAX_STRING_LENGTH", 10) }
 
       it "sets result input as truncated when input is truncated" do
-        result = context.eval({value2: "a" * 11})
+        result = context.eval({value2: "a" * 11}, 10_000_000)
 
         expect(result).to be_input_truncated
       ensure
@@ -254,7 +254,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
             }
           }
 
-          result = context.eval(waf_args)
+          result = context.eval(waf_args, 10_000_000)
 
           aggregate_failures("result") do
             expect(result.status).to eq :match
@@ -278,7 +278,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
             }
           }
 
-          result = context.eval(waf_args)
+          result = context.eval(waf_args, 10_000_000)
 
           aggregate_failures("result") do
             expect(result.status).to eq :ok
@@ -301,7 +301,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       it "destroys the result when decoding fails" do
         waf_context = context
         expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).once.and_call_original
-        expect { waf_context.eval({}) }.to raise_error(
+        expect { waf_context.eval({}, 10_000_000) }.to raise_error(
           Datadog::AppSec::WAF::ConversionError, /Could not convert result into object/
         )
       ensure
@@ -322,17 +322,17 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).once.and_call_original
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).once.and_call_original
 
-      result = waf_context.eval({value1: "retained native input"})
+      result = waf_context.eval({value1: "retained native input"}, 10_000_000)
 
       expect(result.to_h).to eq({
         status: :err_internal, events: [], actions: {}, attributes: {}, duration: 0,
         timeout: false, keep: false, input_truncated: false
       })
-      expect { waf_context.eval({}) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect { waf_context.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
       expect { waf_context.build_subcontext }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
 
       waf_context.finalize!
-      expect { subcontext.eval({}) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect { subcontext.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
     ensure
       subcontext&.finalize!
       context.finalize!
@@ -343,7 +343,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     it "rejects a non-Hash input before native evaluation" do
       expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_context_eval)
 
-      expect { context.eval([]) }.to raise_error(TypeError, "WAF input must be a Hash")
+      expect { context.eval([], 10_000_000) }.to raise_error(TypeError, "WAF input must be a Hash")
     ensure
       context.finalize!
       handle.finalize!
@@ -354,9 +354,9 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_eval).once.and_call_original
 
       expect do
-        context.eval({value1: Datadog::AppSec::WAF::JSONString.new("{")})
+        context.eval({value1: Datadog::AppSec::WAF::JSONString.new("{")}, 10_000_000)
       end.to raise_error(Datadog::AppSec::WAF::ConversionError)
-      expect(context.eval({}).status).to eq(:ok)
+      expect(context.eval({}, 10_000_000).status).to eq(:ok)
     ensure
       context.finalize!
       handle.finalize!
@@ -371,8 +371,8 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).twice.and_call_original
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).once.and_call_original
 
-      expect(waf_context.eval({value1: "binding-owned input"}).status).to eq(:err_invalid_argument)
-      expect { waf_context.eval({}) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect(waf_context.eval({value1: "binding-owned input"}, 10_000_000).status).to eq(:err_invalid_argument)
+      expect { waf_context.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
     ensure
       context.finalize!
       handle.finalize!
@@ -384,10 +384,10 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       invalid_input = Datadog::AppSec::WAF::Converter.ruby_to_object([], coerce: false)
       allow(Datadog::AppSec::WAF::Converter).to receive(:ruby_to_object).and_return(invalid_input)
 
-      expect(waf_context.eval({}).status).to eq(:err_invalid_object)
+      expect(waf_context.eval({}, 10_000_000).status).to eq(:err_invalid_object)
 
       allow(Datadog::AppSec::WAF::Converter).to receive(:ruby_to_object).and_call_original
-      expect(waf_context.eval({}).status).to eq(:ok)
+      expect(waf_context.eval({}, 10_000_000).status).to eq(:ok)
     ensure
       context.finalize!
       handle.finalize!
@@ -400,8 +400,8 @@ RSpec.describe Datadog::AppSec::WAF::Context do
         "parameters" => {"inputs" => [{"address" => "value3"}], "regex" => "rule3"}
       }
 
-      expect(context.eval({value2: "rule1"}).status).to eq(:ok)
-      expect(context.eval({value3: "rule3"}).status).to eq(:match)
+      expect(context.eval({value2: "rule1"}, 10_000_000).status).to eq(:ok)
+      expect(context.eval({value3: "rule3"}, 10_000_000).status).to eq(:match)
     ensure
       context.finalize!
       handle.finalize!
@@ -417,7 +417,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).once.and_call_original
 
-      expect { waf_context.eval({value1: "native-owned input"}) }.to raise_error(RuntimeError, "interrupted")
+      expect { waf_context.eval({value1: "native-owned input"}, 10_000_000) }.to raise_error(RuntimeError, "interrupted")
     ensure
       context.finalize!
       handle.finalize!
@@ -431,7 +431,7 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       expect(logger).to receive(:debug).at_least(:once).and_raise(RuntimeError, "logger failed")
       Datadog::AppSec::WAF.logger = logger
 
-      expect(waf_context.eval({value2: "rule1"}).status).to eq(:match)
+      expect(waf_context.eval({value2: "rule1"}, 10_000_000).status).to eq(:match)
     ensure
       Datadog::AppSec::WAF.logger = previous_logger
       context.finalize!
@@ -458,12 +458,12 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       context.finalize!
       expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_subcontext_destroy)
 
-      expect(subcontext.eval({}).status).to eq(:ok)
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:ok)
 
       subcontext.finalize!
       subcontext.finalize!
       expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_destroy).once
-      expect { subcontext.eval({}) }.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError)
+      expect { subcontext.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::InstanceFinalizedError)
     ensure
       subcontext&.finalize!
       context.finalize!
