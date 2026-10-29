@@ -69,20 +69,7 @@ See upstream libddwaf for details about the [hybrid portable build](https://gith
 ## Releasing
 
 Releases use the manually triggered [Publish workflow](https://github.com/DataDog/libddwaf-rb/actions/workflows/publish.yml)
-on `master`, following the trusted-publishing flow in
-[libdatadog-rb](https://github.com/DataDog/libdatadog-rb/blob/main/.github/workflows/build.yml).
-RubyGems authentication uses short-lived OIDC credentials rather than a stored API key.
-
-Before the first release:
-
-- Create the GitHub `rubygems.org` environment with release reviewers and a
-  deployment branch rule allowing only `master`.
-- Register a [RubyGems trusted publisher](https://guides.rubygems.org/trusted-publishing/)
-  for the `libddwaf` gem: owner `DataDog`, repository `libddwaf-rb`, workflow
-  `publish.yml`, and environment `rubygems.org`.
-- Ensure the Octo STS GitHub App can create release tags under the repository's
-  tag protection rules. The `self.publish` policy grants this workflow a
-  short-lived GitHub token for tagging.
+on `master`.
 
 For each release:
 
