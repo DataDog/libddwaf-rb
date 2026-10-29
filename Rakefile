@@ -426,7 +426,9 @@ namespace :libddwaf do
     platforms.each { |platform| Rake::Task["libddwaf:build"].execute(platform: platform) }
     Rake::Task["build"].invoke
 
-    Rake::Task["release"].invoke
+    Rake::Task["release:guard_clean"].invoke
+    Rake::Task["release:source_control_push"].invoke
+    Rake::Task["release:rubygem_push"].invoke
     platforms.each { |platform| Rake::Task["libddwaf:push"].execute(platform: platform) }
   end
 
@@ -492,6 +494,10 @@ namespace :libddwaf do
     Kernel.system("gem push #{gem_path}", exception: true)
   end
 end
+
+# rubygems/release-gem invokes this entry point; include every platform gem.
+Rake::Task["release"].clear
+task release: "libddwaf:release"
 
 task test: :spec
 task default: :spec
