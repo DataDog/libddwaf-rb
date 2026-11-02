@@ -8,29 +8,12 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
   let(:allocator) { Datadog::AppSec::WAF::LibDDWAF.ddwaf_get_default_allocator }
 
   describe ".ruby_to_object" do
-    context "with coercion to string" do
-      it "converts nil" do
-        object = described_class.ruby_to_object(nil)
-        expect(described_class.object_to_ruby(object)).to eq ""
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
-
+    context "with values converted to strings" do
       it "converts an unhandled object" do
         object = described_class.ruby_to_object(Object.new)
         expect(described_class.object_to_ruby(object)).to eq ""
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
-
-      it "converts a boolean" do
-        true_object = described_class.ruby_to_object(true)
-        expect(described_class.object_to_ruby(true_object)).to eq "true"
-        false_object = described_class.ruby_to_object(false)
-        expect(described_class.object_to_ruby(false_object)).to eq "false"
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(true_object, allocator) if true_object
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(false_object, allocator) if false_object
       end
 
       it "converts a symbol" do
@@ -39,33 +22,11 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
-
-      it "converts a positive integer" do
-        object = described_class.ruby_to_object(42)
-        expect(described_class.object_to_ruby(object)).to eq "42"
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
-
-      it "converts a float" do
-        object = described_class.ruby_to_object(Math::PI)
-        expect(described_class.object_to_ruby(object)).to eq "3.141592653589793"
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
-
-      it "propagates coercion through nested arrays and hashes" do
-        object = described_class.ruby_to_object([1, {foo: [2, true]}])
-
-        expect(described_class.object_to_ruby(object)).to eq(["1", {"foo" => ["2", "true"]}])
-      ensure
-        Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-      end
     end
 
-    context "without coercion to string" do
+    context "with native scalar types" do
       it "converts nil" do
-        object = described_class.ruby_to_object(nil, coerce: false)
+        object = described_class.ruby_to_object(nil)
         expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_get_type(object)).to eq :ddwaf_obj_null
         expect(described_class.object_to_ruby(object)).to be_nil
       ensure
@@ -73,9 +34,9 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       it "converts a boolean" do
-        true_object = described_class.ruby_to_object(true, coerce: false)
+        true_object = described_class.ruby_to_object(true)
         expect(described_class.object_to_ruby(true_object)).to eq true
-        false_object = described_class.ruby_to_object(false, coerce: false)
+        false_object = described_class.ruby_to_object(false)
         expect(described_class.object_to_ruby(false_object)).to eq false
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(true_object, allocator) if true_object
@@ -83,7 +44,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       it "converts a positive integer" do
-        object = described_class.ruby_to_object(42, coerce: false)
+        object = described_class.ruby_to_object(42)
         expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_get_type(object)).to eq :ddwaf_obj_unsigned
         expect(described_class.object_to_ruby(object)).to eq 42
       ensure
@@ -91,7 +52,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       it "converts a negative integer" do
-        object = described_class.ruby_to_object(-42, coerce: false)
+        object = described_class.ruby_to_object(-42)
         expect(Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_get_type(object)).to eq :ddwaf_obj_signed
         expect(described_class.object_to_ruby(object)).to eq(-42)
       ensure
@@ -99,21 +60,21 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       end
 
       it "clamps a positive integer bigger than 2^64 - 1" do
-        object = described_class.ruby_to_object(2**65, coerce: false)
+        object = described_class.ruby_to_object(2**65)
         expect(described_class.object_to_ruby(object)).to eq 2**64 - 1
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
 
       it "clamps a negative integer smaller than -2^63" do
-        object = described_class.ruby_to_object(-(2**65), coerce: false)
+        object = described_class.ruby_to_object(-(2**65))
         expect(described_class.object_to_ruby(object)).to eq(-(2**63))
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
 
       it "converts a float" do
-        object = described_class.ruby_to_object(Math::PI, coerce: false)
+        object = described_class.ruby_to_object(Math::PI)
         expect(described_class.object_to_ruby(object)).to eq Math::PI
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
@@ -151,7 +112,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           end
 
         expect do
-          object = described_class.ruby_to_object({"safe" => "outer", "nested" => ["inner", Datadog::AppSec::WAF::JSONString.new("{")]}, coerce: false)
+          object = described_class.ruby_to_object({"safe" => "outer", "nested" => ["inner", Datadog::AppSec::WAF::JSONString.new("{")]})
         end.to raise_error(Datadog::AppSec::WAF::ConversionError, "Could not convert JSON string")
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
@@ -164,7 +125,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_object_from_json)
 
         expect do
-          object = described_class.ruby_to_object(json_string, coerce: false)
+          object = described_class.ruby_to_object(json_string)
         end.to raise_error(Datadog::AppSec::WAF::ConversionError, "JSON string exceeds the native length limit")
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
@@ -197,7 +158,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_object_insert_key)
 
         expect do
-          object = described_class.ruby_to_object(input, truncate: false, coerce: false)
+          object = described_class.ruby_to_object(input, truncate: false)
         end.to raise_error(Datadog::AppSec::WAF::ConversionError, "Map key exceeds the native length limit")
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
@@ -223,7 +184,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         "array" => Array.new(described_class::MAX_CONTAINER_SIZE + 1, 0),
         "depth" => deep_value
       }
-      object = described_class.ruby_to_object(input, truncate: false, coerce: false)
+      object = described_class.ruby_to_object(input, truncate: false)
 
       expect(described_class.object_to_ruby(object)).to eq(input)
       expect(object).not_to be_truncated
@@ -234,7 +195,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
   describe ".ruby_to_object with truncation" do
     it "accepts an empty input without marking it as truncated" do
-      object = described_class.ruby_to_object({}, coerce: false)
+      object = described_class.ruby_to_object({})
 
       expect(described_class.object_to_ruby(object)).to eq({})
       expect(object).not_to be_truncated
@@ -243,7 +204,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
     end
 
     it "preserves scalar types and stringifies symbols and map keys" do
-      object = described_class.ruby_to_object({body: [1, -2, 1.5, true, false, nil, :symbol, {42 => "value"}]}, coerce: false)
+      object = described_class.ruby_to_object({body: [1, -2, 1.5, true, false, nil, :symbol, {42 => "value"}]})
 
       expect(described_class.object_to_ruby(object)).to eq({"body" => [1, -2, 1.5, true, false, nil, "symbol", {"42" => "value"}]})
       expect(object).not_to be_truncated
@@ -255,7 +216,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       it "#{overflow.zero? ? "preserves" : "truncates"} multibyte strings and keys #{overflow.zero? ? "at" : "above"} the character limit" do
         key = ("é" * (described_class::MAX_STRING_LENGTH + overflow)).encode(Encoding::UTF_16LE)
         value = ("😀" * (described_class::MAX_STRING_LENGTH + overflow)).to_sym
-        object = described_class.ruby_to_object({key => {key => value}}, coerce: false)
+        object = described_class.ruby_to_object({key => {key => value}})
 
         expected_key = "é" * described_class::MAX_STRING_LENGTH
         expect(described_class.object_to_ruby(object)).to eq({expected_key => {expected_key => "😀" * described_class::MAX_STRING_LENGTH}})
@@ -267,7 +228,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       it "#{overflow.zero? ? "preserves" : "truncates"} arrays and maps #{overflow.zero? ? "at" : "above"} the container size limit" do
         size = described_class::MAX_CONTAINER_SIZE
         entries = (size + overflow).times.map { |i| [i.to_s, i] }
-        object = described_class.ruby_to_object({"array" => entries.map(&:last), "map" => entries.to_h}, coerce: false)
+        object = described_class.ruby_to_object({"array" => entries.map(&:last), "map" => entries.to_h})
 
         expect(described_class.object_to_ruby(object)).to eq({"array" => (0...size).to_a, "map" => entries.first(size).to_h})
         expect(object.truncated?).to eq(overflow.positive?)
@@ -282,7 +243,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
           expected = "leaf" if overflow.zero?
           (described_class::MAX_CONTAINER_DEPTH + overflow).times { input = (kind == :array) ? [input] : {"key" => input} }
           described_class::MAX_CONTAINER_DEPTH.times { expected = (kind == :array) ? [expected] : {"key" => expected} }
-          object = described_class.ruby_to_object({"body" => input}, coerce: false)
+          object = described_class.ruby_to_object({"body" => input})
 
           expect(described_class.object_to_ruby(object)).to eq({"body" => expected})
           expect(object.truncated?).to eq(overflow.positive?)
@@ -295,7 +256,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
     it "does not mark empty containers beyond the depth limit as truncated" do
       value = {"array" => [], "map" => {}}
       (described_class::MAX_CONTAINER_DEPTH - 1).times { value = [value] }
-      object = described_class.ruby_to_object({"body" => value}, coerce: false)
+      object = described_class.ruby_to_object({"body" => value})
 
       expect(described_class.object_to_ruby(object)).to eq({"body" => value})
       expect(object).not_to be_truncated
@@ -305,7 +266,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
     it "keeps all addresses when the top-level map exceeds the payload container size limit" do
       input = (described_class::MAX_CONTAINER_SIZE + 1).times.map { |i| ["address#{i}", i] }.to_h
-      object = described_class.ruby_to_object(input, coerce: false)
+      object = described_class.ruby_to_object(input)
 
       expect(described_class.object_to_ruby(object)).to eq(input)
       expect(object).not_to be_truncated
@@ -315,7 +276,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
     it "truncates an address map exceeding native capacity instead of raising" do
       input = (described_class::UINT16_MAX + 1).times.map { |i| ["address#{i}", i] }.to_h
-      object = described_class.ruby_to_object(input, coerce: false)
+      object = described_class.ruby_to_object(input)
       result = described_class.object_to_ruby(object)
 
       expect(result.size).to eq(described_class::UINT16_MAX)
@@ -328,7 +289,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
     it "parses JSONString payloads without applying request limits" do
       payload = {"items" => Array.new(described_class::MAX_CONTAINER_SIZE + 1, "a" * (described_class::MAX_STRING_LENGTH + 1))}
       json = Datadog::AppSec::WAF::JSONString.new(JSON.generate(payload))
-      object = described_class.ruby_to_object({"body" => json}, coerce: false)
+      object = described_class.ruby_to_object({"body" => json})
 
       expect(described_class.object_to_ruby(object)).to eq({"body" => payload})
       expect(object).not_to be_truncated
@@ -339,7 +300,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
 
   describe ".object_to_ruby" do
     it "converts nested arrays and maps with stringified keys" do
-      object = described_class.ruby_to_object({"é" => [{bar: [42]}], 21 => 10.5}, coerce: false)
+      object = described_class.ruby_to_object({"é" => [{bar: [42]}], 21 => 10.5})
 
       expect(described_class.object_to_ruby(object)).to eq({"é" => [{"bar" => [42]}], "21" => 10.5})
     ensure

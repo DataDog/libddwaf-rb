@@ -17,20 +17,12 @@ Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(int_object, allocator)
 float_object = Datadog::AppSec::WAF::Converter.ruby_to_object(12.2)
 Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(float_object, allocator)
 
-# boolean that gets converted to a string
+# boolean that gets converted to a boolean
 bool_object = Datadog::AppSec::WAF::Converter.ruby_to_object(true)
 Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(bool_object, allocator)
 
-# boolean that gets converted to a boolean
-bool_object = Datadog::AppSec::WAF::Converter.ruby_to_object(true, coerce: false)
-Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(bool_object, allocator)
-
-# nil that gets converted to an empty string
-nil_object = Datadog::AppSec::WAF::Converter.ruby_to_object(nil)
-Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(nil_object, allocator)
-
 # nil that gets converted to a null object
-nil_object = Datadog::AppSec::WAF::Converter.ruby_to_object(nil, coerce: false)
+nil_object = Datadog::AppSec::WAF::Converter.ruby_to_object(nil)
 Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(nil_object, allocator)
 
 # simple array

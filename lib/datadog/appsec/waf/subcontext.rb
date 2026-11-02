@@ -33,7 +33,7 @@ module Datadog
             input_transferred = false
 
             begin
-              input_obj = Converter.ruby_to_object(data, coerce: false)
+              input_obj = Converter.ruby_to_object(data)
               input_truncated = input_obj.truncated?
               result_obj = LibDDWAF::Object.new
 

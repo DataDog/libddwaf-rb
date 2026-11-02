@@ -16,7 +16,7 @@ module Datadog
         module_function
 
         # standard:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
-        def ruby_to_object(val, truncate: true, coerce: true)
+        def ruby_to_object(val, truncate: true)
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise ConversionError, "Could not obtain the native allocator" if allocator.null?
 
@@ -28,8 +28,7 @@ module Datadog
               allocator: allocator,
               top_obj: object,
               truncate: truncate,
-              depth: 0,
-              coerce: coerce
+              depth: 0
             )
             complete = true
             object
@@ -39,7 +38,7 @@ module Datadog
         end
 
         # Populate a fresh root or container slot; only the owning root handles cleanup.
-        def populate_object(object, val, allocator:, top_obj:, truncate: true, depth:, coerce:)
+        def populate_object(object, val, allocator:, top_obj:, truncate: true, depth:)
           result = case val
           when Array
             capacity = container_capacity(val.size, truncate: truncate, depth: depth)
@@ -60,8 +59,7 @@ module Datadog
                 allocator: allocator,
                 top_obj: top_obj,
                 truncate: truncate,
-                depth: depth + 1,
-                coerce: coerce
+                depth: depth + 1
               )
             end
             object
@@ -92,8 +90,7 @@ module Datadog
                 allocator: allocator,
                 top_obj: top_obj,
                 truncate: truncate,
-                depth: depth + 1,
-                coerce: coerce
+                depth: depth + 1
               )
             end
             object
@@ -110,9 +107,7 @@ module Datadog
           when String, Symbol
             string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
           when Integer
-            if coerce
-              string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
-            elsif val < 0
+            if val < 0
               clamped = val.clamp(INT64_MIN, -1) #: Integer
               LibDDWAF.ddwaf_object_set_signed(object, clamped)
             else
@@ -120,23 +115,11 @@ module Datadog
               LibDDWAF.ddwaf_object_set_unsigned(object, clamped)
             end
           when Float
-            if coerce
-              string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
-            else
-              LibDDWAF.ddwaf_object_set_float(object, val)
-            end
+            LibDDWAF.ddwaf_object_set_float(object, val)
           when TrueClass, FalseClass
-            if coerce
-              string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
-            else
-              LibDDWAF.ddwaf_object_set_bool(object, val)
-            end
+            LibDDWAF.ddwaf_object_set_bool(object, val)
           when NilClass
-            if coerce
-              string_to_object(object, "", allocator, truncate: truncate, top_obj: top_obj)
-            else
-              LibDDWAF.ddwaf_object_set_null(object)
-            end
+            LibDDWAF.ddwaf_object_set_null(object)
           else
             string_to_object(object, "", allocator, truncate: truncate, top_obj: top_obj)
           end

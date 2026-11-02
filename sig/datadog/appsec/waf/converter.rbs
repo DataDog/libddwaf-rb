@@ -18,8 +18,7 @@ module Datadog
 
         def self?.ruby_to_object: (
           top val,
-          ?truncate: bool,
-          ?coerce: bool?
+          ?truncate: bool
         ) -> LibDDWAF::Object
 
         def self?.populate_object: (
@@ -28,8 +27,7 @@ module Datadog
           allocator: ::FFI::Pointer,
           top_obj: LibDDWAF::Object,
           ?truncate: bool,
-          depth: ::Integer,
-          coerce: bool?
+          depth: ::Integer
         ) -> LibDDWAF::Object
 
         def self?.truncate_input_string: (::String string, top_obj: LibDDWAF::Object) -> ::String

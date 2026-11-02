@@ -144,7 +144,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     expect(allocator).not_to be_null
 
     configuration = Datadog::AppSec::WAF::Converter.ruby_to_object(
-      JSON.parse(File.read("spec/fixtures/valid_config.json")), truncate: false, coerce: false
+      JSON.parse(File.read("spec/fixtures/valid_config.json")), truncate: false
     )
     diagnostics = described_class::Object.new
     builder = described_class.ddwaf_builder_init
@@ -157,7 +157,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     context = described_class.ddwaf_context_init(handle, allocator)
     expect(context).not_to be_null
 
-    parent_input = Datadog::AppSec::WAF::Converter.ruby_to_object({}, coerce: false)
+    parent_input = Datadog::AppSec::WAF::Converter.ruby_to_object({})
     parent_result = described_class::Object.new
     code = described_class.ddwaf_context_eval(context, parent_input, allocator, parent_result, 10_000_000)
     parent_input_transferred = code != :ddwaf_err_invalid_argument
@@ -168,7 +168,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     subcontext = described_class.ddwaf_subcontext_init(context)
     expect(subcontext).not_to be_null
     child_input = Datadog::AppSec::WAF::Converter.ruby_to_object(
-      {"server.request.headers.no_cookies" => {"user-agent" => "TraceTagging/v1"}}, coerce: false
+      {"server.request.headers.no_cookies" => {"user-agent" => "TraceTagging/v1"}}
     )
     child_result = described_class::Object.new
     code = described_class.ddwaf_subcontext_eval(subcontext, child_input, allocator, child_result, 10_000_000)

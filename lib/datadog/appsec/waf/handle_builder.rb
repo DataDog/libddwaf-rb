@@ -68,7 +68,7 @@ module Datadog
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
 
-          config_obj = Converter.ruby_to_object(config, truncate: false, coerce: false)
+          config_obj = Converter.ruby_to_object(config, truncate: false)
           diagnostics_obj = LibDDWAF::Object.new
 
           LibDDWAF.ddwaf_builder_add_or_update_config(@builder_ptr, path, path_length, config_obj, diagnostics_obj)
@@ -103,7 +103,7 @@ module Datadog
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
 
-          config_obj = Converter.ruby_to_object({obfuscator: settings}, truncate: false, coerce: false)
+          config_obj = Converter.ruby_to_object({obfuscator: settings}, truncate: false)
           success = LibDDWAF.ddwaf_builder_add_or_update_config(
             @builder_ptr, OBFUSCATOR_CONFIG_PATH, OBFUSCATOR_CONFIG_PATH.bytesize, config_obj, nil
           )

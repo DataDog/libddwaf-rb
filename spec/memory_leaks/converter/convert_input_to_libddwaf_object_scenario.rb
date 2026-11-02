@@ -13,11 +13,11 @@ input = {
   "depth" => deep_value
 }
 
-object = converter.ruby_to_object(input, coerce: false)
+object = converter.ruby_to_object(input)
 Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator)
 
 begin
-  object = converter.ruby_to_object(input.merge("invalid" => Datadog::AppSec::WAF::JSONString.new("{")), coerce: false)
+  object = converter.ruby_to_object(input.merge("invalid" => Datadog::AppSec::WAF::JSONString.new("{")))
   Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator)
   raise "Expected invalid JSON to fail conversion"
 rescue Datadog::AppSec::WAF::ConversionError
