@@ -4,7 +4,6 @@ module Datadog
       class Subcontext
         @subcontext_ptr: ::FFI::Pointer?
         @context: Context
-        @state: :active | :finalized
 
         def initialize: (
           ::FFI::Pointer subcontext_ptr,
@@ -17,7 +16,7 @@ module Datadog
 
         private
 
-        def ensure_active!: () -> ::FFI::Pointer
+        def ensure_pointer_presence!: () -> void
       end
     end
   end

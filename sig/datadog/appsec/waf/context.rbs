@@ -4,8 +4,6 @@ module Datadog
       class Context
         @context_ptr: ::FFI::Pointer?
 
-        @state: :active | :finalized
-
         EMPTY_RESULT: {
           "events" => WAF::events,
           "actions" => WAF::actions,
@@ -30,7 +28,7 @@ module Datadog
 
         private
 
-        def ensure_active!: () -> ::FFI::Pointer
+        def ensure_pointer_presence!: () -> void
 
         def destroy_context!: () -> void
       end

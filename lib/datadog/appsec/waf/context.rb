@@ -25,12 +25,10 @@ module Datadog
 
         def initialize(context_ptr)
           @context_ptr = context_ptr
-          @state = :active
         end
 
         def finalize!
           Thread.handle_interrupt(::Object => :never) do
-            @state = :finalized
             destroy_context!
           end
         end
@@ -41,7 +39,9 @@ module Datadog
 
           begin
             subcontext = Thread.handle_interrupt(::Object => :never) do
-              pointer = LibDDWAF.ddwaf_subcontext_init(ensure_active!)
+              ensure_pointer_presence!
+
+              pointer = LibDDWAF.ddwaf_subcontext_init(@context_ptr)
               raise LibDDWAFError, "Could not create subcontext" if pointer.null?
 
               begin
@@ -63,7 +63,7 @@ module Datadog
         end
 
         def eval(data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
-          ensure_active!
+          ensure_pointer_presence!
 
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
@@ -78,7 +78,7 @@ module Datadog
               input_truncated = input_obj.truncated?
               result_obj = LibDDWAF::Object.new
 
-              code = LibDDWAF.ddwaf_context_eval(ensure_active!, input_obj, allocator, result_obj, timeout)
+              code = LibDDWAF.ddwaf_context_eval(@context_ptr, input_obj, allocator, result_obj, timeout)
               # In libddwaf 2.0.0, only INVALID_ARGUMENT returns before input ownership transfers.
               input_transferred = code != :ddwaf_err_invalid_argument
 
@@ -111,10 +111,10 @@ module Datadog
 
         private
 
-        def ensure_active!
-          raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized" if @state == :finalized
+        def ensure_pointer_presence!
+          return if @context_ptr
 
-          @context_ptr #: ::FFI::Pointer
+          raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized"
         end
 
         def destroy_context!

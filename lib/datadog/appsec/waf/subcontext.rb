@@ -7,12 +7,10 @@ module Datadog
         def initialize(subcontext_ptr, context:)
           @subcontext_ptr = subcontext_ptr
           @context = context
-          @state = :active
         end
 
         def finalize!
           Thread.handle_interrupt(::Object => :never) do
-            @state = :finalized
             pointer = @subcontext_ptr
             return unless pointer
 
@@ -22,7 +20,7 @@ module Datadog
         end
 
         def eval(data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
-          ensure_active!
+          ensure_pointer_presence!
 
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
@@ -37,7 +35,7 @@ module Datadog
               input_truncated = input_obj.truncated?
               result_obj = LibDDWAF::Object.new
 
-              code = LibDDWAF.ddwaf_subcontext_eval(ensure_active!, input_obj, allocator, result_obj, timeout)
+              code = LibDDWAF.ddwaf_subcontext_eval(@subcontext_ptr, input_obj, allocator, result_obj, timeout)
               # In libddwaf 2.0.0, only INVALID_ARGUMENT returns before input ownership transfers.
               input_transferred = code != :ddwaf_err_invalid_argument
 
@@ -70,10 +68,10 @@ module Datadog
 
         private
 
-        def ensure_active!
-          raise InstanceFinalizedError, "Cannot use WAF subcontext after it has been finalized" if @state == :finalized
+        def ensure_pointer_presence!
+          return if @subcontext_ptr
 
-          @subcontext_ptr #: ::FFI::Pointer
+          raise InstanceFinalizedError, "Cannot use WAF subcontext after it has been finalized"
         end
       end
     end
