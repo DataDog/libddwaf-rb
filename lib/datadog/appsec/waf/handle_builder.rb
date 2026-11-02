@@ -9,9 +9,7 @@ module Datadog
       class HandleBuilder
         OBFUSCATOR_CONFIG_PATH = "libddwaf-rb/obfuscator"
 
-        def initialize(limits: {}, obfuscator: {})
-          @limits = normalize_limits(limits)
-
+        def initialize(obfuscator: {})
           @builder_ptr = LibDDWAF.ddwaf_builder_init
           raise LibDDWAFError, "Could not create builder" if @builder_ptr.null?
 
@@ -44,7 +42,7 @@ module Datadog
           raise LibDDWAFError, "Could not create handle" if handle_obj.null?
 
           begin
-            handle = Handle.new(handle_obj, limits: @limits)
+            handle = Handle.new(handle_obj)
             initialized = true
             handle
           ensure
@@ -70,7 +68,7 @@ module Datadog
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
 
-          config_obj = Converter.ruby_to_object(config, coerce: false)
+          config_obj = Converter.ruby_to_object(config, truncate: false, coerce: false)
           diagnostics_obj = LibDDWAF::Object.new
 
           LibDDWAF.ddwaf_builder_add_or_update_config(@builder_ptr, path, path_length, config_obj, diagnostics_obj)
@@ -96,27 +94,6 @@ module Datadog
 
         private
 
-        def normalize_limits(limits)
-          normalized = {
-            max_container_size: LibDDWAF::DEFAULT_MAX_CONTAINER_SIZE,
-            max_container_depth: LibDDWAF::DEFAULT_MAX_CONTAINER_DEPTH,
-            max_string_length: LibDDWAF::DEFAULT_MAX_STRING_LENGTH
-          }
-
-          normalized.each_key do |name|
-            value = limits[name]
-            next if value.nil?
-
-            unless value.is_a?(Integer) && value.between?(0, 0xffff_ffff)
-              raise ArgumentError, "#{name} must be an integer between 0 and 4294967295"
-            end
-
-            normalized[name] = value unless value.zero?
-          end
-
-          normalized.freeze
-        end
-
         def configure_obfuscator(obfuscator)
           settings = {
             key_regex: obfuscator[:key_regex],
@@ -126,7 +103,7 @@ module Datadog
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
 
-          config_obj = Converter.ruby_to_object({obfuscator: settings}, coerce: false)
+          config_obj = Converter.ruby_to_object({obfuscator: settings}, truncate: false, coerce: false)
           success = LibDDWAF.ddwaf_builder_add_or_update_config(
             @builder_ptr, OBFUSCATOR_CONFIG_PATH, OBFUSCATOR_CONFIG_PATH.bytesize, config_obj, nil
           )

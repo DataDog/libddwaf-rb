@@ -3,7 +3,6 @@ module Datadog
     module WAF
       class Context
         @context_ptr: ::FFI::Pointer?
-        @limits: ::Hash[::Symbol, ::Integer]
 
         @state: :active | :failed | :finalized
         @failed: bool
@@ -21,7 +20,7 @@ module Datadog
 
         RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
 
-        def initialize: (::FFI::Pointer context_ptr, limits: ::Hash[::Symbol, ::Integer]) -> void
+        def initialize: (::FFI::Pointer context_ptr) -> void
 
         def failed?: () -> bool
 

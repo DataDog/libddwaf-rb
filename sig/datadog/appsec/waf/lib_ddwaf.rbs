@@ -2,14 +2,6 @@ module Datadog
   module AppSec
     module WAF
       module LibDDWAF
-        DEFAULT_MAX_CONTAINER_SIZE: ::Integer
-        DEFAULT_MAX_CONTAINER_DEPTH: ::Integer
-        DEFAULT_MAX_STRING_LENGTH: ::Integer
-
-        DDWAF_MAX_CONTAINER_SIZE: ::Integer
-        DDWAF_MAX_CONTAINER_DEPTH: ::Integer
-        DDWAF_MAX_STRING_LENGTH: ::Integer
-
         DDWAF_RUN_TIMEOUT: ::Integer
 
         extend ::FFI::Library

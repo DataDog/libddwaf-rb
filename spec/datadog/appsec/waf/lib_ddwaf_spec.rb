@@ -144,7 +144,7 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     expect(allocator).not_to be_null
 
     configuration = Datadog::AppSec::WAF::Converter.ruby_to_object(
-      JSON.parse(File.read("spec/fixtures/valid_config.json")), coerce: false
+      JSON.parse(File.read("spec/fixtures/valid_config.json")), truncate: false, coerce: false
     )
     diagnostics = described_class::Object.new
     builder = described_class.ddwaf_builder_init

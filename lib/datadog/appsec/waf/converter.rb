@@ -3,8 +3,11 @@
 module Datadog
   module AppSec
     module WAF
-      # Module responsible for Ruby-to-C and C-to-Ruby conversions
       module Converter
+        MAX_CONTAINER_SIZE = 256
+        MAX_CONTAINER_DEPTH = 20
+        MAX_STRING_LENGTH = 4096
+
         INT64_MIN = -(2**63)
         UINT16_MAX = 2**16 - 1
         UINT32_MAX = 2**32 - 1
@@ -13,9 +16,7 @@ module Datadog
         module_function
 
         # standard:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
-        def ruby_to_object(val, limits: nil, coerce: true)
-          raise TypeError, "WAF input must be a Hash" if limits && !(Hash === val)
-
+        def ruby_to_object(val, truncate: true, coerce: true)
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise ConversionError, "Could not obtain the native allocator" if allocator.null?
 
@@ -26,7 +27,7 @@ module Datadog
               object, val,
               allocator: allocator,
               top_obj: object,
-              limits: limits,
+              truncate: truncate,
               depth: 0,
               coerce: coerce
             )
@@ -38,10 +39,10 @@ module Datadog
         end
 
         # Populate a fresh root or container slot; only the owning root handles cleanup.
-        def populate_object(object, val, allocator:, top_obj:, limits:, depth:, coerce:)
+        def populate_object(object, val, allocator:, top_obj:, truncate: true, depth:, coerce:)
           result = case val
           when Array
-            capacity = container_capacity(val.size, limits: limits, depth: depth)
+            capacity = container_capacity(val.size, truncate: truncate, depth: depth)
             container = LibDDWAF.ddwaf_object_set_array(object, capacity, allocator)
             raise ConversionError, "Could not create array object" if container.to_ptr.null?
 
@@ -58,14 +59,14 @@ module Datadog
                 slot, element,
                 allocator: allocator,
                 top_obj: top_obj,
-                limits: limits,
+                truncate: truncate,
                 depth: depth + 1,
                 coerce: coerce
               )
             end
             object
           when Hash
-            capacity = container_capacity(val.size, limits: limits, depth: depth)
+            capacity = container_capacity(val.size, truncate: truncate, depth: depth)
             container = LibDDWAF.ddwaf_object_set_map(object, capacity, allocator)
             raise ConversionError, "Could not create map object" if container.to_ptr.null?
 
@@ -76,16 +77,9 @@ module Datadog
               end
 
               key = entry[0].to_s
-              if limits
+              if truncate
                 key = key.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
-                if depth.zero?
-                  if key.length > LibDDWAF::DDWAF_MAX_STRING_LENGTH || key.bytesize > LibDDWAF::DEFAULT_MAX_STRING_LENGTH
-                    top_obj.mark_truncated!
-                    next
-                  end
-                else
-                  key = truncate_input_string(key, max_bytes: limits.fetch(:max_string_length), top_obj: top_obj)
-                end
+                key = truncate_input_string(key, top_obj: top_obj)
               end
               length = key.bytesize
               raise ConversionError, "Map key exceeds the native length limit" if length > UINT32_MAX
@@ -97,7 +91,7 @@ module Datadog
                 slot, entry[1],
                 allocator: allocator,
                 top_obj: top_obj,
-                limits: limits,
+                truncate: truncate,
                 depth: depth + 1,
                 coerce: coerce
               )
@@ -114,10 +108,10 @@ module Datadog
             end
             object
           when String, Symbol
-            string_to_object(object, val.to_s, allocator, limits: limits, top_obj: top_obj)
+            string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
           when Integer
             if coerce
-              string_to_object(object, val.to_s, allocator, limits: limits, top_obj: top_obj)
+              string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
             elsif val < 0
               clamped = val.clamp(INT64_MIN, -1) #: Integer
               LibDDWAF.ddwaf_object_set_signed(object, clamped)
@@ -127,24 +121,24 @@ module Datadog
             end
           when Float
             if coerce
-              string_to_object(object, val.to_s, allocator, limits: limits, top_obj: top_obj)
+              string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
             else
               LibDDWAF.ddwaf_object_set_float(object, val)
             end
           when TrueClass, FalseClass
             if coerce
-              string_to_object(object, val.to_s, allocator, limits: limits, top_obj: top_obj)
+              string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
             else
               LibDDWAF.ddwaf_object_set_bool(object, val)
             end
           when NilClass
             if coerce
-              string_to_object(object, "", allocator, limits: limits, top_obj: top_obj)
+              string_to_object(object, "", allocator, truncate: truncate, top_obj: top_obj)
             else
               LibDDWAF.ddwaf_object_set_null(object)
             end
           else
-            string_to_object(object, "", allocator, limits: limits, top_obj: top_obj)
+            string_to_object(object, "", allocator, truncate: truncate, top_obj: top_obj)
           end
 
           raise ConversionError, "Could not populate native object" if result.to_ptr.null?
@@ -152,44 +146,27 @@ module Datadog
           object
         end
 
-        def truncate_input_string(string, max_bytes:, top_obj:)
-          if string.length > LibDDWAF::DDWAF_MAX_STRING_LENGTH
-            string = string[0, LibDDWAF::DDWAF_MAX_STRING_LENGTH] #: String
-            top_obj.mark_truncated!
-          end
+        def truncate_input_string(string, top_obj:)
+          return string if string.length <= MAX_STRING_LENGTH
 
-          truncate_string_bytes(string, max_bytes: max_bytes, top_obj: top_obj)
-        end
-
-        def truncate_string_bytes(string, max_bytes:, top_obj:)
-          return string if string.bytesize <= max_bytes
-
-          prefix = string.byteslice(0, max_bytes) #: String
-          prefix = prefix.scrub("")
           top_obj.mark_truncated!
-          prefix
+          string[0, MAX_STRING_LENGTH] #: String
         end
 
-        def string_to_object(object, string, allocator, limits:, top_obj:)
+        def string_to_object(object, string, allocator, truncate: true, top_obj:)
           string = string.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
-          string = truncate_input_string(string, max_bytes: limits.fetch(:max_string_length), top_obj: top_obj) if limits
+          string = truncate_input_string(string, top_obj: top_obj) if truncate
           length = string.bytesize
           raise ConversionError, "String exceeds the native length limit" if length > UINT32_MAX
 
           LibDDWAF.ddwaf_object_set_string(object, string, length, allocator)
         end
 
-        def container_capacity(size, limits:, depth:)
-          if limits
-            max_depth = [limits.fetch(:max_container_depth), LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH - 1].min
-            return 0 if depth > max_depth
+        def container_capacity(size, truncate: true, depth:)
+          if truncate
+            return 0 if depth > MAX_CONTAINER_DEPTH
 
-            max_size = if depth.zero?
-              LibDDWAF::DDWAF_MAX_CONTAINER_SIZE
-            else
-              [limits.fetch(:max_container_size), LibDDWAF::DDWAF_MAX_CONTAINER_SIZE].min
-            end
-            size = [size, max_size].min
+            return [size, depth.zero? ? UINT16_MAX : MAX_CONTAINER_SIZE].min
           end
 
           unless size.between?(0, UINT16_MAX)

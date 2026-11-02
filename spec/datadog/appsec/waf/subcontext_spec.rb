@@ -25,7 +25,7 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
   end
 
   let(:builder) do
-    Datadog::AppSec::WAF::HandleBuilder.new(limits: {max_string_length: 7}).tap do |builder|
+    Datadog::AppSec::WAF::HandleBuilder.new.tap do |builder|
       builder.add_or_update_config(config, path: "test")
     end
   end
@@ -38,7 +38,7 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
       context.eval({request: "attack"}, 10_000_000)
 
       result = context.build_subcontext do |subcontext|
-        subcontext.eval({operation: "execute trailing text"}, 10_000_000)
+        subcontext.eval({operation: "execute" + "a" * Datadog::AppSec::WAF::Converter::MAX_STRING_LENGTH}, 10_000_000)
       end
 
       expect(result.status).to eq(:match)

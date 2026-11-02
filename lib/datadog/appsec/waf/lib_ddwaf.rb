@@ -9,14 +9,6 @@ module Datadog
       # FFI-binding for C-libddwaf
       # See https://github.com/DataDog/libddwaf
       module LibDDWAF
-        DEFAULT_MAX_CONTAINER_SIZE = 256
-        DEFAULT_MAX_CONTAINER_DEPTH = 20
-        DEFAULT_MAX_STRING_LENGTH = 16_384 # in bytes, UTF-8 worst case being 4x size in terms of code point
-
-        DDWAF_MAX_CONTAINER_SIZE = 256
-        DDWAF_MAX_CONTAINER_DEPTH = 20
-        DDWAF_MAX_STRING_LENGTH = 4096
-
         DDWAF_RUN_TIMEOUT = 5000
 
         extend ::FFI::Library

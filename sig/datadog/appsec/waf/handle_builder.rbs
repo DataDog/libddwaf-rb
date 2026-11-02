@@ -5,9 +5,8 @@ module Datadog
         OBFUSCATOR_CONFIG_PATH: ::String
 
         @builder_ptr: ::FFI::Pointer
-        @limits: ::Hash[::Symbol, ::Integer]
 
-        def initialize: (?limits: ::Hash[::Symbol, ::Integer?], ?obfuscator: ::Hash[::Symbol, ::String?]) -> void
+        def initialize: (?obfuscator: ::Hash[::Symbol, ::String?]) -> void
 
         def finalize!: () -> void
 
@@ -18,8 +17,6 @@ module Datadog
         def remove_config_at_path: (::String path) -> bool
 
         private
-
-        def normalize_limits: (::Hash[::Symbol, ::Integer?] limits) -> ::Hash[::Symbol, ::Integer]
 
         def configure_obfuscator: (::Hash[::Symbol, ::String?] obfuscator) -> void
 

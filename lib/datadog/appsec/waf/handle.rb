@@ -6,9 +6,8 @@ module Datadog
       # Ruby representation of the ddwaf_handle in libddwaf
       # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/BINDING_IMPL_NOTES.md?plain=1#L4-L19
       class Handle
-        def initialize(handle_ptr, limits:)
+        def initialize(handle_ptr)
           @handle_ptr = handle_ptr
-          @limits = limits
         end
 
         # Destroys the WAF handle and sets the pointer to nil.
@@ -35,7 +34,7 @@ module Datadog
           raise LibDDWAFError, "Could not create context" if context_obj.null?
 
           begin
-            context = Context.new(context_obj, limits: @limits)
+            context = Context.new(context_obj)
             initialized = true
             context
           ensure

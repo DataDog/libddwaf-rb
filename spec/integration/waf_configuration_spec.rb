@@ -5,7 +5,8 @@ RSpec.describe "WAF configuration" do
     JSON.parse(File.read("spec/fixtures/waf_rules.json"))
   end
 
-  context "limits" do
+  context "fixed input limits" do
+    let(:converter) { Datadog::AppSec::WAF::Converter }
     context "max_container_size" do
       it "matches when value is within container size limit" do
         builder = Datadog::AppSec::WAF::HandleBuilder.new
@@ -13,9 +14,12 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, 10_000_000)
+        headers = (converter::MAX_CONTAINER_SIZE - 1).times.map { |i| ["header#{i}", "value"] }.to_h
+        headers["user-agent"] = "Nessus SOAP"
+        result = context.eval({"server.request.headers.no_cookies" => headers}, 10_000_000)
 
         expect(result.status).to eq(:match)
+        expect(result).not_to be_input_truncated
       ensure
         context&.finalize!
         handle&.finalize!
@@ -23,14 +27,17 @@ RSpec.describe "WAF configuration" do
       end
 
       it "does not match when value is not within container size limit" do
-        builder = Datadog::AppSec::WAF::HandleBuilder.new(limits: {max_container_size: 1})
+        builder = Datadog::AppSec::WAF::HandleBuilder.new
         builder.add_or_update_config(waf_rules, path: "some/path")
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.eval({"server.request.headers.no_cookies" => {"another" => "key", "user-agent" => "Nessus SOAP"}}, 10_000_000)
+        headers = converter::MAX_CONTAINER_SIZE.times.map { |i| ["header#{i}", "value"] }.to_h
+        headers["user-agent"] = "Nessus SOAP"
+        result = context.eval({"server.request.headers.no_cookies" => headers}, 10_000_000)
 
         expect(result.status).to eq(:ok)
+        expect(result).to be_input_truncated
       ensure
         context&.finalize!
         handle&.finalize!
@@ -45,9 +52,12 @@ RSpec.describe "WAF configuration" do
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, 10_000_000)
+        value = "Nessus SOAP"
+        (converter::MAX_CONTAINER_DEPTH - 1).times { value = [value] }
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => value}}, 10_000_000)
 
         expect(result.status).to eq(:match)
+        expect(result).not_to be_input_truncated
       ensure
         context&.finalize!
         handle&.finalize!
@@ -55,14 +65,17 @@ RSpec.describe "WAF configuration" do
       end
 
       it "does not match when value is not within container depth limit" do
-        builder = Datadog::AppSec::WAF::HandleBuilder.new(limits: {max_container_depth: 1})
+        builder = Datadog::AppSec::WAF::HandleBuilder.new
         builder.add_or_update_config(waf_rules, path: "some/path")
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, 10_000_000)
+        value = "Nessus SOAP"
+        converter::MAX_CONTAINER_DEPTH.times { value = [value] }
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => value}}, 10_000_000)
 
         expect(result.status).to eq(:ok)
+        expect(result).to be_input_truncated
       ensure
         context&.finalize!
         handle&.finalize!
@@ -72,14 +85,16 @@ RSpec.describe "WAF configuration" do
 
     context "max_string_length" do
       it "matches when value is within string length limit" do
-        builder = Datadog::AppSec::WAF::HandleBuilder.new(limits: {max_string_length: 11})
+        builder = Datadog::AppSec::WAF::HandleBuilder.new
         builder.add_or_update_config(waf_rules, path: "some/path")
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => "Nessus SOAP"}}, 10_000_000)
+        value = "Nessus" + " " * (converter::MAX_STRING_LENGTH - "NessusSOAP".length) + "SOAP"
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => value}}, 10_000_000)
 
         expect(result.status).to eq(:match)
+        expect(result).not_to be_input_truncated
       ensure
         context&.finalize!
         handle&.finalize!
@@ -87,14 +102,16 @@ RSpec.describe "WAF configuration" do
       end
 
       it "does not match when value is not within string length limit" do
-        builder = Datadog::AppSec::WAF::HandleBuilder.new(limits: {max_string_length: 10})
+        builder = Datadog::AppSec::WAF::HandleBuilder.new
         builder.add_or_update_config(waf_rules, path: "some/path")
         handle = builder.build_handle
         context = handle.build_context
 
-        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => ["Nessus SOAP"]}}, 10_000_000)
+        value = "Nessus" + " " * (converter::MAX_STRING_LENGTH - "NessusSOAP".length + 1) + "SOAP"
+        result = context.eval({"server.request.headers.no_cookies" => {"user-agent" => value}}, 10_000_000)
 
         expect(result.status).to eq(:ok)
+        expect(result).to be_input_truncated
       ensure
         context&.finalize!
         handle&.finalize!

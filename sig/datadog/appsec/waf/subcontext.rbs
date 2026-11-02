@@ -4,13 +4,11 @@ module Datadog
       class Subcontext
         @subcontext_ptr: ::FFI::Pointer?
         @context: Context
-        @limits: ::Hash[::Symbol, ::Integer]
         @state: :active | :failed | :finalized
 
         def initialize: (
           ::FFI::Pointer subcontext_ptr,
-          context: Context,
-          limits: ::Hash[::Symbol, ::Integer]
+          context: Context
         ) -> void
 
         def finalize!: () -> void

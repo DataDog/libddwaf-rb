@@ -4,10 +4,9 @@ module Datadog
   module AppSec
     module WAF
       class Subcontext
-        def initialize(subcontext_ptr, context:, limits:)
+        def initialize(subcontext_ptr, context:)
           @subcontext_ptr = subcontext_ptr
           @context = context
-          @limits = limits
           @state = :active
         end
 
@@ -24,7 +23,6 @@ module Datadog
 
         def eval(data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           ensure_active!
-          raise TypeError, "WAF input must be a Hash" unless Hash === data
 
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
@@ -35,7 +33,7 @@ module Datadog
             input_transferred = false
 
             begin
-              input_obj = Converter.ruby_to_object(data, limits: @limits, coerce: false)
+              input_obj = Converter.ruby_to_object(data, coerce: false)
               input_truncated = input_obj.truncated?
               result_obj = LibDDWAF::Object.new
 

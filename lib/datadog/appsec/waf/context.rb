@@ -23,9 +23,8 @@ module Datadog
           ddwaf_err_invalid_argument: :err_invalid_argument
         }.freeze
 
-        def initialize(context_ptr, limits:)
+        def initialize(context_ptr)
           @context_ptr = context_ptr
-          @limits = limits
           @state = :active
           @failed = false
         end
@@ -55,7 +54,7 @@ module Datadog
               raise LibDDWAFError, "Could not create subcontext" if pointer.null?
 
               begin
-                subcontext = Subcontext.new(pointer, context: self, limits: @limits)
+                subcontext = Subcontext.new(pointer, context: self)
               ensure
                 LibDDWAF.ddwaf_subcontext_destroy(pointer) unless subcontext
               end
@@ -74,7 +73,6 @@ module Datadog
 
         def eval(data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           ensure_active!
-          raise TypeError, "WAF input must be a Hash" unless Hash === data
 
           allocator = LibDDWAF.ddwaf_get_default_allocator
           raise LibDDWAFError, "Could not obtain the native allocator" if allocator.null?
@@ -85,7 +83,7 @@ module Datadog
             input_transferred = false
 
             begin
-              input_obj = Converter.ruby_to_object(data, limits: @limits, coerce: false)
+              input_obj = Converter.ruby_to_object(data, coerce: false)
               input_truncated = input_obj.truncated?
               result_obj = LibDDWAF::Object.new
 

@@ -183,10 +183,8 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
 
     context "when input was marked as truncated" do
-      before { stub_const("Datadog::AppSec::WAF::LibDDWAF::DDWAF_MAX_STRING_LENGTH", 10) }
-
       it "sets result input as truncated when input is truncated" do
-        result = context.eval({value2: "a" * 11}, 10_000_000)
+        result = context.eval({value2: "a" * (Datadog::AppSec::WAF::Converter::MAX_STRING_LENGTH + 1)}, 10_000_000)
 
         expect(result).to be_input_truncated
       ensure
@@ -340,16 +338,6 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       builder.finalize!
     end
 
-    it "rejects a non-Hash input before native evaluation" do
-      expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_context_eval)
-
-      expect { context.eval([], 10_000_000) }.to raise_error(TypeError, "WAF input must be a Hash")
-    ensure
-      context.finalize!
-      handle.finalize!
-      builder.finalize!
-    end
-
     it "remains usable after input conversion fails" do
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_eval).once.and_call_original
 
@@ -380,14 +368,8 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
 
     it "keeps the context usable after native input rejection" do
-      waf_context = context
-      invalid_input = Datadog::AppSec::WAF::Converter.ruby_to_object([], coerce: false)
-      allow(Datadog::AppSec::WAF::Converter).to receive(:ruby_to_object).and_return(invalid_input)
-
-      expect(waf_context.eval({}, 10_000_000).status).to eq(:err_invalid_object)
-
-      allow(Datadog::AppSec::WAF::Converter).to receive(:ruby_to_object).and_call_original
-      expect(waf_context.eval({}, 10_000_000).status).to eq(:ok)
+      expect(context.eval([], 10_000_000).status).to eq(:err_invalid_object)
+      expect(context.eval({}, 10_000_000).status).to eq(:ok)
     ensure
       context.finalize!
       handle.finalize!
