@@ -41,15 +41,6 @@ module Datadog
               # In libddwaf 2.0.0, only INVALID_ARGUMENT returns before input ownership transfers.
               input_transferred = code != :ddwaf_err_invalid_argument
 
-              @context.mark_failed! if code == :ddwaf_err_internal
-
-              if code == :ddwaf_err_internal || code == :ddwaf_err_invalid_argument
-                @state = :failed
-                pointer = @subcontext_ptr
-                @subcontext_ptr = nil
-                LibDDWAF.ddwaf_subcontext_destroy(pointer) if pointer
-              end
-
               raw_result = if Context::SUCCESS_RESULT_CODES.include?(code)
                 decoded = Converter.object_to_ruby(result_obj)
                 raise ConversionError, "Could not convert result into object: #{code}" unless decoded.is_a?(Hash)
@@ -80,16 +71,9 @@ module Datadog
         private
 
         def ensure_active!
-          case @state
-          when :failed
-            raise LibDDWAFError, "Cannot use WAF subcontext after a native error"
-          when :finalized
-            raise InstanceFinalizedError, "Cannot use WAF subcontext after it has been finalized"
-          end
+          raise InstanceFinalizedError, "Cannot use WAF subcontext after it has been finalized" if @state == :finalized
 
-          raise LibDDWAFError, "Cannot use WAF subcontext after a native error" if @context.failed?
-
-          @subcontext_ptr || raise(LibDDWAFError, "WAF subcontext pointer is missing")
+          @subcontext_ptr #: ::FFI::Pointer
         end
       end
     end

@@ -51,43 +51,103 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
       builder.finalize!
     end
 
-    it "fails the family and closes only the faulted child on internal error" do
+    it "keeps the family usable after an internal error in the child" do
       subcontext = context.build_subcontext
       sibling = context.build_subcontext
-      independent_context = handle.build_context
+      codes = %i[ddwaf_err_internal ddwaf_err_internal]
       allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_eval).and_wrap_original do |original, *args|
-        original.call(*args)
-        :ddwaf_err_internal
+        code = original.call(*args)
+        codes.shift || code
       end
       allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).and_call_original
       allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).and_call_original
 
-      expect(subcontext.eval({operation: "execute"}, 10_000_000).status).to eq(:err_internal)
-      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_destroy).once
+      expect(subcontext.eval({operation: "execute"}, 10_000_000).to_h).to eq({
+        status: :err_internal, events: [], actions: {}, attributes: {}, duration: 0,
+        timeout: false, keep: false, input_truncated: false
+      })
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:err_internal)
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:ok)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_eval).exactly(3).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_object_destroy).exactly(3).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_subcontext_destroy)
+      expect(context.eval({}, 10_000_000).status).to eq(:ok)
+      expect(sibling.eval({}, 10_000_000).status).to eq(:ok)
+      expect(context.build_subcontext { |new_subcontext| new_subcontext.eval({}, 10_000_000) }.status).to eq(:ok)
       expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_context_destroy)
-      expect { context.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
-      expect { context.build_subcontext }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
-      expect { sibling.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
-      expect(independent_context.eval({}, 10_000_000).status).to eq(:ok)
     ensure
       subcontext&.finalize!
       sibling&.finalize!
-      independent_context&.finalize!
       context.finalize!
       handle.finalize!
       builder.finalize!
     end
 
-    it "keeps the parent usable after an invalid-argument error in the child" do
+    it "frees untransferred input and keeps the family usable after an invalid-argument error in the child" do
       subcontext = context.build_subcontext
-      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_eval).and_wrap_original do |original, _pointer, *args|
-        original.call(FFI::Pointer::NULL, *args)
+      sibling = context.build_subcontext
+      calls = 0
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_eval).and_wrap_original do |original, pointer, *args|
+        calls += 1
+        original.call((calls <= 2) ? FFI::Pointer::NULL : pointer, *args)
       end
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).and_call_original
 
-      expect(subcontext.eval({operation: "execute"}, 10_000_000).status).to eq(:err_invalid_argument)
+      expect(subcontext.eval({operation: "execute"}, 10_000_000).to_h).to eq({
+        status: :err_invalid_argument, events: [], actions: {}, attributes: {}, duration: 0,
+        timeout: false, keep: false, input_truncated: false
+      })
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:err_invalid_argument)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_eval).twice
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_object_destroy).exactly(4).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_subcontext_destroy)
       expect(context.eval({}, 10_000_000).status).to eq(:ok)
+      expect(sibling.eval({}, 10_000_000).status).to eq(:ok)
+      expect(context.build_subcontext { |new_subcontext| new_subcontext.eval({}, 10_000_000) }.status).to eq(:ok)
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:ok)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_eval).exactly(5).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_context_destroy)
+
+      subcontext.finalize!
+      subcontext.finalize!
+      sibling.finalize!
+      sibling.finalize!
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_destroy).exactly(3).times
     ensure
       subcontext&.finalize!
+      sibling&.finalize!
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+
+    it "keeps the family usable after native input rejection in the child" do
+      subcontext = context.build_subcontext
+      sibling = context.build_subcontext
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_eval).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).and_call_original
+
+      expect(subcontext.eval([], 10_000_000).to_h).to eq({
+        status: :err_invalid_object, events: [], actions: {}, attributes: {}, duration: 0,
+        timeout: false, keep: false, input_truncated: false
+      })
+      expect(subcontext.eval([], 10_000_000).status).to eq(:err_invalid_object)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_object_destroy).twice
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_subcontext_destroy)
+      expect(context.eval({}, 10_000_000).status).to eq(:ok)
+      expect(sibling.eval({}, 10_000_000).status).to eq(:ok)
+      expect(context.build_subcontext { |new_subcontext| new_subcontext.eval({}, 10_000_000) }.status).to eq(:ok)
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:ok)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_subcontext_eval).exactly(5).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_context_destroy)
+    ensure
+      subcontext&.finalize!
+      sibling&.finalize!
       context.finalize!
       handle.finalize!
       builder.finalize!

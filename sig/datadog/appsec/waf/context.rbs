@@ -4,8 +4,7 @@ module Datadog
       class Context
         @context_ptr: ::FFI::Pointer?
 
-        @state: :active | :failed | :finalized
-        @failed: bool
+        @state: :active | :finalized
 
         EMPTY_RESULT: {
           "events" => WAF::events,
@@ -21,10 +20,6 @@ module Datadog
         RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
 
         def initialize: (::FFI::Pointer context_ptr) -> void
-
-        def failed?: () -> bool
-
-        def mark_failed!: () -> bool
 
         def finalize!: () -> void
 

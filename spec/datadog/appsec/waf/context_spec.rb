@@ -309,16 +309,16 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       end
     end
 
-    it "returns an empty error result and closes the context on internal error" do
+    it "returns an empty error result and keeps the context usable on internal error" do
       waf_context = context
       subcontext = waf_context.build_subcontext
+      codes = %i[ddwaf_err_internal ddwaf_err_internal]
       allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_eval).and_wrap_original do |original, *args|
-        original.call(*args)
-        :ddwaf_err_internal
+        code = original.call(*args)
+        codes.shift || code
       end
-      expect(Datadog::AppSec::WAF::Converter).not_to receive(:object_to_ruby)
-      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).once.and_call_original
-      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).once.and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).and_call_original
 
       result = waf_context.eval({value1: "retained native input"}, 10_000_000)
 
@@ -326,11 +326,14 @@ RSpec.describe Datadog::AppSec::WAF::Context do
         status: :err_internal, events: [], actions: {}, attributes: {}, duration: 0,
         timeout: false, keep: false, input_truncated: false
       })
-      expect { waf_context.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
-      expect { waf_context.build_subcontext }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect(waf_context.eval({}, 10_000_000).status).to eq(:err_internal)
+      expect(waf_context.eval({}, 10_000_000).status).to eq(:ok)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_context_eval).exactly(3).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_object_destroy).exactly(3).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_context_destroy)
 
-      waf_context.finalize!
-      expect { subcontext.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:ok)
+      expect(waf_context.build_subcontext { |new_subcontext| new_subcontext.eval({}, 10_000_000) }.status).to eq(:ok)
     ensure
       subcontext&.finalize!
       context.finalize!
@@ -351,26 +354,58 @@ RSpec.describe Datadog::AppSec::WAF::Context do
       builder.finalize!
     end
 
-    it "frees untransferred input and closes the context on invalid argument" do
+    it "frees untransferred input and keeps the context usable on invalid argument" do
       waf_context = context
-      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_eval).and_wrap_original do |original, _pointer, *args|
-        original.call(FFI::Pointer::NULL, *args)
+      subcontext = waf_context.build_subcontext
+      calls = 0
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_eval).and_wrap_original do |original, pointer, *args|
+        calls += 1
+        original.call((calls <= 2) ? FFI::Pointer::NULL : pointer, *args)
       end
-      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).twice.and_call_original
-      expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).once.and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).and_call_original
 
-      expect(waf_context.eval({value1: "binding-owned input"}, 10_000_000).status).to eq(:err_invalid_argument)
-      expect { waf_context.eval({}, 10_000_000) }.to raise_error(Datadog::AppSec::WAF::LibDDWAFError, /native error/)
+      expect(waf_context.eval({value1: "binding-owned input"}, 10_000_000).to_h).to eq({
+        status: :err_invalid_argument, events: [], actions: {}, attributes: {}, duration: 0,
+        timeout: false, keep: false, input_truncated: false
+      })
+      expect(waf_context.eval({}, 10_000_000).status).to eq(:err_invalid_argument)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_context_eval).twice
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_object_destroy).exactly(4).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_context_destroy)
+
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:ok)
+      expect(waf_context.build_subcontext { |new_subcontext| new_subcontext.eval({}, 10_000_000) }.status).to eq(:ok)
+      expect(waf_context.eval({}, 10_000_000).status).to eq(:ok)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_context_eval).exactly(3).times
+
+      waf_context.finalize!
+      waf_context.finalize!
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_context_destroy).once
     ensure
+      subcontext&.finalize!
       context.finalize!
       handle.finalize!
       builder.finalize!
     end
 
     it "keeps the context usable after native input rejection" do
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_eval).and_call_original
+      allow(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_context_destroy).and_call_original
+      subcontext = context.build_subcontext
+
+      expect(context.eval([], 10_000_000).to_h).to eq({
+        status: :err_invalid_object, events: [], actions: {}, attributes: {}, duration: 0,
+        timeout: false, keep: false, input_truncated: false
+      })
       expect(context.eval([], 10_000_000).status).to eq(:err_invalid_object)
+      expect(subcontext.eval({}, 10_000_000).status).to eq(:ok)
+      expect(context.build_subcontext { |new_subcontext| new_subcontext.eval({}, 10_000_000) }.status).to eq(:ok)
       expect(context.eval({}, 10_000_000).status).to eq(:ok)
+      expect(Datadog::AppSec::WAF::LibDDWAF).to have_received(:ddwaf_context_eval).exactly(3).times
+      expect(Datadog::AppSec::WAF::LibDDWAF).not_to have_received(:ddwaf_context_destroy)
     ensure
+      subcontext&.finalize!
       context.finalize!
       handle.finalize!
       builder.finalize!
