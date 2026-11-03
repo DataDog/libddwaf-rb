@@ -260,11 +260,11 @@ module Datadog
 
         attach_function :ddwaf_context_init, [:ddwaf_handle, :ddwaf_allocator], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
-        attach_function :ddwaf_context_eval, [:ddwaf_context, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
+        attach_function :ddwaf_context_eval, [:ddwaf_context, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code
 
         attach_function :ddwaf_subcontext_init, [:ddwaf_context], :ddwaf_subcontext
         attach_function :ddwaf_subcontext_destroy, [:ddwaf_subcontext], :void
-        attach_function :ddwaf_subcontext_eval, [:ddwaf_subcontext, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
+        attach_function :ddwaf_subcontext_eval, [:ddwaf_subcontext, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code
 
         # logging
 
