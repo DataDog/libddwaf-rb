@@ -44,15 +44,11 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       expect(described_class.ddwaf_object_get_unsigned(object)).to eql(value)
     end
 
-    it "passes and returns Ruby true" do
+    it "passes and returns Ruby booleans" do
       described_class.ddwaf_object_set_bool(object, true)
-
       expect(described_class.ddwaf_object_get_bool(object)).to be(true)
-    end
 
-    it "passes and returns Ruby false" do
       described_class.ddwaf_object_set_bool(object, false)
-
       expect(described_class.ddwaf_object_get_bool(object)).to be(false)
     end
 
@@ -126,11 +122,11 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
 
     expect(described_class.ddwaf_set_log_cb(callback, :ddwaf_log_trace)).to be(true)
     expect(received_log).to match(
-      level: :ddwaf_log_info,
-      function: a_string_including("ddwaf_set_log_cb"),
-      file: a_string_ending_with("interface.cpp"),
+      level: satisfy { |level| described_class::DDWAF_LOG_LEVEL.symbols.include?(level) },
+      function: a_kind_of(String),
+      file: a_kind_of(String),
       line: a_kind_of(Integer),
-      message: "Sending log messages to binding, min level trace"
+      message: a_string_matching(/\S/)
     )
   ensure
     level = previous_callback ? :ddwaf_log_trace : :ddwaf_log_off

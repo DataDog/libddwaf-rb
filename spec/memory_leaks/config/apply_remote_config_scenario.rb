@@ -6,7 +6,7 @@ require "json"
 builder = Datadog::AppSec::WAF::HandleBuilder.new
 
 # default config is usually loaded at application start
-default_rules = JSON.parse(File.read("spec/fixtures/waf_rules.json"))
+default_rules = JSON.parse(File.read("spec/fixtures/valid_config.json"))
 builder.add_or_update_config(default_rules, path: "APPSEC/DEFAULT")
 
 # # default config has to be removed before adding config from Remote Configuration

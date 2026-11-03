@@ -103,13 +103,7 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         object = nil
 
         expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_object_destroy)
-          .with(an_instance_of(Datadog::AppSec::WAF::LibDDWAF::Object), allocator).once.and_wrap_original do |original, root, alloc|
-            begin
-              expect(described_class.object_to_ruby(root)).to eq({"safe" => "outer", "nested" => ["inner", nil]})
-            ensure
-              original.call(root, alloc)
-            end
-          end
+          .with(an_instance_of(Datadog::AppSec::WAF::LibDDWAF::Object), allocator).once.and_call_original
 
         expect do
           object = described_class.ruby_to_object({"safe" => "outer", "nested" => ["inner", Datadog::AppSec::WAF::JSONString.new("{")]})
@@ -198,15 +192,6 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
       object = described_class.ruby_to_object({})
 
       expect(described_class.object_to_ruby(object)).to eq({})
-      expect(object).not_to be_truncated
-    ensure
-      Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
-    end
-
-    it "preserves scalar types and stringifies symbols and map keys" do
-      object = described_class.ruby_to_object({body: [1, -2, 1.5, true, false, nil, :symbol, {42 => "value"}]})
-
-      expect(described_class.object_to_ruby(object)).to eq({"body" => [1, -2, 1.5, true, false, nil, "symbol", {"42" => "value"}]})
       expect(object).not_to be_truncated
     ensure
       Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object

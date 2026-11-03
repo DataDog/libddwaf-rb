@@ -35,6 +35,8 @@ RSpec.describe "Memory leaks", memory_leaks: true do
       rescue RuntimeError
         fail("Expected no memory leaks when running #{scenario_file}.\n\nValgrind output:\n#{string_io.string}")
       end
+
+      expect(status).to eq(0), "Expected #{scenario_file} to exit with status 0, got #{status.inspect}.\n\nValgrind output:\n#{string_io.string}"
     end
   end
 end
