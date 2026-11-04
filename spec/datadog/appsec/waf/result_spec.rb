@@ -4,6 +4,41 @@ require "spec_helper"
 require "datadog/appsec/waf/result"
 
 RSpec.describe Datadog::AppSec::WAF::Result do
+  describe ".build_empty" do
+    it "builds a Result with the given status and empty fields" do
+      result = described_class.build_empty(status: :err_internal)
+
+      expect(result.to_h).to eq({
+        status: :err_internal,
+        events: [],
+        actions: {},
+        attributes: {},
+        duration: 0,
+        timeout: false,
+        keep: false,
+        input_truncated: false
+      })
+    end
+
+    it "builds independent instances" do
+      first = described_class.build_empty(status: :err_internal)
+      second = described_class.build_empty(status: :err_internal)
+
+      first.events << {"rule" => {"id" => "rule-1"}}
+      first.actions["block_request"] = {}
+      first.attributes["key"] = "value"
+      first.mark_input_truncated!
+
+      aggregate_failures("second result") do
+        expect(second).not_to equal(first)
+        expect(second.events).to eq([])
+        expect(second.actions).to eq({})
+        expect(second.attributes).to eq({})
+        expect(second).not_to be_input_truncated
+      end
+    end
+  end
+
   describe "#to_h" do
     let(:actions) do
       {"block_request" => {"status_code" => 418}}

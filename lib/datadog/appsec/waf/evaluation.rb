@@ -5,15 +5,6 @@ module Datadog
     module WAF
       # Internal evaluation conversion, ownership and result handling for both native adapters.
       module Evaluation
-        EMPTY_RESULT = {
-          "events" => [],     #: WAF::events
-          "actions" => {},    #: WAF::actions
-          "attributes" => {}, #: WAF::attributes
-          "duration" => 0,
-          "timeout" => false,
-          "keep" => false
-        }.freeze
-
         SUCCESS_RESULT_CODES = %i[ddwaf_ok ddwaf_match].freeze
 
         RESULT_CODE_TO_STATUS = {
@@ -44,24 +35,24 @@ module Datadog
               # only INVALID_ARGUMENT returns before input ownership transfers.
               input_transferred = code != :ddwaf_err_invalid_argument
 
-              raw_result = if SUCCESS_RESULT_CODES.include?(code)
+              status = RESULT_CODE_TO_STATUS.fetch(code)
+              result = if SUCCESS_RESULT_CODES.include?(code)
                 decoded = Converter.object_to_ruby(result_obj)
                 raise ConversionError, "Could not convert result into object: #{code}" unless decoded.is_a?(Hash)
 
-                decoded #: as untyped
+                raw_result = decoded #: as untyped
+                Result.new(
+                  status: status,
+                  events: raw_result["events"],
+                  actions: raw_result["actions"],
+                  attributes: raw_result["attributes"],
+                  duration: raw_result["duration"],
+                  timeout: raw_result["timeout"],
+                  keep: raw_result["keep"]
+                )
               else
-                EMPTY_RESULT
+                Result.build_empty(status: status)
               end
-
-              result = Result.new(
-                status: RESULT_CODE_TO_STATUS.fetch(code),
-                events: raw_result["events"],
-                actions: raw_result["actions"],
-                attributes: raw_result["attributes"],
-                duration: raw_result["duration"],
-                timeout: raw_result["timeout"],
-                keep: raw_result["keep"]
-              )
               result.mark_input_truncated! if input_truncated
               result
             ensure

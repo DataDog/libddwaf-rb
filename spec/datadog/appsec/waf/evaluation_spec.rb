@@ -87,6 +87,7 @@ RSpec.describe Datadog::AppSec::WAF::Evaluation do
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_context_eval(@context_ptr, input_obj, allocator, result_obj, 10_000_000)
       end
 
+      expect(result).to be_a(Datadog::AppSec::WAF::Result)
       expect(result.to_h).to eq({
         status: :err_invalid_object, events: [], actions: {}, attributes: {}, duration: 0,
         timeout: false, keep: false, input_truncated: false

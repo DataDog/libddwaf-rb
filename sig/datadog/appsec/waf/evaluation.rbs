@@ -2,15 +2,6 @@ module Datadog
   module AppSec
     module WAF
       module Evaluation
-        EMPTY_RESULT: {
-          "events" => WAF::events,
-          "actions" => WAF::actions,
-          "attributes" => WAF::attributes,
-          "duration" => ::Integer,
-          "timeout" => bool,
-          "keep" => bool
-        }
-
         SUCCESS_RESULT_CODES: ::Array[::Symbol]
 
         RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
