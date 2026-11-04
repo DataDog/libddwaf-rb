@@ -77,7 +77,10 @@ module Datadog
               key = entry[0].to_s
               if truncate
                 key = key.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
-                key = truncate_input_string(key, top_obj: top_obj)
+                if key.length > MAX_STRING_LENGTH
+                  top_obj.mark_truncated!
+                  key = key[0, MAX_STRING_LENGTH] #: String
+                end
               end
               length = key.bytesize
               raise ConversionError, "Map key exceeds the native length limit" if length > UINT32_MAX
@@ -129,16 +132,12 @@ module Datadog
           object
         end
 
-        def truncate_input_string(string, top_obj:)
-          return string if string.length <= MAX_STRING_LENGTH
-
-          top_obj.mark_truncated!
-          string[0, MAX_STRING_LENGTH] #: String
-        end
-
         def string_to_object(object, string, allocator, top_obj:, truncate: true)
           string = string.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
-          string = truncate_input_string(string, top_obj: top_obj) if truncate
+          if truncate && string.length > MAX_STRING_LENGTH
+            top_obj.mark_truncated!
+            string = string[0, MAX_STRING_LENGTH] #: String
+          end
           length = string.bytesize
           raise ConversionError, "String exceeds the native length limit" if length > UINT32_MAX
 

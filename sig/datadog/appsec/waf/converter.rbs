@@ -30,8 +30,6 @@ module Datadog
           ?truncate: bool
         ) -> LibDDWAF::Object
 
-        def self?.truncate_input_string: (::String string, top_obj: LibDDWAF::Object) -> ::String
-
         def self?.string_to_object: (LibDDWAF::Object object, ::String string, ::FFI::Pointer allocator, top_obj: LibDDWAF::Object, ?truncate: bool) -> LibDDWAF::Object
 
         def self?.container_capacity: (::Integer size, depth: ::Integer, ?truncate: bool) -> ::Integer
