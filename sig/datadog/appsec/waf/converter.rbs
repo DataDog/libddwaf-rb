@@ -26,15 +26,15 @@ module Datadog
           top val,
           allocator: ::FFI::Pointer,
           top_obj: LibDDWAF::Object,
-          ?truncate: bool,
-          depth: ::Integer
+          depth: ::Integer,
+          ?truncate: bool
         ) -> LibDDWAF::Object
 
         def self?.truncate_input_string: (::String string, top_obj: LibDDWAF::Object) -> ::String
 
-        def self?.string_to_object: (LibDDWAF::Object object, ::String string, ::FFI::Pointer allocator, ?truncate: bool, top_obj: LibDDWAF::Object) -> LibDDWAF::Object
+        def self?.string_to_object: (LibDDWAF::Object object, ::String string, ::FFI::Pointer allocator, top_obj: LibDDWAF::Object, ?truncate: bool) -> LibDDWAF::Object
 
-        def self?.container_capacity: (::Integer size, ?truncate: bool, depth: ::Integer) -> ::Integer
+        def self?.container_capacity: (::Integer size, depth: ::Integer, ?truncate: bool) -> ::Integer
 
         def self?.object_to_ruby: (LibDDWAF::Object obj) -> WAF::opaque
 

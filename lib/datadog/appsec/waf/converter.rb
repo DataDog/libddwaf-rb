@@ -38,7 +38,7 @@ module Datadog
         end
 
         # Populate a fresh root or container slot; only the owning root handles cleanup.
-        def populate_object(object, val, allocator:, top_obj:, truncate: true, depth:)
+        def populate_object(object, val, allocator:, top_obj:, depth:, truncate: true)
           result = case val
           when Array
             capacity = container_capacity(val.size, truncate: truncate, depth: depth)
@@ -136,7 +136,7 @@ module Datadog
           string[0, MAX_STRING_LENGTH] #: String
         end
 
-        def string_to_object(object, string, allocator, truncate: true, top_obj:)
+        def string_to_object(object, string, allocator, top_obj:, truncate: true)
           string = string.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
           string = truncate_input_string(string, top_obj: top_obj) if truncate
           length = string.bytesize
@@ -145,7 +145,7 @@ module Datadog
           LibDDWAF.ddwaf_object_set_string(object, string, length, allocator)
         end
 
-        def container_capacity(size, truncate: true, depth:)
+        def container_capacity(size, depth:, truncate: true)
           if truncate
             return 0 if depth > MAX_CONTAINER_DEPTH
 
