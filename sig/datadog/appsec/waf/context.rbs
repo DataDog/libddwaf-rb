@@ -16,8 +16,6 @@ module Datadog
         private
 
         def ensure_pointer_presence!: () -> void
-
-        def destroy_context!: () -> void
       end
     end
   end

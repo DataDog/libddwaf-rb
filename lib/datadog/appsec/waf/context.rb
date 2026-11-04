@@ -12,7 +12,11 @@ module Datadog
 
         def finalize!
           Thread.handle_interrupt(::Object => :never) do
-            destroy_context!
+            pointer = @context_ptr
+            return unless pointer
+
+            @context_ptr = nil
+            LibDDWAF.ddwaf_context_destroy(pointer)
           end
         end
 
@@ -62,14 +66,6 @@ module Datadog
           return if @context_ptr
 
           raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized"
-        end
-
-        def destroy_context!
-          pointer = @context_ptr
-          return unless pointer
-
-          @context_ptr = nil
-          LibDDWAF.ddwaf_context_destroy(pointer)
         end
       end
     end
