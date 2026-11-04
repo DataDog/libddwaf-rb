@@ -28,7 +28,6 @@ module Datadog
 
             begin
               input_obj = Converter.ruby_to_object(data)
-              input_truncated = input_obj.truncated?
               result_obj = LibDDWAF::Object.new
 
               code = yield input_obj, allocator, result_obj
@@ -53,7 +52,7 @@ module Datadog
               else
                 Result.build_empty(status: status)
               end
-              result.mark_input_truncated! if input_truncated
+              result.mark_input_truncated! if input_obj.truncated?
               result
             ensure
               LibDDWAF.ddwaf_object_destroy(result_obj, allocator) if result_obj
