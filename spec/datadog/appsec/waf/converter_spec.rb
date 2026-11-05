@@ -158,13 +158,11 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end
 
-      it "rejects containers exceeding the uint16 capacity before calling native code" do
-        object = nil
-        expect(Datadog::AppSec::WAF::LibDDWAF).not_to receive(:ddwaf_object_set_array)
+      it "caps containers exceeding the uint16 capacity" do
+        object = described_class.ruby_to_object(Array.new(0x1_0000, 0), truncate: false)
 
-        expect do
-          object = described_class.ruby_to_object(Array.new(0x1_0000), truncate: false)
-        end.to raise_error(Datadog::AppSec::WAF::ConversionError, "Container exceeds the native size limit")
+        expect(described_class.object_to_ruby(object).size).to eq(described_class::UINT16_MAX)
+        expect(object).to be_truncated
       ensure
         Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
       end

@@ -28,7 +28,7 @@ module Datadog
               allocator: allocator,
               top_obj: object,
               truncate: truncate,
-              depth: 0
+              current_depth: 0
             )
             complete = true
             object
@@ -38,10 +38,11 @@ module Datadog
         end
 
         # Populate a fresh root or container slot; only the owning root handles cleanup.
-        def populate_object(object, val, allocator:, top_obj:, depth:, truncate: true)
+        def populate_object(object, val, allocator:, top_obj:, current_depth:, truncate: true)
           result = case val
           when Array
-            capacity = container_capacity(val.size, truncate: truncate, depth: depth)
+            capacity = [val.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
+
             container = LibDDWAF.ddwaf_object_set_array(object, capacity, allocator)
             raise ConversionError, "Could not create array object" if container.to_ptr.null?
 
@@ -59,12 +60,13 @@ module Datadog
                 allocator: allocator,
                 top_obj: top_obj,
                 truncate: truncate,
-                depth: depth + 1
+                current_depth: current_depth + 1
               )
             end
             object
           when Hash
-            capacity = container_capacity(val.size, truncate: truncate, depth: depth)
+            capacity = [val.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
+
             container = LibDDWAF.ddwaf_object_set_map(object, capacity, allocator)
             raise ConversionError, "Could not create map object" if container.to_ptr.null?
 
@@ -93,7 +95,7 @@ module Datadog
                 allocator: allocator,
                 top_obj: top_obj,
                 truncate: truncate,
-                depth: depth + 1
+                current_depth: current_depth + 1
               )
             end
             object
@@ -144,18 +146,10 @@ module Datadog
           LibDDWAF.ddwaf_object_set_string(object, string, length, allocator)
         end
 
-        def container_capacity(size, depth:, truncate: true)
-          if truncate
-            return 0 if depth > MAX_CONTAINER_DEPTH
+        def container_size_limit(current_depth)
+          return 0 if current_depth > MAX_CONTAINER_DEPTH
 
-            return [size, depth.zero? ? UINT16_MAX : MAX_CONTAINER_SIZE].min
-          end
-
-          unless size.between?(0, UINT16_MAX)
-            raise ConversionError, "Container exceeds the native size limit"
-          end
-
-          size
+          current_depth.zero? ? UINT16_MAX : MAX_CONTAINER_SIZE
         end
         # standard:enable Metrics/MethodLength,Metrics/CyclomaticComplexity
 
