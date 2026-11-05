@@ -45,7 +45,7 @@ module Datadog
             container = LibDDWAF.ddwaf_object_set_array(object, capacity, allocator)
             raise ConversionError, "Could not create array object" if container.to_ptr.null?
 
-            val.each.with_index do |element, i|
+            val.each_with_index do |element, i|
               if i >= capacity
                 top_obj.mark_truncated!
                 break

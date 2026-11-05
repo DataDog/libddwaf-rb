@@ -22,7 +22,6 @@ module Datadog
 
         def build_subcontext
           subcontext = nil #: Subcontext?
-          caller_owned = false
 
           begin
             subcontext = Thread.handle_interrupt(::Object => :never) do
@@ -38,14 +37,9 @@ module Datadog
               end
             end
 
-            if block_given?
-              yield subcontext
-            else
-              caller_owned = true
-              subcontext
-            end
+            yield subcontext
           ensure
-            subcontext&.finalize! unless caller_owned
+            subcontext&.finalize!
           end
         end
 

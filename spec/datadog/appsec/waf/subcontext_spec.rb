@@ -14,17 +14,17 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
 
   describe "#finalize!" do
     it "finalizes once and rejects subsequent evaluation" do
-      subcontext = context.build_subcontext
       expect(Datadog::AppSec::WAF::LibDDWAF).to receive(:ddwaf_subcontext_destroy).once.and_call_original
 
-      subcontext.finalize!
-      subcontext.finalize!
+      context.build_subcontext do |subcontext|
+        subcontext.finalize!
+        subcontext.finalize!
 
-      expect { subcontext.eval({}) }.to raise_error(
-        Datadog::AppSec::WAF::InstanceFinalizedError, "Cannot use WAF subcontext after it has been finalized"
-      )
+        expect { subcontext.eval({}) }.to raise_error(
+          Datadog::AppSec::WAF::InstanceFinalizedError, "Cannot use WAF subcontext after it has been finalized"
+        )
+      end
     ensure
-      subcontext&.finalize!
       context.finalize!
       handle.finalize!
       builder.finalize!
