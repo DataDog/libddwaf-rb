@@ -10,6 +10,7 @@
 - Raise the minimum supported macOS version to 14.2.1 for the bundled native library.
 - Replace `Context#run(persistent_data, ephemeral_data, timeout)` with `Context#eval(data, timeout)`. Use a subcontext to evaluate ephemeral input.
 - Update the low-level FFI API and native object layouts for libddwaf 2.0.0.
+- Defer asynchronous Ruby interruptions, including `Timeout` exceptions and `Thread#kill`, until input conversion, native evaluation, result conversion, and cleanup complete, to preserve native memory ownership. This can delay interruption for large payloads; libddwaf's evaluation timeout still applies.
 - Remove the `coerce:` keyword from `Converter.ruby_to_object`
 
 # 2025-09-24 v1.25.1.1.0
