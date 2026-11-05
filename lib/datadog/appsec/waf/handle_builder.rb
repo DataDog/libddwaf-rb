@@ -17,7 +17,7 @@ module Datadog
             configure_obfuscator(obfuscator)
             initialized = true
           ensure
-            finalize! unless initialized
+            LibDDWAF.ddwaf_builder_destroy(@builder_ptr) unless initialized
           end
         end
 
