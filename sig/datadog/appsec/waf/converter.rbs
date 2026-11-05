@@ -18,17 +18,32 @@ module Datadog
 
         def self?.ruby_to_object: (
           top val,
+          ?object: LibDDWAF::Object?,
+          ?allocator: ::FFI::Pointer,
+          ?top_obj: LibDDWAF::Object,
+          ?current_depth: ::Integer,
           ?truncate: bool
         ) -> LibDDWAF::Object
 
-        def self?.populate_object: (
+        def self?.array_to_object: (
           LibDDWAF::Object object,
-          top val,
-          allocator: ::FFI::Pointer,
+          ::Array[untyped] array,
+          ::FFI::Pointer allocator,
           top_obj: LibDDWAF::Object,
           current_depth: ::Integer,
           ?truncate: bool
         ) -> LibDDWAF::Object
+
+        def self?.hash_to_object: (
+          LibDDWAF::Object object,
+          ::Hash[untyped, untyped] hash,
+          ::FFI::Pointer allocator,
+          top_obj: LibDDWAF::Object,
+          current_depth: ::Integer,
+          ?truncate: bool
+        ) -> LibDDWAF::Object
+
+        def self?.json_to_object: (LibDDWAF::Object object, JSONString json, ::FFI::Pointer allocator) -> LibDDWAF::Object
 
         def self?.string_to_object: (LibDDWAF::Object object, ::String string, ::FFI::Pointer allocator, top_obj: LibDDWAF::Object, ?truncate: bool) -> LibDDWAF::Object
 

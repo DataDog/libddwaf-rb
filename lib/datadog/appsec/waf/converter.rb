@@ -16,108 +16,36 @@ module Datadog
         module_function
 
         # standard:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
-        def ruby_to_object(val, truncate: true)
-          allocator = LibDDWAF.ddwaf_get_default_allocator
-          raise ConversionError, "Could not obtain the native allocator" if allocator.null?
+        def ruby_to_object(val, object: nil, allocator: nil, top_obj: nil, current_depth: 0, truncate: true)
+          if object.nil?
+            allocator = LibDDWAF.ddwaf_get_default_allocator
+            raise ConversionError, "Could not obtain the native allocator" if allocator.null?
 
-          object = LibDDWAF::Object.new
+            object = LibDDWAF::Object.new
 
-          begin
-            populate_object(
-              object, val,
-              allocator: allocator,
-              top_obj: object,
-              truncate: truncate,
-              current_depth: 0
-            )
-            complete = true
-            object
-          ensure
-            LibDDWAF.ddwaf_object_destroy(object, allocator) unless complete
+            begin
+              ruby_to_object(val, object: object, allocator: allocator, top_obj: object, truncate: truncate)
+              complete = true
+              return object
+            ensure
+              LibDDWAF.ddwaf_object_destroy(object, allocator) unless complete
+            end
           end
-        end
 
-        # Populate a fresh root or container slot; only the owning root handles cleanup.
-        def populate_object(object, val, allocator:, top_obj:, current_depth:, truncate: true)
           result = case val
           when Array
-            capacity = [val.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
-
-            container = LibDDWAF.ddwaf_object_set_array(object, capacity, allocator)
-            raise ConversionError, "Could not create array object" if container.to_ptr.null?
-
-            val.each_with_index do |element, i|
-              if i >= capacity
-                top_obj.mark_truncated!
-                break
-              end
-
-              slot = LibDDWAF.ddwaf_object_insert(object, allocator)
-              raise ConversionError, "Could not insert array element" if slot.to_ptr.null?
-
-              populate_object(
-                slot, element,
-                allocator: allocator,
-                top_obj: top_obj,
-                truncate: truncate,
-                current_depth: current_depth + 1
-              )
-            end
-            object
+            array_to_object(object, val, allocator, top_obj: top_obj, current_depth: current_depth, truncate: truncate)
           when Hash
-            capacity = [val.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
-
-            container = LibDDWAF.ddwaf_object_set_map(object, capacity, allocator)
-            raise ConversionError, "Could not create map object" if container.to_ptr.null?
-
-            val.each.with_index do |entry, i|
-              if i >= capacity
-                top_obj.mark_truncated!
-                break
-              end
-
-              key = entry[0].to_s
-              if truncate
-                key = key.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
-                if key.length > MAX_STRING_LENGTH
-                  top_obj.mark_truncated!
-                  key = key[0, MAX_STRING_LENGTH] #: String
-                end
-              end
-              length = key.bytesize
-              raise ConversionError, "Map key exceeds the native length limit" if length > UINT32_MAX
-
-              slot = LibDDWAF.ddwaf_object_insert_key(object, key, length, allocator)
-              raise ConversionError, "Could not insert map entry" if slot.to_ptr.null?
-
-              populate_object(
-                slot, entry[1],
-                allocator: allocator,
-                top_obj: top_obj,
-                truncate: truncate,
-                current_depth: current_depth + 1
-              )
-            end
-            object
+            hash_to_object(object, val, allocator, top_obj: top_obj, current_depth: current_depth, truncate: truncate)
           when JSONString
-            # TODO: Pass request limits to JSON parsing once libddwaf supports them.
-            length = val.bytesize
-            raise ConversionError, "JSON string exceeds the native length limit" if length > UINT32_MAX
-
-            # In libddwaf 2.0.0, failed parsing leaves this fresh slot invalid.
-            unless LibDDWAF.ddwaf_object_from_json(object, val, length, allocator)
-              raise ConversionError, "Could not convert JSON string"
-            end
-            object
+            json_to_object(object, val, allocator)
           when String, Symbol
-            string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
+            string_to_object(object, val.to_s, allocator, top_obj: top_obj, truncate: truncate)
           when Integer
             if val < 0
-              clamped = val.clamp(INT64_MIN, -1)
-              LibDDWAF.ddwaf_object_set_signed(object, clamped)
+              LibDDWAF.ddwaf_object_set_signed(object, val.clamp(INT64_MIN, -1))
             else
-              clamped = val.clamp(0, UINT64_MAX)
-              LibDDWAF.ddwaf_object_set_unsigned(object, clamped)
+              LibDDWAF.ddwaf_object_set_unsigned(object, val.clamp(0, UINT64_MAX))
             end
           when Float
             LibDDWAF.ddwaf_object_set_float(object, val)
@@ -126,11 +54,88 @@ module Datadog
           when NilClass
             LibDDWAF.ddwaf_object_set_null(object)
           else
-            string_to_object(object, "", allocator, truncate: truncate, top_obj: top_obj)
+            string_to_object(object, "", allocator, top_obj: top_obj, truncate: truncate)
           end
 
           raise ConversionError, "Could not populate native object" if result.to_ptr.null?
 
+          object
+        end
+
+        def array_to_object(object, array, allocator, top_obj:, current_depth:, truncate: true)
+          capacity = [array.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
+
+          container = LibDDWAF.ddwaf_object_set_array(object, capacity, allocator)
+          raise ConversionError, "Could not create array object" if container.to_ptr.null?
+
+          array.each_with_index do |element, i|
+            if i >= capacity
+              top_obj.mark_truncated!
+              break
+            end
+
+            slot = LibDDWAF.ddwaf_object_insert(object, allocator)
+            raise ConversionError, "Could not insert array element" if slot.to_ptr.null?
+
+            ruby_to_object(
+              element,
+              object: slot,
+              allocator: allocator,
+              top_obj: top_obj,
+              current_depth: current_depth + 1,
+              truncate: truncate
+            )
+          end
+          object
+        end
+
+        def hash_to_object(object, hash, allocator, top_obj:, current_depth:, truncate: true)
+          capacity = [hash.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
+
+          container = LibDDWAF.ddwaf_object_set_map(object, capacity, allocator)
+          raise ConversionError, "Could not create map object" if container.to_ptr.null?
+
+          hash.each.with_index do |entry, i|
+            if i >= capacity
+              top_obj.mark_truncated!
+              break
+            end
+
+            key = entry[0].to_s
+            if truncate
+              key = key.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+              if key.length > MAX_STRING_LENGTH
+                top_obj.mark_truncated!
+                key = key[0, MAX_STRING_LENGTH] #: String
+              end
+            end
+            length = key.bytesize
+            raise ConversionError, "Map key exceeds the native length limit" if length > UINT32_MAX
+
+            slot = LibDDWAF.ddwaf_object_insert_key(object, key, length, allocator)
+            raise ConversionError, "Could not insert map entry" if slot.to_ptr.null?
+
+            ruby_to_object(
+              entry[1],
+              object: slot,
+              allocator: allocator,
+              top_obj: top_obj,
+              current_depth: current_depth + 1,
+              truncate: truncate
+            )
+          end
+          object
+        end
+
+        def json_to_object(object, json, allocator)
+          # TODO: Pass request limits to JSON parsing once libddwaf supports them.
+          length = json.bytesize
+          raise ConversionError, "JSON string exceeds the native length limit" if length > UINT32_MAX
+
+          # In libddwaf 2.0.0, failed parsing leaves this fresh slot invalid.
+          unless LibDDWAF.ddwaf_object_from_json(object, json, length, allocator)
+            raise ConversionError, "Could not convert JSON string"
+          end
           object
         end
 
