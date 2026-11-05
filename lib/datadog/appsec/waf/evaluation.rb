@@ -36,18 +36,17 @@ module Datadog
 
               status = RESULT_CODE_TO_STATUS.fetch(code)
               result = if SUCCESS_RESULT_CODES.include?(code)
-                decoded = Converter.object_to_ruby(result_obj)
+                decoded = Converter.object_to_ruby(result_obj) #: WAF::result
                 raise ConversionError, "Could not convert result into object: #{code}" unless decoded.is_a?(Hash)
 
-                raw_result = decoded #: as untyped
                 Result.new(
                   status: status,
-                  events: raw_result["events"],
-                  actions: raw_result["actions"],
-                  attributes: raw_result["attributes"],
-                  duration: raw_result["duration"],
-                  timeout: raw_result["timeout"],
-                  keep: raw_result["keep"]
+                  events: decoded["events"],
+                  actions: decoded["actions"],
+                  attributes: decoded["attributes"],
+                  duration: decoded["duration"],
+                  timeout: decoded["timeout"],
+                  keep: decoded["keep"]
                 )
               else
                 Result.build_empty(status: status)

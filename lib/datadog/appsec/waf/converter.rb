@@ -111,10 +111,10 @@ module Datadog
             string_to_object(object, val.to_s, allocator, truncate: truncate, top_obj: top_obj)
           when Integer
             if val < 0
-              clamped = val.clamp(INT64_MIN, -1) #: Integer
+              clamped = val.clamp(INT64_MIN, -1)
               LibDDWAF.ddwaf_object_set_signed(object, clamped)
             else
-              clamped = val.clamp(0, UINT64_MAX) #: Integer
+              clamped = val.clamp(0, UINT64_MAX)
               LibDDWAF.ddwaf_object_set_unsigned(object, clamped)
             end
           when Float
