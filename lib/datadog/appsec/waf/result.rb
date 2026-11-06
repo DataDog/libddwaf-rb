@@ -8,6 +8,10 @@ module Datadog
       class Result
         attr_reader :status, :events, :actions, :attributes, :duration
 
+        def self.build_empty(status:)
+          new(status: status, events: [], actions: {}, attributes: {}, duration: 0, timeout: false, keep: false)
+        end
+
         def initialize(status:, events:, actions:, attributes:, duration:, timeout:, keep:)
           @status = status
           @events = events

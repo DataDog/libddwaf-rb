@@ -1,0 +1,23 @@
+module Datadog
+  module AppSec
+    module WAF
+      class Subcontext
+        @subcontext_ptr: ::FFI::Pointer?
+        @context: Context
+
+        def initialize: (
+          ::FFI::Pointer subcontext_ptr,
+          context: Context
+        ) -> void
+
+        def finalize!: () -> void
+
+        def eval: (::Hash[WAF::input, WAF::input] data, ?::Integer timeout) -> Result
+
+        private
+
+        def ensure_pointer_presence!: () -> void
+      end
+    end
+  end
+end

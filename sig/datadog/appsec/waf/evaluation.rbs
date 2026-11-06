@@ -1,0 +1,15 @@
+module Datadog
+  module AppSec
+    module WAF
+      module Evaluation
+        SUCCESS_RESULT_CODES: ::Array[::Symbol]
+
+        RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
+
+        def self?.call: (::Hash[WAF::input, WAF::input] data) {
+          (LibDDWAF::Object input_obj, ::FFI::Pointer allocator, LibDDWAF::Object result_obj) -> ::Symbol
+        } -> Result
+      end
+    end
+  end
+end

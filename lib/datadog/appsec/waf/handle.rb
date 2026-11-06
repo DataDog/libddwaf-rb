@@ -23,14 +23,23 @@ module Datadog
         # Builds a WAF context.
         #
         # @raise [LibDDWAFError] if libddwaf could not create the context.
-        # @return [Handle] the WAF handle
+        # @return [Context] the WAF context
         def build_context
           ensure_pointer_presence!
 
-          context_obj = LibDDWAF.ddwaf_context_init(@handle_ptr)
+          output_allocator = LibDDWAF.ddwaf_get_default_allocator
+          raise LibDDWAFError, "Could not obtain the native allocator" if output_allocator.null?
+
+          context_obj = LibDDWAF.ddwaf_context_init(@handle_ptr, output_allocator)
           raise LibDDWAFError, "Could not create context" if context_obj.null?
 
-          Context.new(context_obj)
+          begin
+            context = Context.new(context_obj)
+            initialized = true
+            context
+          ensure
+            LibDDWAF.ddwaf_context_destroy(context_obj) unless initialized
+          end
         end
 
         # Returns the list of known addresses in the WAF handle.

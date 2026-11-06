@@ -4,31 +4,30 @@ require "spec_helper"
 require "datadog/appsec/waf/result"
 
 RSpec.describe Datadog::AppSec::WAF::Result do
+  describe ".build_empty" do
+    it "builds a Result with the given status and empty fields" do
+      result = described_class.build_empty(status: :err_internal)
+
+      expect(result.to_h).to eq({
+        status: :err_internal,
+        events: [],
+        actions: {},
+        attributes: {},
+        duration: 0,
+        timeout: false,
+        keep: false,
+        input_truncated: false
+      })
+    end
+  end
+
   describe "#to_h" do
     let(:actions) do
-      {"block_request" => {"status_code" => "403", "type" => "auto", "grpc_status_code" => "10"}}
+      {"block_request" => {"status_code" => 418}}
     end
 
     let(:events) do
-      [
-        {
-          "rule" => {
-            "id" => "rasp-003-001",
-            "name" => "SQL Injection",
-            "tags" => {},
-            "on_match" => ["block"]
-          },
-          "rule_matches" => [
-            {
-              "operator" => "sqli_detector",
-              "operator_value" => "",
-              "parameters" => [
-                {"resource" => {}, "params" => {}, "db_type" => {}, "highlight" => []}
-              ]
-            }
-          ]
-        }
-      ]
+      [{"rule" => {"id" => "rule-1"}}]
     end
 
     let(:result) do

@@ -2,38 +2,19 @@ module Datadog
   module AppSec
     module WAF
       class Context
-        @context_ptr: ::FFI::Pointer
-
-        @retained: Array[untyped]
-
-        EMPTY_RESULT: {
-          "events" => WAF::events,
-          "actions" => WAF::actions,
-          "attributes" => WAF::attributes,
-          "duration" => ::Integer,
-          "timeout" => bool,
-          "keep" => bool
-        }
-
-        SUCCESS_RESULT_CODES: ::Array[::Symbol]
-
-        RESULT_CODE_TO_STATUS: ::Hash[::Symbol, ::Symbol]
+        @context_ptr: ::FFI::Pointer?
 
         def initialize: (::FFI::Pointer context_ptr) -> void
 
         def finalize!: () -> void
 
-        def run: (WAF::input persistent_data, WAF::input ephemeral_data, ?::Integer timeout) -> Result
+        def build_subcontext: [T] () { (Subcontext) -> T } -> T
+
+        def eval: (::Hash[WAF::input, WAF::input] data, ?::Integer timeout) -> Result
 
         private
 
         def ensure_pointer_presence!: () -> void
-
-        def retained: () -> Array[untyped]
-
-        def retain: (top object) -> void
-
-        def release: (top object) -> void
       end
     end
   end

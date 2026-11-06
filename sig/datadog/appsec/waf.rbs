@@ -9,8 +9,6 @@ module Datadog
         "actions" => actions,
         "attributes" => attributes,
         "timeout" => bool,
-        # NOTE: Schema defines it as a `number`, but we alway get it as `Integer`
-        #       That will be fixed in the libddwaf specs
         "duration" => ::Integer
       }
       type events = ::Array[event]
@@ -20,11 +18,9 @@ module Datadog
         "name" => ::String,
         "tags" => {
           "type" => ::String,
-          # optional key
-          "category" => ::String?
+          ?"category" => ::String
         },
-        # optional key
-        "on_match" => ::Array[::String]?
+        ?"on_match" => ::Array[::String]
       }
       type rule_match = {
         "operator" => ::String,
@@ -45,7 +41,7 @@ module Datadog
       class JSONString < String
       end
 
-      self.@logger: ::Logger
+      self.@logger: ::Logger?
 
       self.@log_callback: LibDDWAF::ddwaf_log_cb
 
@@ -53,9 +49,9 @@ module Datadog
 
       def self?.log_callback: (LibDDWAF::ddwaf_log_level, ::String, ::String, ::Integer, ::FFI::Pointer, ::Integer) -> void
 
-      def self?.logger: () -> ::Logger
+      def self?.logger: () -> ::Logger?
 
-      def self?.logger=: (::Logger logger) -> void
+      def self?.logger=: (::Logger? logger) -> void
     end
   end
 end

@@ -15,9 +15,17 @@ RSpec.describe Datadog::AppSec::WAF::Handle do
 
   subject(:handle) { builder.build_handle }
 
+  after do
+    handle.finalize!
+    builder.finalize!
+  end
+
   describe "#build_context" do
     it "returns a Datadog::AppSec::WAF::Context instance" do
-      expect(handle.build_context).to be_a(Datadog::AppSec::WAF::Context)
+      context = handle.build_context
+      expect(context).to be_a(Datadog::AppSec::WAF::Context)
+    ensure
+      context&.finalize!
     end
 
     it "raises LibDDWAF::Error when handle has been finalized" do
