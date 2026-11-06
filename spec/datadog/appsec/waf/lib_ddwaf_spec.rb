@@ -184,4 +184,70 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
     described_class.ddwaf_object_destroy(diagnostics, allocator) if diagnostics
     described_class.ddwaf_object_destroy(configuration, allocator) if configuration
   end
+
+  context "evaluation GVL selection" do
+    let(:allocator) { described_class.ddwaf_get_default_allocator }
+    let(:configuration) do
+      Datadog::AppSec::WAF::Converter.ruby_to_object(
+        JSON.parse(File.read("spec/fixtures/valid_config.json")), truncate: false
+      )
+    end
+    let(:builder) do
+      described_class.ddwaf_builder_init.tap do |builder|
+        described_class.ddwaf_builder_add_or_update_config(builder, "test", 4, configuration, nil)
+      end
+    end
+    let(:handle) { described_class.ddwaf_builder_build_instance(builder) }
+    let(:context) { described_class.ddwaf_context_init(handle, allocator) }
+    let(:subcontext) { described_class.ddwaf_subcontext_init(context) }
+
+    after do
+      described_class.ddwaf_subcontext_destroy(subcontext)
+      described_class.ddwaf_context_destroy(context)
+      described_class.ddwaf_destroy(handle)
+      described_class.ddwaf_builder_destroy(builder)
+      described_class.ddwaf_object_destroy(configuration, allocator)
+    end
+
+    def evaluate(function, receiver, timeout)
+      input = Datadog::AppSec::WAF::Converter.ruby_to_object({})
+      result = described_class::Object.new
+      code = described_class.public_send(function, receiver, input, allocator, result, timeout)
+      input = nil unless code == :ddwaf_err_invalid_argument
+
+      expect(code).to eq(:ddwaf_ok)
+      expect(described_class.ddwaf_object_get_type(result)).to eq(:ddwaf_obj_map)
+    ensure
+      described_class.ddwaf_object_destroy(result, allocator) if result
+      described_class.ddwaf_object_destroy(input, allocator) if input
+    end
+
+    it "keeps the GVL for timeouts below the cutoff" do
+      expect(described_class).to receive(:ddwaf_context_eval_with_gvl)
+        .with(context, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 5_000)
+        .once.and_call_original
+      expect(described_class).to receive(:ddwaf_subcontext_eval_with_gvl)
+        .with(subcontext, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 5_000)
+        .once.and_call_original
+      expect(described_class).not_to receive(:ddwaf_context_eval_without_gvl)
+      expect(described_class).not_to receive(:ddwaf_subcontext_eval_without_gvl)
+
+      evaluate(:ddwaf_context_eval, context, 5_000)
+      evaluate(:ddwaf_subcontext_eval, subcontext, 5_000)
+    end
+
+    it "releases the GVL for timeouts above the cutoff" do
+      expect(described_class).to receive(:ddwaf_context_eval_without_gvl)
+        .with(context, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 10_001)
+        .once.and_call_original
+      expect(described_class).to receive(:ddwaf_subcontext_eval_without_gvl)
+        .with(subcontext, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 10_001)
+        .once.and_call_original
+      expect(described_class).not_to receive(:ddwaf_context_eval_with_gvl)
+      expect(described_class).not_to receive(:ddwaf_subcontext_eval_with_gvl)
+
+      evaluate(:ddwaf_context_eval, context, 10_001)
+      evaluate(:ddwaf_subcontext_eval, subcontext, 10_001)
+    end
+  end
 end
