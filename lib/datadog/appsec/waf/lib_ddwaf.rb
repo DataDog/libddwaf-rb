@@ -276,7 +276,7 @@ module Datadog
         attach_function :ddwaf_subcontext_eval_without_gvl, :ddwaf_subcontext_eval,
           ddwaf_subcontext_eval_args, :ddwaf_ret_code, blocking: true
 
-        GVL_RELEASE_TIMEOUT_US = 10_000
+        GVL_RELEASE_TIMEOUT_US = 1_000
 
         def self.ddwaf_context_eval(context, input, allocator, result, timeout)
           if timeout > GVL_RELEASE_TIMEOUT_US

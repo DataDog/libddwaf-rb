@@ -222,32 +222,32 @@ RSpec.describe Datadog::AppSec::WAF::LibDDWAF do
       described_class.ddwaf_object_destroy(input, allocator) if input
     end
 
-    it "keeps the GVL for timeouts below the cutoff" do
+    it "keeps the GVL for timeouts up to the cutoff" do
       expect(described_class).to receive(:ddwaf_context_eval_with_gvl)
-        .with(context, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 5_000)
+        .with(context, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 1_000)
         .once.and_call_original
       expect(described_class).to receive(:ddwaf_subcontext_eval_with_gvl)
-        .with(subcontext, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 5_000)
+        .with(subcontext, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 1_000)
         .once.and_call_original
       expect(described_class).not_to receive(:ddwaf_context_eval_without_gvl)
       expect(described_class).not_to receive(:ddwaf_subcontext_eval_without_gvl)
 
-      evaluate(:ddwaf_context_eval, context, 5_000)
-      evaluate(:ddwaf_subcontext_eval, subcontext, 5_000)
+      evaluate(:ddwaf_context_eval, context, 1_000)
+      evaluate(:ddwaf_subcontext_eval, subcontext, 1_000)
     end
 
     it "releases the GVL for timeouts above the cutoff" do
       expect(described_class).to receive(:ddwaf_context_eval_without_gvl)
-        .with(context, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 10_001)
+        .with(context, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 1_001)
         .once.and_call_original
       expect(described_class).to receive(:ddwaf_subcontext_eval_without_gvl)
-        .with(subcontext, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 10_001)
+        .with(subcontext, kind_of(described_class::Object), allocator, kind_of(described_class::Object), 1_001)
         .once.and_call_original
       expect(described_class).not_to receive(:ddwaf_context_eval_with_gvl)
       expect(described_class).not_to receive(:ddwaf_subcontext_eval_with_gvl)
 
-      evaluate(:ddwaf_context_eval, context, 10_001)
-      evaluate(:ddwaf_subcontext_eval, subcontext, 10_001)
+      evaluate(:ddwaf_context_eval, context, 1_001)
+      evaluate(:ddwaf_subcontext_eval, subcontext, 1_001)
     end
   end
 end
