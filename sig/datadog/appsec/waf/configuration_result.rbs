@@ -1,0 +1,17 @@
+module Datadog
+  module AppSec
+    module WAF
+      class ConfigurationResult
+        @success: bool
+
+        @diagnostics: WAF::opaque
+
+        attr_reader diagnostics: WAF::opaque
+
+        def initialize: (success: bool, diagnostics: WAF::opaque) -> void
+
+        def success?: () -> bool
+      end
+    end
+  end
+end

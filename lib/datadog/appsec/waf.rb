@@ -2,6 +2,7 @@
 
 require "datadog/appsec/waf/lib_ddwaf"
 
+require "datadog/appsec/waf/configuration_result"
 require "datadog/appsec/waf/handle_builder"
 require "datadog/appsec/waf/handle"
 require "datadog/appsec/waf/converter"

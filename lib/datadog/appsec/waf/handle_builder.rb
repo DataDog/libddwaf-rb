@@ -55,7 +55,7 @@ module Datadog
 
         # Adds or updates a configuration in the WAF handle builder for the given path.
         #
-        # @return [Hash] diagnostics object
+        # @return [ConfigurationResult] success flag and diagnostics object
         # NOTE: default config that was read from file at application startup
         # has to be removed before adding configurations obtained through Remote Configuration.
         def add_or_update_config(config, path:)
@@ -71,9 +71,9 @@ module Datadog
           config_obj = Converter.ruby_to_object(config, truncate: false)
           diagnostics_obj = LibDDWAF::Object.new
 
-          LibDDWAF.ddwaf_builder_add_or_update_config(@builder_ptr, path, path_length, config_obj, diagnostics_obj)
+          success = LibDDWAF.ddwaf_builder_add_or_update_config(@builder_ptr, path, path_length, config_obj, diagnostics_obj)
 
-          Converter.object_to_ruby(diagnostics_obj)
+          ConfigurationResult.new(success: success, diagnostics: Converter.object_to_ruby(diagnostics_obj))
         ensure
           LibDDWAF.ddwaf_object_destroy(config_obj, allocator) if config_obj
           LibDDWAF.ddwaf_object_destroy(diagnostics_obj, allocator) if diagnostics_obj

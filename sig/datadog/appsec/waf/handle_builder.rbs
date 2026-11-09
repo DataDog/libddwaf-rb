@@ -12,7 +12,7 @@ module Datadog
 
         def build_handle: () -> Handle
 
-        def add_or_update_config: (WAF::input config, path: ::String) -> WAF::opaque
+        def add_or_update_config: (WAF::input config, path: ::String) -> ConfigurationResult
 
         def remove_config_at_path: (::String path) -> bool
 
