@@ -3,7 +3,6 @@
 module Datadog
   module AppSec
     module WAF
-      # Ruby representation of the result of adding or updating a configuration in the WAF handle builder.
       class ConfigurationResult
         attr_reader :diagnostics
 

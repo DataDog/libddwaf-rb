@@ -6,6 +6,7 @@
 
 ## Changed
 
+- Change `HandleBuilder#add_or_update_config` to return a `ConfigurationResult` instead of a diagnostics hash. Use `success?` to read the native success flag and `diagnostics` to access the diagnostics hash.
 - Upgrade libddwaf to 2.0.0.
 - Raise the minimum supported macOS version to 14.2.1 for the bundled native library.
 - Replace `Context#run(persistent_data, ephemeral_data, timeout)` with `Context#eval(data, timeout)`. Use a subcontext to evaluate ephemeral input.
