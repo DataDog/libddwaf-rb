@@ -28,8 +28,6 @@ module Datadog
 
         attr_reader duration: ::Integer
 
-        def self.build_empty: (status: ::Symbol) -> Result
-
         def initialize: (
           status: ::Symbol,
           events: WAF::events,

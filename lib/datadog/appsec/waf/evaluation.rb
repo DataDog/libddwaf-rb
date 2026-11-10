@@ -49,7 +49,7 @@ module Datadog
                   keep: decoded["keep"]
                 )
               else
-                Result.build_empty(status: status)
+                Result.new(status: status, events: [], actions: {}, attributes: {}, duration: 0, timeout: false, keep: false)
               end
               result.mark_input_truncated! if input_obj.truncated?
               result
