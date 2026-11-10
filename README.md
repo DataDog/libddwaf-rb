@@ -68,21 +68,33 @@ See upstream libddwaf for details about the [hybrid portable build](https://gith
 
 ## Releasing
 
-Releases are manual and run from a maintainer's machine:
+Releases use the manually triggered [Publish workflow](https://github.com/DataDog/libddwaf-rb/actions/workflows/publish.yml)
+on `master`.
+
+For each release:
+
+1. Release the matching libddwaf binaries upstream first.
+2. Update `lib/datadog/appsec/waf/version.rb` and `CHANGELOG.md`, merge into
+   `master`, and confirm that the Test and Package workflows pass.
+3. Run the Publish workflow on `master` and approve its `rubygems.org` deployment.
+4. Confirm that all five gems are available on RubyGems.org: the generic gem,
+   `x86_64-linux`, `aarch64-linux`, `x86_64-darwin`, and `arm64-darwin`.
+
+The workflow fetches the upstream binaries, builds the generic gem, and runs
+the specs. It then uses `rubygems/release-gem` to run `rake release`, which
+delegates to `libddwaf:release`: build all five gems, push the version tag,
+and publish each gem with Sigstore attestation support. Do not create the
+release tag beforehand.
+
+After all five gems are available, the workflow automatically notifies dd-trace-rb
+of the released version, triggering a PR to update its pin.
+
+If notification fails, rerun the failed notification job. To notify consumers
+manually about an already published version:
 
 ```
-rake libddwaf:release
+gh workflow run "Notify Consumers" --ref master -f version='<published-version>'
 ```
-
-This requires the matching libddwaf binaries to be released upstream first. The task builds the gems for all supported platforms, pushes the Ruby gem and its tag, and pushes each platform gem to rubygems.org.
-
-After releasing, tell dd-trace-rb:
-
-```
-gh workflow run "Notify Consumers" --ref master
-```
-
-That workflow reads the latest published version from rubygems.org and opens a PR in dd-trace-rb pinning it.
 
 ## Testing with Docker
 
