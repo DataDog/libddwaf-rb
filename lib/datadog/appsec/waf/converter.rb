@@ -113,7 +113,7 @@ module Datadog
           container = LibDDWAF.ddwaf_object_set_map(object, capacity, allocator)
           raise ConversionError, "Could not create map object" if container.to_ptr.null?
 
-          hash.each.with_index do |entry, i|
+          hash.each_with_index do |entry, i|
             if i >= capacity
               top_obj.mark_truncated!
               break
@@ -186,11 +186,11 @@ module Datadog
           when :ddwaf_obj_float
             LibDDWAF.ddwaf_object_get_float(obj)
           when :ddwaf_obj_array
-            (0...LibDDWAF.ddwaf_object_get_size(obj)).each.with_object([]) do |i, array| #$ ::Array[WAF::opaque]
+            (0...LibDDWAF.ddwaf_object_get_size(obj)).each_with_object([]) do |i, array| #$ ::Array[WAF::opaque]
               array << object_to_ruby(LibDDWAF.ddwaf_object_at_value(obj, i))
             end
           when :ddwaf_obj_map
-            (0...LibDDWAF.ddwaf_object_get_size(obj)).each.with_object({}) do |i, hash| #$ ::Hash[::String, WAF::opaque]
+            (0...LibDDWAF.ddwaf_object_get_size(obj)).each_with_object({}) do |i, hash| #$ ::Hash[::String, WAF::opaque]
               key = object_to_string(LibDDWAF.ddwaf_object_at_key(obj, i))
               value = object_to_ruby(LibDDWAF.ddwaf_object_at_value(obj, i))
               hash[key] = value
