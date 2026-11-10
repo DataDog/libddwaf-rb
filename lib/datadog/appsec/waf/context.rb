@@ -21,6 +21,8 @@ module Datadog
         end
 
         def build_subcontext
+          raise ArgumentError, "Block is required to build a subcontext" unless block_given?
+
           subcontext = nil #: Subcontext?
 
           begin

@@ -2,7 +2,7 @@
 
 ## Added
 
-- Add `Context#build_subcontext`, `Subcontext#eval` and `Subcontext#finalize!` for temporary evaluations using inherited context data. Subcontexts created with a block are finalized automatically.
+- Add `Context#build_subcontext`, which yields a `Subcontext` for temporary evaluations using inherited context data and finalizes it when the block returns. Use `Subcontext#eval` to evaluate data within it.
 
 ## Changed
 
