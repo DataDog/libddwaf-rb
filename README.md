@@ -86,13 +86,15 @@ delegates to `libddwaf:release`: build all five gems, push the version tag,
 and publish each gem with Sigstore attestation support. Do not create the
 release tag beforehand.
 
-After releasing, tell dd-trace-rb:
+After all five gems are available, the workflow automatically notifies dd-trace-rb
+of the released version, triggering a PR to update its pin.
+
+If notification fails, rerun the failed notification job. To notify consumers
+manually about an already published version:
 
 ```
-gh workflow run "Notify Consumers" --ref master
+gh workflow run "Notify Consumers" --ref master -f version='<published-version>'
 ```
-
-That workflow reads the latest published version from rubygems.org and opens a PR in dd-trace-rb pinning it.
 
 ## Testing with Docker
 

@@ -12,6 +12,8 @@ jobs:
     if: github.repository == 'DataDog/libddwaf-rb' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     environment: rubygems.org
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     permissions:
       contents: read
       id-token: write # RubyGems trusted publishing and Octo STS
@@ -23,7 +25,8 @@ jobs:
         uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           ruby-version: '3.4'
-          bundler-cache: true
+      - name: Install dependencies
+        run: bundle install
       - name: Fetch binaries and build generic gem
         run: bundle exec rake libddwaf:buildx
       - name: Run specs
@@ -36,3 +39,14 @@ jobs:
       - uses: rubygems/release-gem@6317d8d1f7e28c24d28f6eff169ea854948bd9f7 # v1.2.0
         with:
           token: ${{ steps.octo-sts.outputs.token }}
+      - name: Read published version
+        id: version
+        run: ruby -Ilib -rdatadog/appsec/waf/version -e 'puts "version=#{Datadog::AppSec::WAF::VERSION::STRING}"' >> "$GITHUB_OUTPUT"
+
+  notify:
+    needs: publish
+    permissions:
+      id-token: write
+    uses: ./.github/workflows/notify-consumers.yml
+    with:
+      version: ${{ needs.publish.outputs.version }}
