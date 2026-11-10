@@ -63,6 +63,8 @@ module Datadog
         end
 
         def array_to_object(object, array, allocator, top_obj:, current_depth:, truncate: true)
+          raise ConversionError, "Array exceeds the native size limit" if !truncate && array.size > UINT16_MAX
+
           max_capacity =
             if !truncate || current_depth.zero?
               UINT16_MAX
@@ -99,6 +101,8 @@ module Datadog
         end
 
         def hash_to_object(object, hash, allocator, top_obj:, current_depth:, truncate: true)
+          raise ConversionError, "Map exceeds the native size limit" if !truncate && hash.size > UINT16_MAX
+
           max_capacity =
             if !truncate || current_depth.zero?
               UINT16_MAX
