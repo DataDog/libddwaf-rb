@@ -261,38 +261,14 @@ module Datadog
         attach_function :ddwaf_context_init, [:ddwaf_handle, :ddwaf_allocator], :ddwaf_context
         attach_function :ddwaf_context_destroy, [:ddwaf_context], :void
 
-        ddwaf_context_eval_args = [:ddwaf_context, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us]
-        attach_function :ddwaf_context_eval_with_gvl, :ddwaf_context_eval,
-          ddwaf_context_eval_args, :ddwaf_ret_code, blocking: false
-        attach_function :ddwaf_context_eval_without_gvl, :ddwaf_context_eval,
-          ddwaf_context_eval_args, :ddwaf_ret_code, blocking: true
+        attach_function :ddwaf_context_eval,
+          [:ddwaf_context, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
 
         attach_function :ddwaf_subcontext_init, [:ddwaf_context], :ddwaf_subcontext
         attach_function :ddwaf_subcontext_destroy, [:ddwaf_subcontext], :void
 
-        ddwaf_subcontext_eval_args = [:ddwaf_subcontext, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us]
-        attach_function :ddwaf_subcontext_eval_with_gvl, :ddwaf_subcontext_eval,
-          ddwaf_subcontext_eval_args, :ddwaf_ret_code, blocking: false
-        attach_function :ddwaf_subcontext_eval_without_gvl, :ddwaf_subcontext_eval,
-          ddwaf_subcontext_eval_args, :ddwaf_ret_code, blocking: true
-
-        GVL_RELEASE_TIMEOUT_US = 1_000
-
-        def self.ddwaf_context_eval(context, input, allocator, result, timeout)
-          if timeout > GVL_RELEASE_TIMEOUT_US
-            ddwaf_context_eval_without_gvl(context, input, allocator, result, timeout)
-          else
-            ddwaf_context_eval_with_gvl(context, input, allocator, result, timeout)
-          end
-        end
-
-        def self.ddwaf_subcontext_eval(subcontext, input, allocator, result, timeout)
-          if timeout > GVL_RELEASE_TIMEOUT_US
-            ddwaf_subcontext_eval_without_gvl(subcontext, input, allocator, result, timeout)
-          else
-            ddwaf_subcontext_eval_with_gvl(subcontext, input, allocator, result, timeout)
-          end
-        end
+        attach_function :ddwaf_subcontext_eval,
+          [:ddwaf_subcontext, :ddwaf_object, :ddwaf_allocator, :ddwaf_object, :timeout_us], :ddwaf_ret_code, blocking: true
 
         # logging
 
