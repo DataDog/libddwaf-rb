@@ -2,12 +2,15 @@
 
 require "datadog/appsec/waf/lib_ddwaf"
 
+require "datadog/appsec/waf/configuration_result"
 require "datadog/appsec/waf/handle_builder"
 require "datadog/appsec/waf/handle"
 require "datadog/appsec/waf/converter"
 require "datadog/appsec/waf/errors"
 require "datadog/appsec/waf/result"
+require "datadog/appsec/waf/evaluation"
 require "datadog/appsec/waf/context"
+require "datadog/appsec/waf/subcontext"
 require "datadog/appsec/waf/version"
 
 module Datadog
@@ -24,9 +27,10 @@ module Datadog
       end
 
       def log_callback(level, func, file, line, message, len)
-        return if WAF.logger.nil?
+        logger = WAF.logger
+        return if logger.nil?
 
-        WAF.logger.debug do
+        logger.debug do
           {
             level: level,
             func: func,
@@ -35,6 +39,9 @@ module Datadog
             message: message.read_bytes(len)
           }.inspect
         end
+      rescue Exception # standard:disable Lint/RescueException
+        # Exceptions must not escape a native callback after input ownership transfers.
+        nil
       end
 
       def logger

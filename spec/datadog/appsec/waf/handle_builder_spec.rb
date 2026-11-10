@@ -5,6 +5,8 @@ require "spec_helper"
 RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
   subject(:builder) { described_class.new }
 
+  after { builder.finalize! }
+
   let(:valid_config) do
     JSON.parse(File.read("spec/fixtures/valid_config.json"))
   end
@@ -27,47 +29,34 @@ RSpec.describe Datadog::AppSec::WAF::HandleBuilder do
         builder.add_or_update_config(valid_config, path: "some/path")
       end
 
-      after do
-        builder.remove_config_at_path("some/path")
-      end
-
       it "returns a Datadog::AppSec::WAF::Handle instance" do
-        expect(builder.build_handle).to be_a(Datadog::AppSec::WAF::Handle)
+        handle = builder.build_handle
+        expect(handle).to be_a(Datadog::AppSec::WAF::Handle)
+      ensure
+        handle&.finalize!
       end
     end
   end
 
-  describe "#add_or_update_configuration" do
-    it "returns diagnostics hash when adding valid config" do
-      diagnostics = builder.add_or_update_config(valid_config, path: "some/path")
+  describe "#add_or_update_config" do
+    it "returns success and diagnostics hash when adding valid config" do
+      result = builder.add_or_update_config(valid_config, path: "some/path")
 
-      aggregate_failures("diagnostics data") do
-        expect(diagnostics.fetch("ruleset_version")).to eq("1.13.0")
+      expect(result).to be_a(Datadog::AppSec::WAF::ConfigurationResult)
+      expect(result.success?).to be(true)
+      expect(result.diagnostics.dig("rules", "loaded")).to eq(["rasp-003-001"])
+      expect(result.diagnostics.dig("rules", "errors")).to be_empty
 
-        expect(diagnostics).to have_key("rules")
-        expect(diagnostics.dig("rules", "loaded")).to eq(["rasp-003-001"])
-        expect(diagnostics.dig("rules", "errors")).to be_empty
-
-        expect(diagnostics).to have_key("rules_compat")
-        expect(diagnostics.dig("rules_compat", "loaded")).to eq(["ttr-000-001"])
-        expect(diagnostics.dig("rules_compat", "errors")).to be_empty
-
-        expect(diagnostics).to have_key("actions")
-        expect(diagnostics.dig("actions", "loaded")).to eq(["block-sqli"])
-        expect(diagnostics.dig("actions", "errors")).to be_empty
-      end
+      result = builder.add_or_update_config(valid_config, path: "some/path")
+      expect(result.success?).to be(true)
     end
 
-    it "returns diagnostics hash with errors when adding invalid config" do
-      diagnostics = builder.add_or_update_config({"rules" => [{"id" => "foo", "name" => "Banana"}]}, path: "some/path")
+    it "returns failure and diagnostics hash with errors when adding invalid config" do
+      result = builder.add_or_update_config({"rules" => [{"id" => "foo", "name" => "Banana"}]}, path: "some/path")
 
-      expect(diagnostics).to be_a(Hash)
-
-      aggregate_failures("diagnostics data") do
-        expect(diagnostics).to have_key("rules")
-        expect(diagnostics.dig("rules", "loaded")).to be_empty
-        expect(diagnostics.dig("rules", "failed")).to eq(["foo"])
-      end
+      expect(result.success?).to be(false)
+      expect(result.diagnostics.dig("rules", "loaded")).to be_empty
+      expect(result.diagnostics.dig("rules", "failed")).to eq(["foo"])
     end
 
     it "raises LibDDWAF::Error when builder has been finalized" do

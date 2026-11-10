@@ -11,7 +11,7 @@ builder.add_or_update_config(config, path: "APPSEC/RC_CONFIG")
 handle = builder.build_handle
 context = handle.build_context
 
-context.run({"server.request.query" => {"user_id" => "foo';delete from users;--"}}, {})
+context.eval({"server.request.query" => {"user_id" => "foo';delete from users;--"}})
 
 context.finalize!
 handle.finalize!

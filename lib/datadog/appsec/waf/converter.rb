@@ -3,202 +3,212 @@
 module Datadog
   module AppSec
     module WAF
-      # Module responsible for Ruby-to-C and C-to-Ruby conversions
       module Converter
+        MAX_CONTAINER_SIZE = 256
+        MAX_CONTAINER_DEPTH = 20
+        MAX_STRING_LENGTH = 4096
+
         INT64_MIN = -(2**63)
+        UINT16_MAX = 2**16 - 1
         UINT32_MAX = 2**32 - 1
         UINT64_MAX = 2**64 - 1
 
         module_function
 
         # standard:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
-        def ruby_to_object(val, max_container_size: nil, max_container_depth: nil, max_string_length: nil, top_obj: nil, coerce: true)
-          case val
-          when Array
-            container = LibDDWAF::Object.new
-            res = LibDDWAF.ddwaf_object_array(container)
-            raise ConversionError, "Could not convert into object: #{val}" if res.null?
+        def ruby_to_object(val, object: nil, allocator: nil, top_obj: nil, current_depth: 0, truncate: true)
+          if object.nil?
+            allocator = LibDDWAF.ddwaf_get_default_allocator
+            raise ConversionError, "Could not obtain the native allocator" if allocator.null?
 
-            if max_container_depth == 0
-              top_obj&.mark_truncated!
-            else
-              val.each.with_index do |e, i|
-                if max_container_size && i >= max_container_size
-                  (top_obj || container).mark_truncated!
-                  break val
-                end
+            object = LibDDWAF::Object.new
 
-                member = Converter.ruby_to_object(
-                  e,
-                  max_container_size: max_container_size,
-                  max_container_depth: (max_container_depth - 1 if max_container_depth),
-                  max_string_length: max_string_length,
-                  top_obj: top_obj || container,
-                  coerce: coerce
-                )
-                e_res = LibDDWAF.ddwaf_object_array_add(container, member)
-                raise ConversionError, "Could not add to array object: #{e.inspect}" unless e_res
-              end
+            begin
+              ruby_to_object(val, object: object, allocator: allocator, top_obj: object, truncate: truncate)
+              complete = true
+              return object
+            ensure
+              LibDDWAF.ddwaf_object_destroy(object, allocator) unless complete
             end
-
-            container_complete = true
-            container
-          when Hash
-            container = LibDDWAF::Object.new
-            res = LibDDWAF.ddwaf_object_map(container)
-            raise ConversionError, "Could not convert into object: #{val}" if res.null?
-
-            if max_container_depth == 0
-              top_obj&.mark_truncated!
-            else
-              val.each.with_index do |e, i|
-                if max_container_size && i >= max_container_size
-                  (top_obj || container).mark_truncated!
-                  break val
-                end
-
-                # for Steep, which doesn't handle |(k, v), i|
-                k = e[0].to_s
-                v = e[1]
-
-                if max_string_length && k.length > max_string_length
-                  k = k[0, max_string_length]
-                  (top_obj || container).mark_truncated!
-                end
-                member = Converter.ruby_to_object(
-                  v,
-                  max_container_size: max_container_size,
-                  max_container_depth: (max_container_depth - 1 if max_container_depth),
-                  max_string_length: max_string_length,
-                  top_obj: top_obj || container,
-                  coerce: coerce
-                )
-                kv_res = LibDDWAF.ddwaf_object_map_addl(container, k, k.bytesize, member)
-                raise ConversionError, "Could not add to map object: #{e[0].inspect} => #{v.inspect}" unless kv_res
-              end
-            end
-
-            container_complete = true
-            container
-          when JSONString
-            length = val.bytesize
-            raise ConversionError, "JSON string exceeds the native length limit" if length > UINT32_MAX
-
-            obj = LibDDWAF::Object.new
-            unless LibDDWAF.ddwaf_object_from_json(obj, val, length)
-              raise ConversionError, "Could not convert JSON string"
-            end
-
-            obj
-          when String
-            obj = LibDDWAF::Object.new
-            encoded_val = val.to_s.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
-            if max_string_length && encoded_val.length > max_string_length
-              encoded_val = encoded_val[0, max_string_length] #: String
-              (top_obj || obj).mark_truncated!
-            end
-            res = LibDDWAF.ddwaf_object_stringl(obj, encoded_val, encoded_val.bytesize)
-            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
-
-            obj
-          when Symbol
-            obj = LibDDWAF::Object.new
-            str = val.to_s
-            if max_string_length && str.length > max_string_length
-              str = str[0, max_string_length] #: String
-              (top_obj || obj).mark_truncated!
-            end
-            res = LibDDWAF.ddwaf_object_stringl(obj, str, str.bytesize)
-            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
-
-            obj
-          when Integer
-            obj = LibDDWAF::Object.new
-            res = if coerce
-              LibDDWAF.ddwaf_object_string(obj, val.to_s)
-            elsif val < 0
-              clamped = val.clamp(INT64_MIN, -1) #: Integer
-              LibDDWAF.ddwaf_object_signed(obj, clamped)
-            else
-              clamped = val.clamp(0, UINT64_MAX) #: Integer
-              LibDDWAF.ddwaf_object_unsigned(obj, clamped)
-            end
-            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
-
-            obj
-          when Float
-            obj = LibDDWAF::Object.new
-            res = if coerce
-              LibDDWAF.ddwaf_object_string(obj, val.to_s)
-            else
-              LibDDWAF.ddwaf_object_float(obj, val)
-            end
-            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
-
-            obj
-          when TrueClass, FalseClass
-            obj = LibDDWAF::Object.new
-            res = if coerce
-              LibDDWAF.ddwaf_object_string(obj, val.to_s)
-            else
-              LibDDWAF.ddwaf_object_bool(obj, val)
-            end
-            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
-
-            obj
-          when NilClass
-            obj = LibDDWAF::Object.new
-            res = if coerce
-              LibDDWAF.ddwaf_object_string(obj, "")
-            else
-              LibDDWAF.ddwaf_object_null(obj)
-            end
-            raise ConversionError, "Could not convert into object: #{val.inspect}" if res.null?
-
-            obj
-          else
-            Converter.ruby_to_object("")
           end
-        ensure
-          LibDDWAF.ddwaf_object_free(container) if container && !container_complete
+
+          result = case val
+          when Array
+            array_to_object(object, val, allocator, top_obj: top_obj, current_depth: current_depth, truncate: truncate)
+          when Hash
+            hash_to_object(object, val, allocator, top_obj: top_obj, current_depth: current_depth, truncate: truncate)
+          when JSONString
+            json_to_object(object, val, allocator)
+          when String, Symbol
+            string_to_object(object, val.to_s, allocator, top_obj: top_obj, truncate: truncate)
+          when Integer
+            if val < 0
+              LibDDWAF.ddwaf_object_set_signed(object, val.clamp(INT64_MIN, -1))
+            else
+              LibDDWAF.ddwaf_object_set_unsigned(object, val.clamp(0, UINT64_MAX))
+            end
+          when Float
+            LibDDWAF.ddwaf_object_set_float(object, val)
+          when TrueClass, FalseClass
+            LibDDWAF.ddwaf_object_set_bool(object, val)
+          when NilClass
+            LibDDWAF.ddwaf_object_set_null(object)
+          else
+            string_to_object(object, "", allocator, top_obj: top_obj, truncate: truncate)
+          end
+
+          raise ConversionError, "Could not populate native object" if result.to_ptr.null?
+
+          object
+        end
+
+        def array_to_object(object, array, allocator, top_obj:, current_depth:, truncate: true)
+          raise ConversionError, "Array exceeds the native size limit" if !truncate && array.size > UINT16_MAX
+
+          max_capacity =
+            if !truncate || current_depth.zero?
+              UINT16_MAX
+            elsif current_depth > MAX_CONTAINER_DEPTH
+              0
+            else
+              MAX_CONTAINER_SIZE
+            end
+
+          capacity = (array.size > max_capacity) ? max_capacity : array.size
+
+          container = LibDDWAF.ddwaf_object_set_array(object, capacity, allocator)
+          raise ConversionError, "Could not create array object" if container.to_ptr.null?
+
+          array.each_with_index do |element, i|
+            if i >= capacity
+              top_obj.mark_truncated!
+              break
+            end
+
+            slot = LibDDWAF.ddwaf_object_insert(object, allocator)
+            raise ConversionError, "Could not insert array element" if slot.to_ptr.null?
+
+            ruby_to_object(
+              element,
+              object: slot,
+              allocator: allocator,
+              top_obj: top_obj,
+              current_depth: current_depth + 1,
+              truncate: truncate
+            )
+          end
+          object
+        end
+
+        def hash_to_object(object, hash, allocator, top_obj:, current_depth:, truncate: true)
+          raise ConversionError, "Map exceeds the native size limit" if !truncate && hash.size > UINT16_MAX
+
+          max_capacity =
+            if !truncate || current_depth.zero?
+              UINT16_MAX
+            elsif current_depth > MAX_CONTAINER_DEPTH
+              0
+            else
+              MAX_CONTAINER_SIZE
+            end
+
+          capacity = (hash.size > max_capacity) ? max_capacity : hash.size
+
+          container = LibDDWAF.ddwaf_object_set_map(object, capacity, allocator)
+          raise ConversionError, "Could not create map object" if container.to_ptr.null?
+
+          hash.each_with_index do |entry, i|
+            if i >= capacity
+              top_obj.mark_truncated!
+              break
+            end
+
+            key = entry[0].to_s
+            if truncate
+              key = key.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+              if key.length > MAX_STRING_LENGTH
+                top_obj.mark_truncated!
+                key = key[0, MAX_STRING_LENGTH] #: String
+              end
+            end
+            length = key.bytesize
+            raise ConversionError, "Map key exceeds the native length limit" if length > UINT32_MAX
+
+            slot = LibDDWAF.ddwaf_object_insert_key(object, key, length, allocator)
+            raise ConversionError, "Could not insert map entry" if slot.to_ptr.null?
+
+            ruby_to_object(
+              entry[1],
+              object: slot,
+              allocator: allocator,
+              top_obj: top_obj,
+              current_depth: current_depth + 1,
+              truncate: truncate
+            )
+          end
+          object
+        end
+
+        def json_to_object(object, json, allocator)
+          # TODO: Pass request limits to JSON parsing once libddwaf supports them.
+          length = json.bytesize
+          raise ConversionError, "JSON string exceeds the native length limit" if length > UINT32_MAX
+
+          # In libddwaf 2.0.0, failed parsing leaves this fresh slot invalid.
+          unless LibDDWAF.ddwaf_object_from_json(object, json, length, allocator)
+            raise ConversionError, "Could not convert JSON string"
+          end
+          object
+        end
+
+        def string_to_object(object, string, allocator, top_obj:, truncate: true)
+          string = string.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+          if truncate && string.length > MAX_STRING_LENGTH
+            top_obj.mark_truncated!
+            string = string[0, MAX_STRING_LENGTH] #: String
+          end
+          length = string.bytesize
+          raise ConversionError, "String exceeds the native length limit" if length > UINT32_MAX
+
+          LibDDWAF.ddwaf_object_set_string(object, string, length, allocator)
         end
         # standard:enable Metrics/MethodLength,Metrics/CyclomaticComplexity
 
         # standard:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
         def object_to_ruby(obj)
-          case obj[:type]
+          case LibDDWAF.ddwaf_object_get_type(obj)
           when :ddwaf_obj_invalid, :ddwaf_obj_null
             nil
           when :ddwaf_obj_bool
-            obj[:valueUnion][:boolean]
-          when :ddwaf_obj_string
-            # NOTE: FFI's `AbstractMemoryPointer#read_bytes` returns a binary string,
-            #       which is not automatically encoded as UTF-8 and will raise an error
-            #       if it contains non-ASCII characters and is used in a JSON#generate call.
-            bytes = obj[:valueUnion][:stringValue].read_bytes(obj[:nbEntries])
-            bytes.ascii_only? ? bytes : bytes.force_encoding(Encoding::UTF_8)
+            LibDDWAF.ddwaf_object_get_bool(obj)
+          when :ddwaf_obj_string, :ddwaf_obj_literal_string, :ddwaf_obj_small_string
+            object_to_string(obj)
           when :ddwaf_obj_signed
-            obj[:valueUnion][:intValue]
+            LibDDWAF.ddwaf_object_get_signed(obj)
           when :ddwaf_obj_unsigned
-            obj[:valueUnion][:uintValue]
+            LibDDWAF.ddwaf_object_get_unsigned(obj)
           when :ddwaf_obj_float
-            obj[:valueUnion][:f64]
+            LibDDWAF.ddwaf_object_get_float(obj)
           when :ddwaf_obj_array
-            (0...obj[:nbEntries]).each.with_object([]) do |i, a| #$ ::Array[WAF::opaque]
-              ptr = obj[:valueUnion][:array] + i * LibDDWAF::Object.size
-              e = Converter.object_to_ruby(LibDDWAF::Object.new(ptr))
-              a << e
+            (0...LibDDWAF.ddwaf_object_get_size(obj)).each_with_object([]) do |i, array| #$ ::Array[WAF::opaque]
+              array << object_to_ruby(LibDDWAF.ddwaf_object_at_value(obj, i))
             end
           when :ddwaf_obj_map
-            (0...obj[:nbEntries]).each.with_object({}) do |i, h| #$ ::Hash[::String, WAF::opaque]
-              ptr = obj[:valueUnion][:array] + i * Datadog::AppSec::WAF::LibDDWAF::Object.size
-              o = Datadog::AppSec::WAF::LibDDWAF::Object.new(ptr)
-              l = o[:parameterNameLength]
-              k = o[:parameterName].read_bytes(l)
-              v = Converter.object_to_ruby(LibDDWAF::Object.new(ptr))
-              h[k] = v
+            (0...LibDDWAF.ddwaf_object_get_size(obj)).each_with_object({}) do |i, hash| #$ ::Hash[::String, WAF::opaque]
+              key = object_to_string(LibDDWAF.ddwaf_object_at_key(obj, i))
+              value = object_to_ruby(LibDDWAF.ddwaf_object_at_value(obj, i))
+              hash[key] = value
             end
           end
+        end
+
+        def object_to_string(obj)
+          length = LibDDWAF::SizeTPtr.new
+          pointer = LibDDWAF.ddwaf_object_get_string(obj, length)
+          bytes = pointer.read_bytes(length[:value])
+
+          # FFI reads binary strings; restore UTF-8 for non-ASCII content.
+          bytes.ascii_only? ? bytes : bytes.force_encoding(Encoding::UTF_8)
         end
         # standard:enable Metrics/MethodLength,Metrics/CyclomaticComplexity
       end

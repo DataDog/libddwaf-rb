@@ -184,11 +184,6 @@ module Helpers
 end
 
 namespace :spec do
-  RSpec::Core::RakeTask.new(:stress_tests) do |t, _args|
-    t.pattern = "spec/**/*_spec.rb"
-    t.rspec_opts = "--tag stress_tests"
-  end
-
   namespace :memory_leaks do
     desc "Run all tests for memory leaks"
     RSpec::Core::RakeTask.new(:all) do |t, _args|

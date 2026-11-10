@@ -46,7 +46,16 @@ module Datadog
 
         def input_truncated?: () -> bool
 
-        def to_h: () -> ::Hash[::Symbol, (::Symbol | WAF::opaque)]
+        def to_h: () -> {
+          status: ::Symbol,
+          events: WAF::events,
+          actions: WAF::actions,
+          attributes: WAF::attributes,
+          duration: ::Integer,
+          keep: bool,
+          timeout: bool,
+          input_truncated: bool
+        }
       end
     end
   end

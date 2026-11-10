@@ -4,112 +4,56 @@ module Datadog
   module AppSec
     module WAF
       # Ruby representation of the ddwaf_context in libddwaf
-      # See https://github.com/DataDog/libddwaf/blob/10e3a1dfc7bc9bb8ab11a09a9f8b6b339eaf3271/BINDING_IMPL_NOTES.md?plain=1#L125-L158
+      # See https://github.com/DataDog/libddwaf/blob/2.0.0/src/interface.cpp
       class Context
-        EMPTY_RESULT = {
-          "events" => [],     #: WAF::events
-          "actions" => {},    #: WAF::actions
-          "attributes" => {}, #: WAF::attributes
-          "duration" => 0,
-          "timeout" => false,
-          "keep" => false
-        }.freeze
-        SUCCESS_RESULT_CODES = %i[ddwaf_ok ddwaf_match].freeze
-        RESULT_CODE_TO_STATUS = {
-          ddwaf_ok: :ok,
-          ddwaf_match: :match,
-          ddwaf_err_internal: :err_internal,
-          ddwaf_err_invalid_object: :err_invalid_object,
-          ddwaf_err_invalid_argument: :err_invalid_argument
-        }.freeze
-
         def initialize(context_ptr)
           @context_ptr = context_ptr
         end
 
-        # Destroys the WAF context and sets the pointer to nil.
-        #
-        # The instance becomes unusable after this method is called.
         def finalize!
-          context_ptr_to_destroy = @context_ptr
-          @context_ptr = nil
+          Thread.handle_interrupt(::Object => :never) do
+            pointer = @context_ptr
+            return unless pointer
 
-          retained.each do |retained_obj|
-            next unless retained_obj.is_a?(LibDDWAF::Object)
-
-            LibDDWAF.ddwaf_object_free(retained_obj)
+            @context_ptr = nil
+            LibDDWAF.ddwaf_context_destroy(pointer)
           end
-
-          retained.clear
-          LibDDWAF.ddwaf_context_destroy(context_ptr_to_destroy)
         end
 
-        # Runs the WAF context with the given persistent and ephemeral data.
-        #
-        # @raise [ConversionError] if the conversion of persistent or ephemeral data fails
-        # @raise [LibDDWAFError] if libddwaf could not create the result object
-        #
-        # @return [Result] the result of the WAF run
-        def run(persistent_data, ephemeral_data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
+        def build_subcontext
+          raise ArgumentError, "Block is required to build a subcontext" unless block_given?
+
+          subcontext = nil #: Subcontext?
+
+          begin
+            subcontext = Thread.handle_interrupt(::Object => :never) do
+              ensure_pointer_presence!
+
+              pointer = LibDDWAF.ddwaf_subcontext_init(@context_ptr)
+              raise LibDDWAFError, "Could not create subcontext" if pointer.null?
+
+              begin
+                subcontext = Subcontext.new(pointer, context: self)
+              ensure
+                LibDDWAF.ddwaf_subcontext_destroy(pointer) unless subcontext
+              end
+            end
+
+            yield subcontext
+          ensure
+            subcontext&.finalize!
+          end
+        end
+
+        def eval(data, timeout = LibDDWAF::DDWAF_RUN_TIMEOUT)
           ensure_pointer_presence!
 
-          persistent_data_obj = Converter.ruby_to_object(
-            persistent_data,
-            max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
-            max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
-            max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
-            coerce: false
-          )
-          if persistent_data_obj.null?
-            raise ConversionError, "Could not convert persistent data: #{persistent_data.inspect}"
+          Evaluation.call(data) do |input_obj, allocator, result_obj|
+            LibDDWAF.ddwaf_context_eval(
+              @context_ptr, #: ::FFI::Pointer
+              input_obj, allocator, result_obj, timeout
+            )
           end
-
-          # retain C objects in memory for subsequent calls to run
-          retain(persistent_data_obj)
-
-          ephemeral_data_obj = Converter.ruby_to_object(
-            ephemeral_data,
-            max_container_size: LibDDWAF::DDWAF_MAX_CONTAINER_SIZE,
-            max_container_depth: LibDDWAF::DDWAF_MAX_CONTAINER_DEPTH,
-            max_string_length: LibDDWAF::DDWAF_MAX_STRING_LENGTH,
-            coerce: false
-          )
-          if ephemeral_data_obj.null?
-            raise ConversionError, "Could not convert ephemeral data: #{ephemeral_data.inspect}"
-          end
-
-          result_obj = LibDDWAF::Object.new
-          raise LibDDWAFError, "Could not create result object" if result_obj.null?
-
-          code = LibDDWAF.ddwaf_run(@context_ptr, persistent_data_obj, ephemeral_data_obj, result_obj, timeout)
-          result = Converter.object_to_ruby(result_obj)
-
-          # NOTE: In case of the error, `libddwaf` will not "fill" the result
-          #       object, so it will be empty and the conversion of it will return
-          #       `nil`, but that is not a conversion issue.
-          if SUCCESS_RESULT_CODES.include?(code) && result.nil?
-            raise ConversionError, "Could not convert result into object: #{code}"
-          end
-
-          result ||= EMPTY_RESULT
-          result = Result.new(
-            status: RESULT_CODE_TO_STATUS[code],
-            events: result["events"],
-            actions: result["actions"],
-            attributes: result["attributes"],
-            duration: result["duration"],
-            timeout: result["timeout"],
-            keep: result["keep"]
-          )
-
-          if persistent_data_obj.truncated? || ephemeral_data_obj.truncated?
-            result.mark_input_truncated!
-          end
-
-          result
-        ensure
-          LibDDWAF.ddwaf_object_free(result_obj) if result_obj
-          LibDDWAF.ddwaf_object_free(ephemeral_data_obj) if ephemeral_data_obj
         end
 
         private
@@ -118,18 +62,6 @@ module Datadog
           return if @context_ptr
 
           raise InstanceFinalizedError, "Cannot use WAF context after it has been finalized"
-        end
-
-        def retained
-          @retained ||= []
-        end
-
-        def retain(object)
-          retained << object
-        end
-
-        def release(object)
-          retained.delete(object)
         end
       end
     end

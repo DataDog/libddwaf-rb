@@ -5,7 +5,7 @@ require "json"
 
 builder = Datadog::AppSec::WAF::HandleBuilder.new
 
-config = JSON.parse(File.read("spec/fixtures/waf_rules.json"))
+config = JSON.parse(File.read("spec/fixtures/valid_config.json"))
 builder.add_or_update_config(config, path: "APPSEC/DEFAULT")
 
 handle = builder.build_handle
