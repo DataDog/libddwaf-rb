@@ -30,4 +30,20 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
       builder.finalize!
     end
   end
+
+  describe "#eval" do
+    it "matches ephemeral data against data inherited from the context" do
+      context.eval({"server.request.query" => {"id" => "1 OR 1=1"}})
+      input = {"server.db.statement" => "SELECT * FROM users WHERE id = 1 OR 1=1", "server.db.system" => "mysql"}
+
+      results = 2.times.map { context.build_subcontext { |subcontext| subcontext.eval(input, 10_000_000) } }
+
+      expect(results.map(&:status)).to eq([:match, :match])
+      expect(results.map { |result| result.events.dig(0, "rule", "id") }).to eq(["rasp-003-001", "rasp-003-001"])
+    ensure
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+  end
 end
