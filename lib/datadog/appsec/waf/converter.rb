@@ -63,7 +63,16 @@ module Datadog
         end
 
         def array_to_object(object, array, allocator, top_obj:, current_depth:, truncate: true)
-          capacity = [array.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
+          max_capacity =
+            if !truncate || current_depth.zero?
+              UINT16_MAX
+            elsif current_depth > MAX_CONTAINER_DEPTH
+              0
+            else
+              MAX_CONTAINER_SIZE
+            end
+
+          capacity = (array.size > max_capacity) ? max_capacity : array.size
 
           container = LibDDWAF.ddwaf_object_set_array(object, capacity, allocator)
           raise ConversionError, "Could not create array object" if container.to_ptr.null?
@@ -90,7 +99,16 @@ module Datadog
         end
 
         def hash_to_object(object, hash, allocator, top_obj:, current_depth:, truncate: true)
-          capacity = [hash.size, truncate ? container_size_limit(current_depth) : UINT16_MAX].min
+          max_capacity =
+            if !truncate || current_depth.zero?
+              UINT16_MAX
+            elsif current_depth > MAX_CONTAINER_DEPTH
+              0
+            else
+              MAX_CONTAINER_SIZE
+            end
+
+          capacity = (hash.size > max_capacity) ? max_capacity : hash.size
 
           container = LibDDWAF.ddwaf_object_set_map(object, capacity, allocator)
           raise ConversionError, "Could not create map object" if container.to_ptr.null?
@@ -149,12 +167,6 @@ module Datadog
           raise ConversionError, "String exceeds the native length limit" if length > UINT32_MAX
 
           LibDDWAF.ddwaf_object_set_string(object, string, length, allocator)
-        end
-
-        def container_size_limit(current_depth)
-          return 0 if current_depth > MAX_CONTAINER_DEPTH
-
-          current_depth.zero? ? UINT16_MAX : MAX_CONTAINER_SIZE
         end
         # standard:enable Metrics/MethodLength,Metrics/CyclomaticComplexity
 

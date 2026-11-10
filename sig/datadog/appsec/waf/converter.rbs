@@ -47,8 +47,6 @@ module Datadog
 
         def self?.string_to_object: (LibDDWAF::Object object, ::String string, ::FFI::Pointer allocator, top_obj: LibDDWAF::Object, ?truncate: bool) -> LibDDWAF::Object
 
-        def self?.container_size_limit: (::Integer current_depth) -> ::Integer
-
         def self?.object_to_ruby: (LibDDWAF::Object obj) -> WAF::opaque
 
         def self?.object_to_string: (LibDDWAF::Object obj) -> ::String
