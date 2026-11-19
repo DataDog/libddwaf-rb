@@ -313,5 +313,12 @@ RSpec.describe Datadog::AppSec::WAF::Converter do
     ensure
       Datadog::AppSec::WAF::LibDDWAF.ddwaf_object_destroy(object, allocator) if object
     end
+
+    it "converts an empty string with a NULL data pointer" do
+      object = Datadog::AppSec::WAF::LibDDWAF::Object.new
+      object[:via][:str][:type] = Datadog::AppSec::WAF::LibDDWAF::DDWAF_OBJ_TYPE[:ddwaf_obj_string]
+
+      expect(described_class.object_to_ruby(object)).to eq("")
+    end
   end
 end
