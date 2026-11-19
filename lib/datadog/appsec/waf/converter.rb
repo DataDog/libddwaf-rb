@@ -205,6 +205,8 @@ module Datadog
         def object_to_string(obj)
           length = LibDDWAF::SizeTPtr.new
           pointer = LibDDWAF.ddwaf_object_get_string(obj, length)
+          return +"" if length[:value].zero?
+
           bytes = pointer.read_bytes(length[:value])
 
           # FFI reads binary strings; restore UTF-8 for non-ASCII content.
