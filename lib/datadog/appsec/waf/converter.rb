@@ -205,7 +205,7 @@ module Datadog
         def object_to_string(obj)
           length = LibDDWAF::SizeTPtr.new
           pointer = LibDDWAF.ddwaf_object_get_string(obj, length)
-          return +"" if length[:value].zero?
+          return "" if length[:value].zero?
 
           bytes = pointer.read_bytes(length[:value])
 
