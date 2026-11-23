@@ -1,5 +1,7 @@
 # Unreleased
 
+# 2025-09-19 v2.0.1.0.0
+
 ## Added
 
 - Add `Context#build_subcontext`, which yields a `Subcontext` for temporary evaluations using inherited context data and finalizes it when the block returns. Use `Subcontext#eval` to evaluate data within it.
@@ -7,10 +9,9 @@
 ## Changed
 
 - Change `HandleBuilder#add_or_update_config` to return a `ConfigurationResult` instead of a diagnostics hash. Use `success?` to read the native success flag and `diagnostics` to access the diagnostics hash.
-- Upgrade libddwaf to 2.0.0.
+- Upgrade libddwaf to 2.0.1 and update the low-level FFI API.
 - Raise the minimum supported macOS version to 14.2.1 for the bundled native library.
 - Replace `Context#run(persistent_data, ephemeral_data, timeout)` with `Context#eval(data, timeout)`. Use a subcontext to evaluate ephemeral input.
-- Update the low-level FFI API and native object layouts for libddwaf 2.0.0.
 - Defer asynchronous Ruby interruptions, including `Timeout` exceptions and `Thread#kill`, until input conversion, native evaluation, result conversion, and cleanup complete, to preserve native memory ownership. This can delay interruption for large payloads; libddwaf's evaluation timeout still applies.
 - Remove the `coerce:` keyword from `Converter.ruby_to_object`
 
