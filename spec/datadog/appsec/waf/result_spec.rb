@@ -16,6 +16,7 @@ RSpec.describe Datadog::AppSec::WAF::Result do
     let(:result) do
       described_class.new(
         status: :match,
+        status_code: 1,
         events: events,
         actions: actions,
         attributes: {},
@@ -28,6 +29,7 @@ RSpec.describe Datadog::AppSec::WAF::Result do
     it "converts to Hash" do
       expect(result.to_h).to eq({
         status: :match,
+        status_code: 1,
         events: events,
         actions: actions,
         attributes: {},
@@ -43,6 +45,7 @@ RSpec.describe Datadog::AppSec::WAF::Result do
     let(:result) do
       described_class.new(
         status: :ok,
+        status_code: 0,
         events: [],
         actions: {},
         attributes: {},

@@ -6,10 +6,11 @@ module Datadog
       # Ruby representation of the ddwaf_result of a libddwaf run.
       # See https://github.com/DataDog/libddwaf/blob/8dbee187ff74a0aa25e1bcbdde51677f77930e1b/include/ddwaf.h#L277-L290
       class Result
-        attr_reader :status, :events, :actions, :attributes, :duration
+        attr_reader :status, :status_code, :events, :actions, :attributes, :duration
 
-        def initialize(status:, events:, actions:, attributes:, duration:, timeout:, keep:)
+        def initialize(status:, status_code:, events:, actions:, attributes:, duration:, timeout:, keep:)
           @status = status
+          @status_code = status_code
           @events = events
           @actions = actions
           @attributes = attributes
@@ -39,6 +40,7 @@ module Datadog
         def to_h
           {
             status: @status,
+            status_code: @status_code,
             events: @events,
             actions: @actions,
             attributes: @attributes,

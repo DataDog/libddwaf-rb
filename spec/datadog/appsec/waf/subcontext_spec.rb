@@ -38,7 +38,7 @@ RSpec.describe Datadog::AppSec::WAF::Subcontext do
 
       results = 2.times.map { context.build_subcontext { |subcontext| subcontext.eval(input, 10_000_000) } }
 
-      expect(results.map(&:status)).to eq([:match, :match])
+      expect(results.map { |result| [result.status, result.status_code] }).to eq([[:match, 1], [:match, 1]])
       expect(results.map { |result| result.events.dig(0, "rule", "id") }).to eq(["rasp-003-001", "rasp-003-001"])
     ensure
       context.finalize!
