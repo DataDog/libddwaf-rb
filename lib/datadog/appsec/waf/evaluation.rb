@@ -35,12 +35,14 @@ module Datadog
               input_transferred = code != :ddwaf_err_invalid_argument
 
               status = RESULT_CODE_TO_STATUS.fetch(code)
+              status_code = LibDDWAF::DDWAF_RET_CODE[code]
               result = if SUCCESS_RESULT_CODES.include?(code)
                 decoded = Converter.object_to_ruby(result_obj) #: WAF::result
                 raise ConversionError, "Could not convert result into object: #{code}" unless decoded.is_a?(Hash)
 
                 Result.new(
                   status: status,
+                  status_code: status_code,
                   events: decoded["events"],
                   actions: decoded["actions"],
                   attributes: decoded["attributes"],
@@ -49,7 +51,7 @@ module Datadog
                   keep: decoded["keep"]
                 )
               else
-                Result.new(status: status, events: [], actions: {}, attributes: {}, duration: 0, timeout: false, keep: false)
+                Result.new(status: status, status_code: status_code, events: [], actions: {}, attributes: {}, duration: 0, timeout: false, keep: false)
               end
               result.mark_input_truncated! if input_obj.truncated?
               result

@@ -4,6 +4,12 @@
 
 ## Added
 
+- Add `Result#status_code` with the raw libddwaf return code.
+
+# 2025-09-19 v2.0.1.0.0
+
+## Added
+
 - Add `Context#build_subcontext`, which yields a `Subcontext` for temporary evaluations using inherited context data and finalizes it when the block returns. Use `Subcontext#eval` to evaluate data within it.
 
 ## Changed

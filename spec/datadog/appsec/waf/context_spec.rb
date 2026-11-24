@@ -30,6 +30,21 @@ RSpec.describe Datadog::AppSec::WAF::Context do
     end
   end
 
+  describe "#eval" do
+    it "returns the raw native return code" do
+      results = [
+        {"server.request.query" => {"id" => "1 OR 1=1"}},
+        {"server.db.statement" => "SELECT * FROM users WHERE id = 1 OR 1=1", "server.db.system" => "mysql"}
+      ].map { |data| context.eval(data, 10_000_000) }
+
+      expect(results.map { |result| [result.status, result.status_code] }).to eq([[:ok, 0], [:match, 1]])
+    ensure
+      context.finalize!
+      handle.finalize!
+      builder.finalize!
+    end
+  end
+
   describe "#build_subcontext" do
     it "returns the block value and finalizes the child" do
       subcontext = nil

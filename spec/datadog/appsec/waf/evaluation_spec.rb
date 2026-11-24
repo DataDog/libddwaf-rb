@@ -59,7 +59,7 @@ RSpec.describe Datadog::AppSec::WAF::Evaluation do
 
       expect(result).to be_a(Datadog::AppSec::WAF::Result)
       expect(result.to_h).to match({
-        status: :ok, events: [], actions: {}, attributes: {}, duration: be >= 0,
+        status: :ok, status_code: 0, events: [], actions: {}, attributes: {}, duration: be >= 0,
         timeout: false, keep: false, input_truncated: false
       })
     end
@@ -71,6 +71,7 @@ RSpec.describe Datadog::AppSec::WAF::Evaluation do
 
       aggregate_failures("result") do
         expect(result.status).to eq(:match)
+        expect(result.status_code).to eq(1)
         expect(result.events).to contain_exactly(a_hash_including("rule" => a_hash_including("id" => "evaluation")))
         expect(result.actions.keys).to contain_exactly("block_request")
         expect(result.actions.fetch("block_request")).to include("status_code" => 418, "grpc_status_code" => 42, "type" => "json")
@@ -89,7 +90,7 @@ RSpec.describe Datadog::AppSec::WAF::Evaluation do
 
       expect(result).to be_a(Datadog::AppSec::WAF::Result)
       expect(result.to_h).to eq({
-        status: :err_invalid_object, events: [], actions: {}, attributes: {}, duration: 0,
+        status: :err_invalid_object, status_code: -2, events: [], actions: {}, attributes: {}, duration: 0,
         timeout: false, keep: false, input_truncated: false
       })
     end

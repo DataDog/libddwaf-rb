@@ -4,6 +4,8 @@ module Datadog
       class Result
         @status: ::Symbol
 
+        @status_code: ::Integer
+
         @events: WAF::events
 
         @actions: WAF::actions
@@ -20,6 +22,8 @@ module Datadog
 
         attr_reader status: ::Symbol
 
+        attr_reader status_code: ::Integer
+
         attr_reader events: WAF::events
 
         attr_reader actions: WAF::actions
@@ -30,6 +34,7 @@ module Datadog
 
         def initialize: (
           status: ::Symbol,
+          status_code: ::Integer,
           events: WAF::events,
           actions: WAF::actions,
           attributes: WAF::attributes,
@@ -48,6 +53,7 @@ module Datadog
 
         def to_h: () -> {
           status: ::Symbol,
+          status_code: ::Integer,
           events: WAF::events,
           actions: WAF::actions,
           attributes: WAF::attributes,
